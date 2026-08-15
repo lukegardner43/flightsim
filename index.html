@@ -202,8 +202,9 @@
 
       <button id="go" disabled>Find a place first</button>
       <p class="fine">Map data © OpenStreetMap contributors (ODbL) via Overpass. Postcode geocoding by
-        Postcodes.io; place search by Nominatim. Aerial imagery © Esri and its sources. Ground is flat and
-        heights are estimated where OSM has none — not for navigation.</p>
+        Postcodes.io; place search by Nominatim. Aerial imagery © Esri and its sources. Terrain heights from
+        Terrarium DEM tiles (AWS open elevation data). Building heights are estimated where OSM has none —
+        not for navigation.</p>
     </div>
 
     <div class="card-bd" id="load">
@@ -211,7 +212,7 @@
       <div class="gridwrap">
         <svg id="gridsvg" viewBox="0 0 100 100"></svg>
         <div class="gs">
-          <div><b id="cellsDone">0</b> / 5 requests · <span id="cellState">contacting Overpass</span></div>
+          <div><b id="cellsDone">0</b> / 9 requests · <span id="cellState">contacting Overpass</span></div>
           <div style="margin-top:6px"><b id="bCount">0</b> buildings</div>
           <div><b id="rCount">0</b> km of road</div>
           <div style="margin-top:6px;color:#8a7c60" id="here"></div>
@@ -220,9 +221,9 @@
       </div>
       <button id="flynow" type="button">Take off now — keep loading</button>
       <button id="retry" type="button" class="linky" style="display:none">Retry failed requests</button>
-      <p class="fine" id="loadnote">Five requests, not twenty-five: one for the detailed 2.5 km core, then four for the
-        surrounding 10 km, two at a time. Each falls back through the Overpass mirrors in turn and gives up after
-        40–50 seconds rather than hanging.</p>
+      <p class="fine" id="loadnote">Terrain first, then nine map requests, two at a time: the detailed 2.5 km core,
+        a mid ring out to 6 km that keeps every building, and an outer ring of landmarks to 10 km. Each falls back
+        through the Overpass mirrors in turn and gives up after 40–50 seconds rather than hanging.</p>
     </div>
   </div>
 </div>
@@ -599,13 +600,16 @@ function makeShape(outer, holes){
   return sh;
 }
 function Batch(){ this.p=[]; this.n=[]; this.c=[]; }
-Batch.prototype.addGeom = function(g, col, yOffset){
+/* drape: lift every vertex onto the terrain instead of by a flat offset,
+   which is what keeps parks, water and fields lying on the hillside. */
+Batch.prototype.addGeom = function(g, col, yOffset, drape){
   if(g.index) g = g.toNonIndexed();
   if(!g.attributes.normal) g.computeVertexNormals();
   var pa = g.attributes.position.array, na = g.attributes.normal.array, ct = g.attributes.position.count;
   var dy = yOffset||0;
   for(var i=0;i<ct;i++){
-    this.p.push(pa[i*3], pa[i*3+1]+dy, pa[i*3+2]);
+    if(drape) this.p.push(pa[i*3], pa[i*3+1]+dy+terrainY(pa[i*3], pa[i*3+2]), pa[i*3+2]);
+    else this.p.push(pa[i*3], pa[i*3+1]+dy, pa[i*3+2]);
     this.n.push(na[i*3], na[i*3+1], na[i*3+2]);
     this.c.push(col.r, col.g, col.b);
   }
@@ -648,27 +652,148 @@ function wallColour(h, seed, house){
 }
 
 /* ============================================================
+   4.5  TERRAIN
+   Terrarium DEM tiles (AWS open elevation data) pack a height in
+   metres into the RGB channels of an ordinary PNG:
+       h = R*256 + G + B/256 - 32768
+   A handful of tiles covers the 13 km square. They are decoded once
+   into a heightfield and everything else in the world — the ground,
+   the buildings, the roads, the aeroplane — reads its height from it.
+   Heights are stored relative to the home point, so home is y = 0 and
+   the flight model keeps working in the units it always used.
+   ============================================================ */
+var DEM_Z = 12;                       /* ~22 m per sample at UK latitudes */
+var DEM_HOSTS = [
+  "https://elevation-tiles-prod.s3.amazonaws.com/terrarium/",
+  "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/"
+];
+var dem = {};                         /* "tx/ty" -> Float32Array(256*256) */
+var HF = {n:257, half:6600, step:1, y:null, ready:false, min:0, max:0, elev0:0};
+
+function demPixel(lat, lon){
+  var s = 256*Math.pow(2, DEM_Z), r = lat*Math.PI/180;
+  return {x:(lon+180)/360*s,
+          y:(1 - Math.log(Math.tan(r) + 1/Math.cos(r))/Math.PI)/2*s};
+}
+function demHeight(lat, lon){
+  var p = demPixel(lat, lon);
+  var x0 = Math.floor(p.x), y0 = Math.floor(p.y), fx = p.x-x0, fy = p.y-y0;
+  function at(px, py){
+    var tx = Math.floor(px/256), ty = Math.floor(py/256);
+    var t = dem[tx+"/"+ty];
+    return t ? t[(py - ty*256)*256 + (px - tx*256)] : null;
+  }
+  var a = at(x0,y0), b = at(x0+1,y0), c = at(x0,y0+1), d = at(x0+1,y0+1);
+  if(a === null || b === null || c === null || d === null) return null;
+  return a*(1-fx)*(1-fy) + b*fx*(1-fy) + c*(1-fx)*fy + d*fx*fy;
+}
+
+function loadDemTile(tx, ty){
+  return new Promise(function(resolve){
+    var host = 0;
+    (function attempt(){
+      if(host >= DEM_HOSTS.length) return resolve(false);
+      var im = new Image(), done = false;
+      im.crossOrigin = "anonymous";        /* required, or the canvas is tainted */
+      var t = setTimeout(function(){ if(!done){ done = true; attempt(); } }, 9000);
+      im.onload = function(){
+        if(done) return; done = true; clearTimeout(t);
+        try{
+          var cv = document.createElement("canvas"); cv.width = cv.height = 256;
+          cv.getContext("2d").drawImage(im, 0, 0);
+          var px = cv.getContext("2d").getImageData(0,0,256,256).data;
+          var h = new Float32Array(65536);
+          for(var i=0;i<65536;i++) h[i] = (px[i*4]*256 + px[i*4+1] + px[i*4+2]/256) - 32768;
+          dem[tx+"/"+ty] = h; resolve(true);
+        }catch(err){ resolve(false); }     /* no CORS header -> tainted canvas */
+      };
+      im.onerror = function(){ if(!done){ done = true; clearTimeout(t); attempt(); } };
+      im.src = DEM_HOSTS[host++] + DEM_Z + "/" + tx + "/" + ty + ".png";
+    })();
+  });
+}
+
+function buildHeightfield(){
+  var e0 = demHeight(LAT0, LON0);
+  if(e0 === null) return false;
+  HF.elev0 = e0;
+  HF.step = HF.half*2/(HF.n-1);
+  var y = new Float32Array(HF.n*HF.n), ok = 0, sum = 0, mn = 1e9, mx = -1e9, i, j;
+  for(j=0;j<HF.n;j++){
+    for(i=0;i<HF.n;i++){
+      var ll = worldToLatLon(-HF.half + i*HF.step, -HF.half + j*HF.step);
+      var h = demHeight(ll.lat, ll.lon);
+      if(h === null){ y[j*HF.n+i] = NaN; continue; }
+      h -= HF.elev0; y[j*HF.n+i] = h; ok++; sum += h;
+      if(h < mn) mn = h; if(h > mx) mx = h;
+    }
+  }
+  if(!ok) return false;
+  /* A tile that failed to load leaves a hole; sitting it at the average of
+     what did load beats a cliff down to home level. */
+  var fill = sum/ok;
+  for(i=0;i<y.length;i++) if(isNaN(y[i])) y[i] = fill;
+  HF.y = y; HF.min = Math.min(0, mn); HF.max = Math.max(0, mx); HF.ready = true;
+  return true;
+}
+
+/* Bilinear lookup — the one function the rest of the world calls. */
+function terrainY(x, z){
+  if(!HF.ready) return 0;
+  var n = HF.n, lim = n - 1.001;
+  var fx = (x + HF.half)/HF.step, fz = (z + HF.half)/HF.step;
+  fx = fx < 0 ? 0 : (fx > lim ? lim : fx);
+  fz = fz < 0 ? 0 : (fz > lim ? lim : fz);
+  var i = fx|0, j = fz|0, sx = fx-i, sz = fz-j, y = HF.y;
+  return y[j*n+i]*(1-sx)*(1-sz) + y[j*n+i+1]*sx*(1-sz) +
+         y[(j+1)*n+i]*(1-sx)*sz + y[(j+1)*n+i+1]*sx*sz;
+}
+
+function loadTerrain(){
+  var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180), R = HF.half + 400;
+  var nw = demPixel(LAT0 + R/mLat, LON0 - R/mLon);
+  var se = demPixel(LAT0 - R/mLat, LON0 + R/mLon);
+  var jobs = [], tx, ty;
+  for(tx = Math.floor(nw.x/256); tx <= Math.floor(se.x/256); tx++)
+    for(ty = Math.floor(nw.y/256); ty <= Math.floor(se.y/256); ty++)
+      jobs.push(loadDemTile(tx, ty));
+  if(!jobs.length) return Promise.resolve(false);
+  return Promise.all(jobs).then(function(res){
+    var got = res.filter(Boolean).length;
+    if(!got) return false;
+    try{ return buildHeightfield(); }
+    catch(err){ report("Heightfield", err); return false; }
+  });
+}
+
+/* ============================================================
    5.  DATA FETCHING
    Two phases, five requests total — not twenty-five. Every request
    races all three Overpass mirrors and takes whichever answers
    first, with a hard client-side timeout so nothing can hang.
    ============================================================ */
-var HALF_A = 1250;                 /* full-detail core: 2.5 km square */
-var HALF_B = 5000;                 /* whole world:      10 km square  */
+var HALF_A = 1250;                 /* full-detail core:  2.5 km square */
+var HALF_M = 3000;                 /* mid ring:          every building */
+var HALF_B = 5000;                 /* outer ring:        landmarks only */
 var GRID = 5, CELL = 2000;         /* nav-display graticule only      */
 var OVERPASS = [
   "https://overpass.kumi.systems/api/interpreter",   /* usually the least queued */
   "https://overpass-api.de/api/interpreter",
   "https://overpass.osm.ch/api/interpreter"
 ];
+/* Caps are per cell now, not one shared pot: the core used to be able to
+   eat the whole budget and leave the surrounding rings empty. */
+/* midHalf sizes the every-building ring. It is the one number that decides how
+   much JSON a dense city sends back, so it shrinks with the quality setting. */
 var QUALITY = {
-  low:  {budget: 9000,  perCell: 4000,  trees: 0},
-  med:  {budget: 26000, perCell: 12000, trees: 800},
-  high: {budget: 55000, perCell: 26000, trees: 2200}
+  low:  {core: 5000,  mid: 2200,  outer: 1200, trees: 0,    midHalf: 2200},
+  med:  {core: 12000, mid: 5000,  outer: 2500, trees: 800,  midHalf: 3000},
+  high: {core: 26000, mid: 11000, outer: 5000, trees: 2200, midHalf: 3600}
 };
-var Q, budget = 0, treeBudget = 0, statBuildings = 0, statRoadM = 0;
+var Q, treeBudget = 0, statBuildings = 0, statRoadM = 0;
 var world = new THREE.Group();
-var coverage = {a:0, b:[0,0,0,0]};   /* 0 pending, 1 loading, 2 done, 3 failed */
+/* 0 pending, 1 loading, 2 done, 3 failed */
+var coverage = {a:0, m:[0,0,0,0], b:[0,0,0,0]};
 
 function bboxM(west, south, east, north){
   var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
@@ -693,6 +818,19 @@ function queryFull(bb){
     'node["natural"="tree"]('+b+');' +
     ");out geom;";
 }
+/* Mid ring: still every building, but without the footway/service clutter
+   that makes the core query heavy. This is the ring that used to be empty. */
+function queryMid(bb){
+  var b = bbs(bb);
+  return "[out:json][timeout:45];(" +
+    'way["building"]('+b+');' +
+    'relation["building"]["type"="multipolygon"]('+b+');' +
+    'way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|motorway_link|trunk_link|primary_link)$"]('+b+');' +
+    'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
+    'way["landuse"~"^(grass|forest|meadow|village_green|recreation_ground|cemetery)$"]('+b+');' +
+    'way["leisure"~"^(park|garden|pitch|golf_course)$"]('+b+');' +
+    ");out geom;";
+}
 function queryNotable(bb){
   var b = bbs(bb);
   return "[out:json][timeout:45];(" +
@@ -703,6 +841,17 @@ function queryNotable(bb){
     'way["landuse"~"^(forest|farmland|meadow)$"]('+b+');' +
     'way["leisure"~"^(park|golf_course|nature_reserve)$"]('+b+');' +
     ");out geom;";
+}
+
+/* A ring is four rectangles that meet but never overlap, so nothing inside
+   the previous ring is fetched (or paid for) twice. west,south,east,north */
+function ringRects(inner, outer){
+  return [
+    [-outer,  inner,  outer,  outer],    /* north strip */
+    [-outer, -outer,  outer, -inner],    /* south strip */
+    [-outer, -inner, -inner,  inner],    /* west  strip */
+    [ inner, -inner,  outer,  inner]     /* east  strip */
+  ];
 }
 
 /* Mirrors are tried in a staggered race: the next one joins a few seconds
@@ -814,13 +963,13 @@ function addBuildings(list, group, cell){
       if(area < 14) continue;
       var c = centroid(pts), dist = Math.sqrt(c.x*c.x + c.z*c.z);
       if(inSkip(c.x, c.z, cell)) continue;         /* already drawn at full detail */
-      if(!cell.inner && area < 220) continue;      /* outer ring keeps only real mass */
+      if(area < cell.minArea) continue;
       prepared.push({pts:pts, holes:(o===0?inners:null), tags:t, area:area, dist:dist,
                      score:area/(1 + dist*0.0018)});
     }
   }
   prepared.sort(function(a,b){ return b.score - a.score; });
-  var cap = Math.max(0, Math.min(Q.perCell, budget|0));
+  var cap = Math.max(0, cell.cap|0);
   if(prepared.length > cap) prepared.length = cap;
 
   var tallest = 0;
@@ -837,24 +986,28 @@ function addBuildings(list, group, cell){
     var wallTop = h - roofH;
     if(wallTop < minH + 2.2) wallTop = minH + 2.2;
 
+    /* One ground height per building: a building sits on a level pad, it
+       doesn't shear to follow the hillside. */
+    var pad = terrainY(b.pts[0].x, b.pts[0].z);
+
     var shape, geo;
     try{ shape = makeShape(b.pts, b.holes); }catch(err){ continue; }
     try{ geo = new THREE.ExtrudeGeometry(shape, {depth:wallTop-minH, bevelEnabled:false, curveSegments:1}); }
     catch(err){ continue; }
     geo.rotateX(-Math.PI/2);
-    walls.addGeom(geo, wallColour(h, seed, house), minH);
+    walls.addGeom(geo, wallColour(h, seed, house), pad + minH);
 
     if(house && roofH > 0.6 && b.pts.length < 24){
-      var cc = centroid(b.pts), apex = {x:cc.x, y:wallTop+roofH, z:cc.z};
+      var top = pad + wallTop;
+      var cc = centroid(b.pts), apex = {x:cc.x, y:top+roofH, z:cc.z};
       var rc = COL.roofHouse.clone().offsetHSL(0,(hash(seed,41)-0.5)*0.1,(hash(seed,51)-0.5)*0.09);
       for(var v=0;v<b.pts.length;v++){
         var p1 = b.pts[v], p2 = b.pts[(v+1)%b.pts.length];
-        roofs.addTri({x:p1.x,y:wallTop,z:p1.z},{x:p2.x,y:wallTop,z:p2.z}, apex, rc);
-        roofs.addTri({x:p2.x,y:wallTop,z:p2.z},{x:p1.x,y:wallTop,z:p1.z}, apex, rc);
+        roofs.addTri({x:p1.x,y:top,z:p1.z},{x:p2.x,y:top,z:p2.z}, apex, rc);
+        roofs.addTri({x:p2.x,y:top,z:p2.z},{x:p1.x,y:top,z:p1.z}, apex, rc);
       }
     }
   }
-  budget -= prepared.length;
   statBuildings += prepared.length;
   if(walls.count()) group.add(walls.mesh(matBuild));
   if(roofs.count()) group.add(roofs.mesh(matRoof));
@@ -873,7 +1026,9 @@ function addRoads(list, group, cell){
     if(e.tags && e.tags.lanes){ var ln = parseFloat(e.tags.lanes); if(ln > 0) w = Math.max(w, ln*1.6); }
     var col = (hw === "footway" || hw === "pedestrian") ? COL.path :
               (/^(motorway|trunk|primary)/.test(hw) ? COL.road : COL.roadMinor);
-    var y = /^(motorway|trunk|primary)/.test(hw) ? 0.36 : 0.3;
+    /* Roads ride the hillside: each end of each segment takes its own ground
+       height, with a clearance that keeps them above the terrain mesh. */
+    var y = /^(motorway|trunk|primary)/.test(hw) ? 1.1 : 0.9;
     var pts = ringToPts(e.geometry);
     for(var j=0;j<pts.length-1;j++){
       var a = pts[j], c = pts[j+1];
@@ -882,8 +1037,9 @@ function addRoads(list, group, cell){
       if(inSkip((a.x+c.x)/2, (a.z+c.z)/2, cell)) continue;
       statRoadM += L;
       var nx = -dz/L*w, nz = dx/L*w;
-      b.addTri({x:a.x+nx,y:y,z:a.z+nz},{x:c.x+nx,y:y,z:c.z+nz},{x:c.x-nx,y:y,z:c.z-nz}, col);
-      b.addTri({x:a.x+nx,y:y,z:a.z+nz},{x:c.x-nx,y:y,z:c.z-nz},{x:a.x-nx,y:y,z:a.z-nz}, col);
+      var ya = terrainY(a.x, a.z) + y, yc = terrainY(c.x, c.z) + y;
+      b.addTri({x:a.x+nx,y:ya,z:a.z+nz},{x:c.x+nx,y:yc,z:c.z+nz},{x:c.x-nx,y:yc,z:c.z-nz}, col);
+      b.addTri({x:a.x+nx,y:ya,z:a.z+nz},{x:c.x-nx,y:yc,z:c.z-nz},{x:a.x-nx,y:ya,z:a.z-nz}, col);
     }
   }
   if(b.count()) group.add(b.mesh(matFlat));
@@ -901,11 +1057,11 @@ function addAreas(list, group, cell){
       }
     }
     var col, y;
-    if(t.natural === "water" || t.waterway === "riverbank"){ col = COL.water; y = 0.18; }
-    else if(t.leisure === "pitch" || t.leisure === "golf_course"){ col = COL.pitch; y = 0.22; }
+    if(t.natural === "water" || t.waterway === "riverbank"){ col = COL.water; y = 0.5; }
+    else if(t.leisure === "pitch" || t.leisure === "golf_course"){ col = COL.pitch; y = 0.6; }
     else if(t.leisure === "park" || t.leisure === "garden" || t.leisure === "nature_reserve" ||
-            t.landuse === "forest"){ col = COL.park; y = 0.2; }
-    else { col = COL.grass; y = 0.2; }
+            t.landuse === "forest"){ col = COL.park; y = 0.55; }
+    else { col = COL.grass; y = 0.55; }
     for(var r=0;r<rings.length;r++){
       var pts = rings[r];
       if(pts.length < 3 || Math.abs(signedArea(pts)) < 120) continue;
@@ -914,7 +1070,7 @@ function addAreas(list, group, cell){
       var g;
       try{ g = new THREE.ShapeGeometry(makeShape(pts, null)); }catch(err){ continue; }
       g.rotateX(-Math.PI/2);
-      b.addGeom(g, col, y);
+      b.addGeom(g, col, y, true);
     }
   }
   if(b.count()) group.add(b.mesh(matFlat));
@@ -936,7 +1092,7 @@ function addTrees(nodes, group){
   for(var i=0;i<n;i++){
     var w = toWorld(nodes[i].lon, nodes[i].lat);
     var s = 0.7 + hash(w.x, w.z)*0.9;
-    pos.set(w.x, 0, w.z); sc.set(s, s*(0.85 + hash(w.z,w.x)*0.5), s);
+    pos.set(w.x, terrainY(w.x, w.z), w.z); sc.set(s, s*(0.85 + hash(w.z,w.x)*0.5), s);
     q.setFromAxisAngle(ax, hash(w.x,3)*6.28);
     mtx.compose(pos,q,sc); im.setMatrixAt(i, mtx);
   }
@@ -956,25 +1112,46 @@ function tile2lat(y,z){
   var n = Math.PI - 2*Math.PI*y/Math.pow(2,z);
   return 180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)));
 }
-function drapeImagery(z, halfM, y){
+/* Each imagery tile becomes a subdivided sheet pushed onto the heightfield,
+   so the aerial photograph wraps the actual hills. The two layers used to be
+   flat planes 0.1 m apart, which is what made the ground flicker: coplanar
+   surfaces cannot be ordered by a depth buffer. Now the sharp layer sits on
+   a small lift with a polygon offset and its own render order, and coarse
+   tiles that it completely covers are never built at all. */
+function drapeImagery(z, halfM, o){
+  o = o || {};
   var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
   var xs = lon2tile(LON0 - halfM/mLon, z), xe = lon2tile(LON0 + halfM/mLon, z);
   var ys = lat2tile(LAT0 + halfM/mLat, z), ye = lat2tile(LAT0 - halfM/mLat, z);
   var loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
   var group = new THREE.Group(); scene.add(group);
+  var ex = o.excludeHalf || 0, lift = o.lift || 0;
   for(var tx=xs; tx<=xe; tx++){
     for(var ty=ys; ty<=ye; ty++){
       (function(tx,ty){
         var w0 = toWorld(tile2lon(tx,z), tile2lat(ty,z));
         var w1 = toWorld(tile2lon(tx+1,z), tile2lat(ty+1,z));
+        var x0 = Math.min(w0.x,w1.x), x1 = Math.max(w0.x,w1.x);
+        var z0 = Math.min(w0.z,w1.z), z1 = Math.max(w0.z,w1.z);
+        if(ex && x0 >= -ex && x1 <= ex && z0 >= -ex && z1 <= ex) return;
         var url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
                 + z + "/" + ty + "/" + tx;
         loader.load(url, guard("Imagery tile", function(tex){
           tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
-          var m = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(w1.x-w0.x), Math.abs(w1.z-w0.z)),
-                                 new THREE.MeshBasicMaterial({map:tex}));
-          m.rotation.x = -Math.PI/2;
-          m.position.set((w0.x+w1.x)/2, y, (w0.z+w1.z)/2);
+          var w = x1-x0, d = z1-z0, cx = (x0+x1)/2, cz = (z0+z1)/2;
+          var seg = HF.ready ? Math.max(1, Math.min(28, Math.round(Math.max(w,d)/45))) : 1;
+          var g = new THREE.PlaneGeometry(w, d, seg, seg);
+          g.rotateX(-Math.PI/2);
+          var pa = g.attributes.position.array;
+          for(var i=0;i<pa.length;i+=3) pa[i+1] = terrainY(cx+pa[i], cz+pa[i+2]) + lift;
+          g.computeVertexNormals();                 /* lit ground: hillsides shade */
+          var mat = new THREE.MeshLambertMaterial({map:tex});
+          if(o.offset){
+            mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4;
+          }
+          var m = new THREE.Mesh(g, mat);
+          m.position.set(cx, 0, cz);
+          m.renderOrder = o.order || 0;
           group.add(m);
         }), null, function(){});
       })(tx,ty);
@@ -990,25 +1167,36 @@ var SUN = {
   gold:{sky:[0x2f4e78,0xf0b071], sun:0xffcf8a, si:1.02, amb:0x6f6a78, ai:0.52, fog:0xe2b483, fd:0.000135},
   dusk:{sky:[0x101a2e,0x9c5a6b], sun:0xc78a9a, si:0.45, amb:0x3d4a63, ai:0.44, fog:0x53607a, fd:0.00019}
 };
-var scene, camera, renderer, plane, propeller, clock, running = false, camMode = 0, startY = 420;
+var scene, camera, renderer, plane, propeller, clock, base, sky;
+var running = false, camMode = 0, startY = 420;
 var frameFailed = false;      /* set only when a frame throws, so the loop stops cleanly */
 
 function initScene(){
   var S = SUN[opt.sun];
   scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(S.fog, S.fd);
-  camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.9, 40000);
-  renderer = new THREE.WebGLRenderer({antialias: innerWidth > 820, powerPreference:"high-performance"});
+  /* 0.9 m near against a 40 km far plane is a depth ratio of 44,000:1, which
+     leaves almost no precision in the distance — the other half of the
+     flicker. A logarithmic depth buffer plus a saner near plane fixes it. */
+  camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 1.2, 32000);
+  renderer = new THREE.WebGLRenderer({antialias: innerWidth > 820, powerPreference:"high-performance",
+                                      logarithmicDepthBuffer: true});
   renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 820 ? 1.4 : 2));
   renderer.setSize(innerWidth, innerHeight);
   $("app").appendChild(renderer.domElement);
 
-  var sky = new THREE.Mesh(new THREE.SphereGeometry(30000, 24, 12), new THREE.ShaderMaterial({
-    side:THREE.BackSide, depthWrite:false, fog:false,
+  /* The dome rides with the camera and never takes part in the depth buffer:
+     as a fixed sphere at the origin it was big enough to poke through the far
+     plane once the aeroplane flew away from home, and the clipped-off part
+     showed as a black wedge in the sky. */
+  sky = new THREE.Mesh(new THREE.SphereGeometry(20000, 24, 12), new THREE.ShaderMaterial({
+    side:THREE.BackSide, depthWrite:false, depthTest:false, fog:false,
     uniforms:{top:{value:new THREE.Color(S.sky[0])}, bot:{value:new THREE.Color(S.sky[1])}},
     vertexShader:"varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
     fragmentShader:"uniform vec3 top; uniform vec3 bot; varying float h; void main(){ gl_FragColor = vec4(mix(bot, top, clamp(h*1.6+0.1,0.0,1.0)),1.0); }"
   }));
+  sky.renderOrder = -2;
+  sky.frustumCulled = false;
   scene.add(sky);
   var sun = new THREE.DirectionalLight(S.sun, S.si);
   sun.position.set(-1400, opt.sun === "noon" ? 2600 : 800, 1100);
@@ -1017,11 +1205,19 @@ function initScene(){
 
   matBuild = new THREE.MeshLambertMaterial({vertexColors:true});
   matRoof  = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
-  matFlat  = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide});
+  /* Roads, water and parks lie on the same terrain as the imagery, so they
+     get a polygon offset and a later render order rather than a fixed lift. */
+  matFlat  = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide,
+    polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-8});
 
-  var base = new THREE.Mesh(new THREE.PlaneGeometry(90000,90000),
+  /* Backdrop beyond the imagery. It has to stay inside the sky sphere and the
+     far plane, and just under the lowest ground, or it shows through valleys. */
+  base = new THREE.Mesh(new THREE.PlaneGeometry(40000,40000),
     new THREE.MeshBasicMaterial({color: opt.sun === "dusk" ? 0x1a2130 : 0x40492f}));
-  base.rotation.x = -Math.PI/2; base.position.y = -0.8; scene.add(base);
+  base.rotation.x = -Math.PI/2;
+  base.position.y = (HF.ready ? HF.min : 0) - 1.2;
+  base.renderOrder = -1;
+  scene.add(base);
 
   scene.add(world);
   buildAircraft();
@@ -1062,14 +1258,16 @@ function buildAircraft(){
    Phase B  (4 parallel) : the rest of the 10 km, landmarks + A-roads.
    You can take off the moment phase A lands.
    ============================================================ */
+var CELLS = 9;                      /* 1 core + 4 mid + 4 outer */
 function status(txt){ $("cellState").textContent = txt; }
 function tally(){
   $("bCount").textContent = statBuildings.toLocaleString();
   $("rCount").textContent = Math.round(statRoadM/1000).toLocaleString();
-  var done = (coverage.a === 2 ? 1 : 0);
-  for(var i=0;i<4;i++) if(coverage.b[i] === 2) done++;
+  var done = (coverage.a === 2 ? 1 : 0), i;
+  for(i=0;i<4;i++) if(coverage.m[i] === 2) done++;
+  for(i=0;i<4;i++) if(coverage.b[i] === 2) done++;
   $("cellsDone").textContent = done;
-  $("barfill").style.width = (done/5*100) + "%";
+  $("barfill").style.width = (done/CELLS*100) + "%";
   drawGridSvg();
 }
 function fail(where, err){
@@ -1084,48 +1282,73 @@ $("go").onclick = function(){
   if(!chosen) return;
   LAT0 = chosen.lat; LON0 = chosen.lon;
   M0 = merc(LON0, LAT0); K = Math.cos(LAT0*Math.PI/180);
-  Q = QUALITY[opt.quality]; budget = Q.budget; treeBudget = Q.trees;
+  Q = QUALITY[opt.quality]; treeBudget = Q.trees;
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (osgb(LAT0, LON0) || "outside the OS grid");
-  try{
-    initScene();
-    drapeImagery(15, 5200, -0.1);
-    drapeImagery(17, 1300, 0.0);
-    drawGridSvg();
-    startLoad();
-  }catch(err){
-    report("Scene setup failed", err);
-    status("failed — see diagnostics");
-  }
+  status("reading terrain heights …");
+  drawGridSvg();
+  /* Terrain first: it is nine small PNGs against Overpass's tens of seconds,
+     and every mesh built afterwards needs to know where the ground is. */
+  loadTerrain().catch(function(err){ report("Terrain", err); return false; })
+    .then(function(ok){
+      try{
+        if(ok){
+          startY = Math.max(360, HF.max + 280);
+          $("here").textContent += " · ground " + Math.round(HF.elev0) + " m, relief " +
+                                   Math.round(HF.max - HF.min) + " m";
+        }else{
+          status("no terrain data — flat ground");
+        }
+        initScene();
+        drapeImagery(15, 5600, {excludeHalf:HALF_A, order:0});
+        drapeImagery(17, HALF_A, {order:1, lift:0.4, offset:true});
+        startLoad();
+      }catch(err){
+        report("Scene setup failed", err);
+        status("failed — see diagnostics");
+      }
+    });
 };
 $("retry").onclick = function(){
   $("retry").style.display = "none";
   $("loadnote").textContent = "Retrying…";
-  if(coverage.a !== 2 && coverage.a !== 1) phaseA();
-  for(var i=0;i<4;i++) if(coverage.b[i] === 0 || coverage.b[i] === 3) queueB(i);
+  if(coverage.a === 0 || coverage.a === 3) phaseA();
+  for(var i=0;i<4;i++){
+    if(coverage.m[i] === 0 || coverage.m[i] === 3) queueCell("m", i);
+    if(coverage.b[i] === 0 || coverage.b[i] === 3) queueCell("b", i);
+  }
 };
 
-/* The core comes first and alone; the outer quadrants follow two at a time.
+/* The core goes first and alone; the two rings follow two cells at a time.
    Overpass gives each address a couple of slots, so queueing beats blasting:
-   five requests fired at once mostly come back as 429 and nothing loads. */
-var bQueue = [], bActive = 0, B_MAX = 2;
-function queueB(i){ if(bQueue.indexOf(i) < 0) bQueue.push(i); pumpB(); }
-function pumpB(){
-  while(bActive < B_MAX && bQueue.length){ bActive++; phaseB(bQueue.shift()); }
+   nine requests fired at once come back as 429 and nothing loads. */
+var cq = [], cqActive = 0, CQ_MAX = 2;
+function queueCell(kind, i){
+  var key = kind + i;
+  if(cq.indexOf(key) < 0) cq.push(key);
+  pumpCells();
 }
-function bDone(){ bActive = Math.max(0, bActive-1); pumpB(); }
+function pumpCells(){
+  while(cqActive < CQ_MAX && cq.length){
+    var key = cq.shift(); cqActive++;
+    ringCell(key.charAt(0), +key.slice(1));
+  }
+}
+function cellDone(){ cqActive = Math.max(0, cqActive-1); pumpCells(); }
 
 function startLoad(){
+  HALF_M = Q.midHalf;
+  RING_M = ringRects(HALF_A, HALF_M);
+  RING_B = ringRects(HALF_M, HALF_B);
   phaseA();
-  setTimeout(function(){ for(var i=0;i<4;i++) queueB(i); }, 1200);
+  setTimeout(function(){
+    for(var i=0;i<4;i++) queueCell("m", i);       /* nearest ring first */
+    for(var j=0;j<4;j++) queueCell("b", j);
+  }, 1200);
 }
 
-var QUAD = [                                   /* west, south, east, north (metres) */
-  [-HALF_B, 0, 0, HALF_B],                     /* NW */
-  [0, 0, HALF_B, HALF_B],                      /* NE */
-  [-HALF_B, -HALF_B, 0, 0],                    /* SW */
-  [0, -HALF_B, HALF_B, 0]                      /* SE */
-];
+var RING_M = ringRects(HALF_A, HALF_M);      /* rebuilt in startLoad once the */
+var RING_B = ringRects(HALF_M, HALF_B);      /* quality setting is known      */
 
 function phaseA(){
   coverage.a = 1; drawGridSvg();
@@ -1133,10 +1356,9 @@ function phaseA(){
   var t0 = Date.now();
   overpassTry(queryFull(bboxM(-HALF_A, -HALF_A, HALF_A, HALF_A)), 40000, 1, 4000)
     .then(function(data){
-      try{ buildCell(data, {inner:true, skipHalf:0, tallest:0}); }
+      try{ buildCell(data, {inner:true, skipHalf:0, cap:Q.core, minArea:14, tallest:0}); }
       catch(err){ report("Core tile", err); }
       coverage.a = 2;
-      startY = Math.max(360, 320);
       status("core loaded in " + ((Date.now()-t0)/1000).toFixed(1) + "s");
       $("flynow").classList.add("on");
       tally(); maybeFinish();
@@ -1146,26 +1368,30 @@ function phaseA(){
       fail("Core area", err);
     });
 }
-function phaseB(i){
-  coverage.b[i] = 1; drawGridSvg();
-  var qd = QUAD[i], t0 = Date.now();
-  overpassTry(queryNotable(bboxM(qd[0], qd[1], qd[2], qd[3])), 50000, 1, 4000)
+
+/* One cell of a ring. The mid ring keeps every building down to 45 m²; the
+   outer ring keeps landmarks, which is all that reads from 5 km up anyway. */
+function ringCell(kind, i){
+  var mid = kind === "m", cov = mid ? coverage.m : coverage.b;
+  var r = (mid ? RING_M : RING_B)[i], bb = bboxM(r[0], r[1], r[2], r[3]);
+  cov[i] = 1; drawGridSvg();
+  overpassTry(mid ? queryMid(bb) : queryNotable(bb), 50000, 1, 4000)
     .then(function(data){
-      try{ buildCell(data, {inner:false, skipHalf:HALF_A, tallest:0}); }
-      catch(err){ report("Outer quadrant " + i, err); }
-      coverage.b[i] = 2;
-      bDone(); tally(); maybeFinish();
+      try{
+        buildCell(data, {inner:false, skipHalf: mid ? HALF_A : HALF_M,
+                         cap: mid ? Q.mid : Q.outer, minArea: mid ? 45 : 220, tallest:0});
+      }catch(err){ report((mid ? "Mid" : "Outer") + " section " + i, err); }
+      cov[i] = 2; cellDone(); tally(); maybeFinish();
     })
     .catch(function(err){
-      coverage.b[i] = 3; bDone(); tally();
-      if(coverage.a === 2) status("outer quadrant unavailable — core is flying");
-      else if(coverage.a === 3) fail("Outer area", err);
+      cov[i] = 3; cellDone(); tally();
+      if(coverage.a === 2) status("a " + (mid ? "mid" : "outer") + " section is unavailable — the rest is flying");
+      else if(coverage.a === 3) fail(mid ? "Mid ring" : "Outer ring", err);
       /* core still in flight: leave the note alone, it has the better story */
     });
 }
 function maybeFinish(){
-  var pending = (coverage.a === 1 ? 1 : 0);
-  for(var i=0;i<4;i++) if(coverage.b[i] === 1) pending++;
+  var pending = (coverage.a === 1 ? 1 : 0) + cq.length + cqActive;
   if(pending === 0){
     $("loadhd").textContent = "World ready";
     status("complete");
@@ -1178,12 +1404,23 @@ $("flynow").onclick = function(){ if(!running && plane) launch(); };
 function coverColour(v){
   return v === 2 ? "#C22A6B" : v === 1 ? "#e9b8cb" : v === 3 ? "#cbc3b1" : "#f3ecdd";
 }
+/* Concentric rings in svg space: 100 units = the 10 km square. Each ring is
+   drawn as the four strips it is actually fetched as — north, south, west, east. */
+function ringStrips(inner, outer){
+  return [[50-outer, 50-outer, outer*2, outer-inner],      /* north */
+          [50-outer, 50+inner, outer*2, outer-inner],      /* south */
+          [50-outer, 50-inner, outer-inner, inner*2],      /* west  */
+          [50+inner, 50-inner, outer-inner, inner*2]];     /* east  */
+}
 function drawGridSvg(){
-  var out = "";
-  var q = [[0,0],[50,0],[0,50],[50,50]];        /* NW NE SW SE in svg space */
-  for(var i=0;i<4;i++){
-    out += '<rect x="'+q[i][0]+'" y="'+q[i][1]+'" width="50" height="50" fill="'+
-           coverColour(coverage.b[i])+'" stroke="#cdbf9d" stroke-width="0.6"/>';
+  var out = "", i, s, mid = HALF_M/HALF_B*50;
+  var rings = [{r:ringStrips(mid, 50), c:coverage.b}, {r:ringStrips(12.5, mid), c:coverage.m}];
+  for(var k=0;k<rings.length;k++){
+    for(i=0;i<4;i++){
+      s = rings[k].r[i];
+      out += '<rect x="'+s[0]+'" y="'+s[1]+'" width="'+s[2]+'" height="'+s[3]+'" fill="'+
+             coverColour(rings[k].c[i])+'" stroke="#cdbf9d" stroke-width="0.5"/>';
+    }
   }
   out += '<rect x="37.5" y="37.5" width="25" height="25" fill="'+coverColour(coverage.a)+
          '" stroke="#16202E" stroke-width="1"/>';
@@ -1241,15 +1478,16 @@ var touch = {x:0, y:0, active:false};
 })();
 $("bCam").onclick = cycleCam; $("bRst").onclick = respawn; $("bHome").onclick = goHome;
 function cycleCam(){ if(!plane) return; camMode = (camMode+1)%3; }
+function spawnY(z){ return Math.max(startY, terrainY(0, z) + 260); }
 function respawn(){
   if(!plane) return;
-  plane.position.set(0, startY, 3400); plane.quaternion.identity();
+  plane.position.set(0, spawnY(3400), 3400); plane.quaternion.identity();
   st.speed = 85; st.throttle = 0.75; st.crashed = false;
   flash("Reset", "Nose on the home point");
 }
 function goHome(){
   if(!plane) return;
-  plane.position.set(0, Math.max(startY, plane.position.y), 2200);
+  plane.position.set(0, Math.max(spawnY(2200), plane.position.y), 2200);
   plane.quaternion.identity(); st.speed = Math.max(st.speed, 80); st.crashed = false;
   flash("Returned to home point", chosen ? chosen.name : "");
 }
@@ -1296,13 +1534,14 @@ function physics(dt){
   plane.position.addScaledVector(vel, dt);
   if(propeller) propeller.rotation.z += dt*(6 + st.throttle*70);
 
-  if(plane.position.y < 3.5){
-    plane.position.y = 3.5;
+  var gnd = terrainY(plane.position.x, plane.position.z);
+  if(plane.position.y < gnd + 3.5){
+    plane.position.y = gnd + 3.5;
     if(!st.crashed && st.speed > 30){
       st.crashed = true; st.speed *= 0.25;
       flash("Ground contact", "R to reset · H to return home");
     }
-  } else if(plane.position.y > 6) st.crashed = false;
+  } else if(plane.position.y > gnd + 6) st.crashed = false;
   if(plane.position.y > 12000) plane.position.y = 12000;
 
   var d = Math.sqrt(plane.position.x*plane.position.x + plane.position.z*plane.position.z);
@@ -1321,11 +1560,18 @@ function updateCam(dt){
   var back = camMode === 0 ? 26 : 62, hgt = camMode === 0 ? 7.5 : 17;
   tmp.copy(plane.position).addScaledVector(fwd, -back).addScaledVector(up, hgt);
   camPos.lerp(tmp, Math.min(1, dt*4.2));
-  if(camPos.y < 4) camPos.y = 4;
+  var floor = terrainY(camPos.x, camPos.z) + 4;
+  if(camPos.y < floor) camPos.y = floor;
   camera.position.copy(camPos);
   camAim.lerp(plane.position, Math.min(1, dt*7));
   camera.up.copy(up).lerp(AY, 0.55).normalize();
   camera.lookAt(camAim);
+}
+/* Backdrop follows the aeroplane so neither the dome nor the ground plane
+   can ever wander out past the far clip. */
+function followCam(){
+  if(sky) sky.position.copy(camera.position);
+  if(base) base.position.set(camera.position.x, base.position.y, camera.position.z);
 }
 
 var COMPASS = ["NORTH","NE","EAST","SE","SOUTH","SW","WEST","NW"];
@@ -1333,7 +1579,8 @@ var hudT = 0, navCtx = null;
 function updateHud(dt){
   hudT += dt; if(hudT < 0.12) return; hudT = 0;
   $("spd").textContent = Math.round(st.speed*1.944);
-  $("alt").textContent = Math.round(plane.position.y*3.281).toLocaleString();
+  /* altitude above sea level, since the ground is no longer at zero */
+  $("alt").textContent = Math.round((plane.position.y + HF.elev0)*3.281).toLocaleString();
   var h = (Math.atan2(fwd.x, -fwd.z)*180/Math.PI + 360) % 360;
   $("hdg").textContent = ("00"+Math.round(h)).slice(-3);
   $("hdgname").textContent = COMPASS[Math.round(h/45)%8];
@@ -1351,9 +1598,14 @@ function drawNav(h){
     return v === 2 ? "rgba(194,42,107,.26)" : v === 1 ? "rgba(194,42,107,.10)" :
            v === 3 ? "rgba(150,150,150,.10)" : "rgba(231,222,201,.04)";
   }
-  var q = [[0,0],[m,0],[0,m],[m,m]];
-  for(var i=0;i<4;i++){ c.fillStyle = tint(coverage.b[i]); c.fillRect(q[i][0], q[i][1], m, m); }
-  var inner = S*(HALF_A/ext)/2;
+  function ringState(a){
+    var done = 0, load = 0, failed = 0;
+    for(var i=0;i<4;i++){ if(a[i] === 2) done++; else if(a[i] === 1) load++; else if(a[i] === 3) failed++; }
+    return done === 4 ? 2 : (load ? 1 : (failed === 4 ? 3 : 0));
+  }
+  var midH = S*(HALF_M/ext)/2, inner = S*(HALF_A/ext)/2;
+  c.fillStyle = tint(ringState(coverage.b)); c.fillRect(0, 0, S, S);
+  c.fillStyle = tint(ringState(coverage.m)); c.fillRect(m-midH, m-midH, midH*2, midH*2);
   c.fillStyle = tint(coverage.a);
   c.fillRect(m-inner, m-inner, inner*2, inner*2);
   c.strokeStyle = "rgba(231,222,201,.22)"; c.lineWidth = 1;
@@ -1377,7 +1629,7 @@ function loop(){
   if(!running) return;
   try{
     var dt = Math.min(clock.getDelta(), 0.05);
-    physics(dt); updateCam(dt); updateHud(dt);
+    physics(dt); updateCam(dt); followCam(); updateHud(dt);
     renderer.render(scene, camera);
   }catch(err){
     frameFailed = true; running = false;
@@ -1390,7 +1642,7 @@ function launch(){
   try{
     $("brief").style.display = "none";
     $("hud").classList.add("on"); $("ctl").classList.add("on");
-    plane.position.set(0, startY, 3400);
+    plane.position.set(0, spawnY(3400), 3400);
     camPos.copy(plane.position).add(new THREE.Vector3(0,12,34));
     camAim.copy(plane.position);
     running = true; loop();
@@ -1400,6 +1652,20 @@ function launch(){
     report("Launch", err);
   }
 }
+
+/* Console handle: everything above lives in a closure, so without this there
+   is no way to poke at the world from the dev tools (or from a test). */
+window.__sim = {
+  state: st, coverage: coverage, heightfield: HF,
+  terrainY: terrainY,
+  scene: function(){ return scene; },
+  camera: function(){ return camera; },
+  plane: function(){ return plane; },
+  stats: function(){ return {buildings: statBuildings, roadKm: Math.round(statRoadM/1000),
+                             relief: HF.ready ? Math.round(HF.max - HF.min) : null}; },
+  freeze: function(){ running = false; },
+  draw:   function(){ if(renderer && scene && camera) renderer.render(scene, camera); }
+};
 
 };
 </script>
