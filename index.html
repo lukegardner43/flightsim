@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>TERRAFLIGHT UK — 10 km grid</title>
+<style>
+  :root{
+    --chart:#E7DEC9; --ink:#16202E; --magenta:#C22A6B; --cyan:#3E86A8; --paper:#F3EDDF;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--ink);
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:var(--chart);
+    overscroll-behavior:none;touch-action:none}
+  canvas{display:block}
+  #app canvas{position:fixed;inset:0}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+
+  /* ---------- BRIEFING ---------- */
+  #brief{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
+    padding:16px;background:radial-gradient(120% 90% at 50% 0%,#22304a 0%,#0e1622 60%,#080d15 100%);
+    overflow:auto}
+  .card{width:min(560px,100%);background:var(--paper);color:var(--ink);border:1px solid #cdbf9d;
+    box-shadow:0 30px 70px rgba(0,0,0,.6);
+    background-image:linear-gradient(rgba(194,42,107,.055) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(194,42,107,.055) 1px,transparent 1px);
+    background-size:22px 22px}
+  .card-hd{padding:18px 20px 14px;border-bottom:2px solid var(--ink)}
+  .eyebrow{font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:var(--magenta);font-weight:700}
+  h1{margin:6px 0 2px;font-size:32px;line-height:.95;letter-spacing:-.02em;font-weight:800;text-transform:uppercase}
+  h1 em{font-style:normal;color:var(--magenta)}
+  .sub{font-size:12.5px;line-height:1.45;color:#4a5566;margin-top:8px;max-width:46ch}
+  .card-bd{padding:16px 20px 20px}
+  .lbl{font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;color:#7b6a49;font-weight:700;margin:0 0 7px}
+  .find{display:flex;gap:7px}
+  .find input{flex:1;min-width:0;border:1px solid #cdbf9d;background:#fbf7ec;padding:11px 11px;
+    font:13px/1 ui-monospace,Menlo,monospace;color:var(--ink)}
+  .find input:focus{outline:2px solid var(--magenta);outline-offset:-2px}
+  .find button{appearance:none;border:0;background:var(--ink);color:var(--paper);padding:0 16px;
+    font:700 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;cursor:pointer}
+  .find button:hover{background:var(--magenta)}
+  #hits{margin-top:9px;display:none}
+  #hits.on{display:block}
+  .hit{display:block;width:100%;text-align:left;appearance:none;border:1px solid #cdbf9d;
+    border-bottom:0;background:#fbf7ec;color:var(--ink);padding:9px 11px;cursor:pointer;font:inherit}
+  .hit:last-child{border-bottom:1px solid #cdbf9d}
+  .hit b{display:block;font-size:13px}
+  .hit span{display:block;font:10px/1.3 ui-monospace,Menlo,monospace;color:#8a7c60;margin-top:2px}
+  .hit:hover{border-color:var(--magenta)}
+  .hit[aria-pressed=true]{background:var(--magenta);color:#fff;border-color:var(--magenta)}
+  .hit[aria-pressed=true] span{color:#f6cfdf}
+  .note{font:11px/1.5 ui-monospace,Menlo,monospace;color:#8a7c60;margin:9px 0 0}
+  .note.err{color:#b0243f}
+  .linky{appearance:none;border:0;background:none;padding:0;margin-top:10px;
+    font:700 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.16em;color:var(--magenta);
+    text-transform:uppercase;cursor:pointer;text-decoration:underline}
+  #probeout{margin-top:9px;padding:9px 10px;border:1px solid #cdbf9d;background:#fbf7ec;
+    font:11px/1.75 ui-monospace,Menlo,monospace;color:#4a5566;display:none}
+  #probeout.on{display:block}
+  .pf{color:#b0243f;font-weight:700}
+  .pp{color:#2f7d4f;font-weight:700}
+  .verdict{margin-top:8px;padding-top:8px;border-top:1px solid #e0d6bd;color:#16202E}
+  .or{margin:12px 0 7px;font:700 9.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.26em;
+    text-transform:uppercase;color:#7b6a49}
+  .row{display:flex;gap:7px;margin-top:14px;flex-wrap:wrap}
+  .seg{flex:1 1 0;min-width:110px}
+  .seg-btns{display:flex;border:1px solid #cdbf9d;background:#fbf7ec}
+  .seg-btns button{flex:1;appearance:none;border:0;background:transparent;padding:8px 4px;
+    font:700 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#5b6373;cursor:pointer}
+  .seg-btns button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+  #go{width:100%;margin-top:16px;appearance:none;border:0;background:var(--magenta);color:#fff;
+    padding:14px;font:800 13px/1 "Helvetica Neue",Arial;letter-spacing:.2em;text-transform:uppercase;cursor:pointer}
+  #go:hover{background:#a92159}
+  #go:disabled{background:#b6b0a4;cursor:default}
+  .fine{margin-top:12px;font-size:10px;line-height:1.5;color:#8a7c60}
+
+  /* ---------- LOADING ---------- */
+  #load{display:none;padding:16px 20px 20px}
+  #load.on{display:block}
+  .gridwrap{display:flex;gap:16px;align-items:flex-start}
+  #gridsvg{flex:0 0 auto;width:150px;height:150px;border:1px solid #cdbf9d;background:#fbf7ec}
+  .gs{font:11px/1.7 ui-monospace,Menlo,monospace;color:#4a5566;flex:1;min-width:0}
+  .gs b{color:var(--ink)}
+  .bar{height:3px;background:#e0d6bd;overflow:hidden;margin-top:10px}
+  .bar i{display:block;height:100%;width:0%;background:var(--magenta);transition:width .3s}
+  #flynow{width:100%;margin-top:14px;appearance:none;border:1px solid var(--ink);background:transparent;
+    color:var(--ink);padding:12px;font:800 12px/1 "Helvetica Neue",Arial;letter-spacing:.18em;
+    text-transform:uppercase;cursor:pointer;display:none}
+  #flynow.on{display:block}
+  #flynow:hover{background:var(--ink);color:var(--paper)}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;z-index:10;pointer-events:none;display:none;
+    padding:calc(env(safe-area-inset-top) + 10px) 12px 12px}
+  #hud.on{display:block}
+  .tape{position:absolute;top:calc(env(safe-area-inset-top) + 10px);border:1px solid rgba(231,222,201,.35);
+    background:rgba(12,18,28,.55);backdrop-filter:blur(6px);padding:6px 9px;min-width:80px}
+  .tape.l{left:12px}.tape.r{right:12px}
+  .tape .k{font:700 8px/1 ui-monospace,Menlo,monospace;letter-spacing:.22em;color:var(--magenta)}
+  .tape .v{font:700 21px/1.1 ui-monospace,Menlo,monospace;margin-top:4px;letter-spacing:-.02em}
+  .tape .u{font-size:9px;opacity:.55;margin-left:3px}
+  #hdgbar{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translateX(-50%);text-align:center}
+  #hdgbar .v{font:700 20px/1 ui-monospace,Menlo,monospace}
+  #hdgbar .k{font:700 8px/1 ui-monospace,Menlo,monospace;letter-spacing:.22em;color:var(--magenta);margin-top:5px}
+  #osgb{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 62px);
+    font:700 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;color:rgba(231,222,201,.62)}
+  #thr{position:absolute;left:12px;bottom:calc(env(safe-area-inset-bottom) + 190px);width:8px;height:110px;
+    border:1px solid rgba(231,222,201,.35);background:rgba(12,18,28,.5)}
+  #thr i{position:absolute;left:0;right:0;bottom:0;background:var(--magenta)}
+  #msg{position:absolute;left:50%;top:42%;transform:translateX(-50%);text-align:center;
+    font:800 15px/1.4 "Helvetica Neue",Arial;letter-spacing:.12em;text-transform:uppercase;
+    text-shadow:0 2px 14px #000;opacity:0;transition:opacity .3s;white-space:nowrap}
+  #msg.on{opacity:1}
+  #msg small{display:block;font:400 11px/1.5 ui-monospace,Menlo,monospace;letter-spacing:.04em;
+    text-transform:none;opacity:.75;margin-top:6px}
+  #ret{position:absolute;left:50%;top:50%;width:120px;height:120px;margin:-60px 0 0 -60px;opacity:.45}
+  /* nav display */
+  #nav{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 14px);
+    width:118px;height:118px;border:1px solid rgba(231,222,201,.35);background:rgba(12,18,28,.55);
+    backdrop-filter:blur(6px)}
+  #navc{width:100%;height:100%;display:block}
+  #navlbl{position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom) + 136px);
+    font:700 8px/1 ui-monospace,Menlo,monospace;letter-spacing:.22em;color:var(--magenta)}
+
+  /* ---------- CONTROLS ---------- */
+  #ctl{position:fixed;inset:0;z-index:20;pointer-events:none;display:none}
+  #ctl.on{display:block}
+  #stick{position:absolute;left:calc(env(safe-area-inset-left) + 16px);bottom:calc(env(safe-area-inset-bottom) + 16px);
+    width:126px;height:126px;border-radius:50%;border:1px solid rgba(231,222,201,.3);
+    background:rgba(12,18,28,.4);pointer-events:auto;touch-action:none}
+  #knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;
+    background:rgba(194,42,107,.85);border:1px solid #f0d5e2}
+  #thrpad{position:absolute;right:calc(env(safe-area-inset-right) + 16px);bottom:calc(env(safe-area-inset-bottom) + 16px);
+    width:58px;height:146px;border:1px solid rgba(231,222,201,.3);background:rgba(12,18,28,.4);
+    pointer-events:auto;touch-action:none;overflow:hidden}
+  #thrpad i{position:absolute;left:0;right:0;bottom:0;background:rgba(194,42,107,.5)}
+  #thrpad span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font:700 9px/1 ui-monospace,Menlo,monospace;letter-spacing:.18em;color:#fff;text-shadow:0 1px 4px #000}
+  .btn{position:absolute;pointer-events:auto;border:1px solid rgba(231,222,201,.3);background:rgba(12,18,28,.55);
+    color:var(--chart);font:700 9px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;padding:9px 10px;
+    cursor:pointer;backdrop-filter:blur(6px)}
+  .btn:active{background:var(--magenta)}
+  #bCam{right:calc(env(safe-area-inset-right) + 16px);bottom:calc(env(safe-area-inset-bottom) + 172px)}
+  #bRst{right:calc(env(safe-area-inset-right) + 16px);bottom:calc(env(safe-area-inset-bottom) + 212px)}
+  #bHome{right:calc(env(safe-area-inset-right) + 16px);bottom:calc(env(safe-area-inset-bottom) + 252px)}
+  #keys{position:absolute;left:12px;bottom:calc(env(safe-area-inset-bottom) + 14px);
+    font:10px/1.7 ui-monospace,Menlo,monospace;color:rgba(231,222,201,.5);pointer-events:none}
+  @media (max-width:820px){#keys{display:none}}
+  @media (min-width:821px){#stick,#thrpad{display:none}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="brief">
+  <div class="card">
+    <div class="card-hd">
+      <div class="eyebrow">VFR flight · live OS-referenced OpenStreetMap data</div>
+      <h1>Terraflight <em>UK</em></h1>
+      <div class="sub">Type any UK address or postcode. The sim builds a 10 × 10 km square around it
+        as a 5 × 5 grid of tiles, streamed in nearest-first — so you're airborne over your own street
+        within seconds while the outer country fills in behind you.</div>
+    </div>
+
+    <div class="card-bd" id="setup">
+      <p class="lbl">Home point</p>
+      <div class="find">
+        <input id="q" placeholder="e.g. SW1A 1AA  ·  or  Durham Cathedral" autocomplete="off" autocapitalize="characters">
+        <button id="find" type="button">FIND</button>
+      </div>
+      <div id="hits"></div>
+      <p class="note" id="qnote">Postcodes resolve instantly. Place and street names are matched across Great Britain and Northern Ireland.</p>
+
+      <p class="or">or go straight to coordinates</p>
+      <div class="find">
+        <input id="mlat" placeholder="latitude  e.g. 54.7753" inputmode="decimal">
+        <input id="mlon" placeholder="longitude  e.g. -1.5763" inputmode="decimal">
+        <button id="useco" type="button">USE</button>
+      </div>
+
+      <button class="linky" id="probe" type="button">Run connection test</button>
+      <div id="probeout"></div>
+
+      <div class="row">
+        <div class="seg"><p class="lbl">Detail budget</p>
+          <div class="seg-btns" id="segQ">
+            <button data-v="low">LIGHT</button>
+            <button data-v="med" aria-pressed="true">NORMAL</button>
+            <button data-v="high">HEAVY</button>
+          </div>
+        </div>
+        <div class="seg"><p class="lbl">Light</p>
+          <div class="seg-btns" id="segSun">
+            <button data-v="noon" aria-pressed="true">NOON</button>
+            <button data-v="gold">GOLDEN</button>
+            <button data-v="dusk">DUSK</button>
+          </div>
+        </div>
+      </div>
+
+      <button id="go" disabled>Find a place first</button>
+      <p class="fine">Map data © OpenStreetMap contributors (ODbL) via Overpass. Postcode geocoding by
+        Postcodes.io; place search by Nominatim. Aerial imagery © Esri and its sources. Ground is flat and
+        heights are estimated where OSM has none — not for navigation.</p>
+    </div>
+
+    <div class="card-bd" id="load">
+      <p class="lbl" id="loadhd">Building the grid</p>
+      <div class="gridwrap">
+        <svg id="gridsvg" viewBox="0 0 100 100"></svg>
+        <div class="gs">
+          <div><b id="cellsDone">0</b> / 5 requests · <span id="cellState">contacting Overpass</span></div>
+          <div style="margin-top:6px"><b id="bCount">0</b> buildings</div>
+          <div><b id="rCount">0</b> km of road</div>
+          <div style="margin-top:6px;color:#8a7c60" id="here"></div>
+          <div class="bar"><i id="barfill"></i></div>
+        </div>
+      </div>
+      <button id="flynow" type="button">Take off now — keep loading</button>
+      <button id="retry" type="button" class="linky" style="display:none">Retry failed requests</button>
+      <p class="fine" id="loadnote">Five requests, not twenty-five: one for the detailed 2.5 km core, four for the surrounding
+        10 km. Each races all three Overpass mirrors and gives up after 40–50 seconds rather than hanging.</p>
+    </div>
+  </div>
+</div>
+
+<div id="hud">
+  <div class="tape l"><div class="k">SPEED</div><div class="v"><span id="spd">0</span><span class="u">KT</span></div></div>
+  <div class="tape r"><div class="k">ALT</div><div class="v"><span id="alt">0</span><span class="u">FT</span></div></div>
+  <div id="hdgbar"><div class="v"><span id="hdg">000</span>°</div><div class="k" id="hdgname">NORTH</div></div>
+  <div id="osgb" class="mono">—</div>
+  <div id="thr"><i id="thrfill"></i></div>
+  <svg id="ret" viewBox="0 0 120 120" fill="none" stroke="#C22A6B" stroke-width="1.5">
+    <path d="M32 60h18M70 60h18M60 32v10M60 78v10"/><circle cx="60" cy="60" r="2.5" fill="#C22A6B" stroke="none"/>
+  </svg>
+  <div id="navlbl">GRID 10 KM</div>
+  <div id="nav"><canvas id="navc" width="236" height="236"></canvas></div>
+  <div id="msg"></div>
+</div>
+
+<div id="ctl">
+  <div id="stick"><div id="knob"></div></div>
+  <div id="thrpad"><i></i><span>THR</span></div>
+  <button class="btn" id="bCam">CAM</button>
+  <button class="btn" id="bRst">RST</button>
+  <button class="btn" id="bHome">HOME</button>
+  <div id="keys">↑↓ PITCH · ←→ ROLL<br>A/D RUDDER · W/S THROTTLE<br>C CAM · R RESET · H HOME</div>
+</div>
+
+<script>
+window.__APP = function(){
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+
+/* This viewer reports every uncaught error as a bare "Script error." — inline
+   code included. Catching the exception ourselves is the only way to see the
+   real message and stack, so anything async is wrapped. */
+function report(label, err){
+  var m = (err && (err.message || String(err))) || "unknown";
+  var s = (err && err.stack) ? "\n" + String(err.stack).split("\n").slice(0,5).join("\n") : "";
+  if(window.__diag) window.__diag(label, m + s, true);
+  else if(window.console) console.error(label, err);
+}
+function guard(label, fn){
+  return function(){
+    try{ return fn.apply(this, arguments); }
+    catch(err){ report(label, err); }
+  };
+}
+
+/* ============================================================
+   1.  GEOCODING  (postcode -> Postcodes.io, else Nominatim)
+   ============================================================ */
+var PC_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+var chosen = null;
+
+function geocode(q){
+  q = q.trim();
+  if(!q) return Promise.resolve([]);
+  if(PC_RE.test(q)){
+    var pc = q.replace(/\s+/g,"");
+    return fetch("https://api.postcodes.io/postcodes/"+encodeURIComponent(pc))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j || j.status !== 200 || !j.result) throw 0;
+        var r = j.result;
+        return [{name:r.postcode,
+                 detail:[r.admin_ward, r.admin_district, r.region||r.country].filter(Boolean).join(" · "),
+                 lat:r.latitude, lon:r.longitude}];
+      })
+      .catch(function(){ return nominatim(q); });
+  }
+  return nominatim(q);
+}
+function nominatim(q){
+  var u = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=gb&q="
+        + encodeURIComponent(q);
+  return fetch(u, {headers:{"Accept":"application/json"}})
+    .then(function(r){ return r.json(); })
+    .then(function(list){
+      if(!Array.isArray(list)) return [];
+      return list.map(function(o){
+        var parts = (o.display_name||"").split(",").map(function(s){return s.trim();});
+        return {name: parts[0] || o.display_name,
+                detail: parts.slice(1,4).join(" · "),
+                lat: parseFloat(o.lat), lon: parseFloat(o.lon)};
+      });
+    });
+}
+
+$("find").onclick = doFind;
+$("q").addEventListener("keydown", function(e){ if(e.key === "Enter") doFind(); });
+function doFind(){
+  var q = $("q").value;
+  if(!q.trim()) return;
+  $("qnote").className = "note"; $("qnote").textContent = "Searching…";
+  $("hits").classList.remove("on"); $("hits").innerHTML = "";
+  chosen = null; setGo(false);
+  geocode(q).then(function(res){
+    if(!res.length){
+      $("qnote").className = "note err";
+      $("qnote").textContent = "No match in Great Britain or Northern Ireland. Try a postcode, or add the county.";
+      return;
+    }
+    $("qnote").textContent = res.length === 1 ? "Found it." : "Pick the right one.";
+    var box = $("hits"); box.classList.add("on");
+    res.forEach(function(r, i){
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "hit";
+      b.setAttribute("aria-pressed", res.length === 1 ? "true" : "false");
+      b.innerHTML = "<b></b><span></span>";
+      b.querySelector("b").textContent = r.name;
+      b.querySelector("span").textContent = (r.detail ? r.detail + "  ·  " : "") +
+        r.lat.toFixed(5) + ", " + r.lon.toFixed(5);
+      b.onclick = function(){
+        Array.prototype.forEach.call(box.children, function(c){ c.setAttribute("aria-pressed","false"); });
+        b.setAttribute("aria-pressed","true");
+        chosen = r; setGo(true);
+      };
+      box.appendChild(b);
+      if(res.length === 1){ chosen = r; setGo(true); }
+    });
+  }).catch(function(err){
+    $("qnote").className = "note err";
+    $("qnote").textContent = "Geocoding blocked or unreachable (" +
+      ((err && err.message) || "network error") + "). Running the connection test…";
+    runProbe();
+  });
+}
+
+/* ---- manual coordinates: a way in when the geocoders are blocked ---- */
+$("useco").onclick = function(){
+  var la = parseFloat($("mlat").value), lo = parseFloat($("mlon").value);
+  if(isNaN(la) || isNaN(lo) || Math.abs(la) > 85 || Math.abs(lo) > 180){
+    $("qnote").className = "note err";
+    $("qnote").textContent = "Enter a latitude and longitude in decimal degrees.";
+    return;
+  }
+  $("qnote").className = "note";
+  $("qnote").textContent = "Using coordinates directly — no geocoder needed.";
+  $("hits").classList.remove("on");
+  chosen = {name: la.toFixed(4) + ", " + lo.toFixed(4), detail:"", lat:la, lon:lo};
+  setGo(true);
+};
+
+/* ---- connection test: names exactly which services this viewer allows ---- */
+function probeFetch(name, url, opts){
+  return fetch(url, opts || {})
+    .then(function(r){ return {name:name, ok:true, info:"HTTP " + r.status}; })
+    .catch(function(e){ return {name:name, ok:false, info:(e && e.message) || "blocked"}; });
+}
+function probeImage(name, url){
+  return new Promise(function(res){
+    var im = new Image(), done = false;
+    im.crossOrigin = "anonymous";
+    var t = setTimeout(function(){ if(!done){ done = true; res({name:name, ok:false, info:"timed out"}); } }, 8000);
+    im.onload  = function(){ if(!done){ done = true; clearTimeout(t); res({name:name, ok:true,  info:"image loaded"}); } };
+    im.onerror = function(){ if(!done){ done = true; clearTimeout(t); res({name:name, ok:false, info:"blocked"}); } };
+    im.src = url;
+  });
+}
+function runProbe(){
+  var out = $("probeout");
+  out.classList.add("on");
+  out.textContent = "Testing four services…";
+  Promise.all([
+    probeFetch("Postcodes.io &nbsp;(postcode lookup)", "https://api.postcodes.io/postcodes/SW1A1AA"),
+    probeFetch("Nominatim &nbsp;&nbsp;&nbsp;&nbsp;(place search)",
+      "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q=durham"),
+    probeFetch("Overpass &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(map geometry)", "https://overpass-api.de/api/interpreter",
+      {method:"POST",
+       body:"data=" + encodeURIComponent("[out:json][timeout:10];node(51.500,-0.100,51.501,-0.099);out count;"),
+       headers:{"Content-Type":"application/x-www-form-urlencoded"}}),
+    probeImage("Esri imagery &nbsp;(aerial tiles)",
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/10/335/511")
+  ]).then(function(res){
+    var html = "";
+    res.forEach(function(r){
+      html += '<div><span class="' + (r.ok ? "pp" : "pf") + '">' + (r.ok ? "PASS" : "FAIL") +
+              '</span> &nbsp;' + r.name + ' &nbsp;<span style="color:#8a7c60">' + r.info + '</span></div>';
+    });
+    var geo = res[0].ok || res[1].ok, data = res[2].ok;
+    var verdict;
+    if(geo && data){
+      verdict = "All reachable — search should work. If it just failed, try again; the public servers rate-limit.";
+    } else if(!geo && data){
+      verdict = "Map data is reachable but the geocoders are not. Use the coordinate box above and the sim will run normally.";
+    } else {
+      verdict = "This viewer is blocking outbound requests, so no map data can be fetched here. " +
+                "Download this file and open it in a browser tab — there are no such restrictions there and it will run fully.";
+    }
+    html += '<div class="verdict">' + verdict + '</div>';
+    out.innerHTML = html;
+  });
+}
+$("probe").onclick = runProbe;
+function setGo(ok){
+  var g = $("go");
+  g.disabled = !ok;
+  g.textContent = ok ? "Start engine — " + chosen.name : "Find a place first";
+}
+
+/* quality + light */
+var opt = {quality:"med", sun:"noon"};
+function seg(id, key){
+  var el = $(id);
+  Array.prototype.forEach.call(el.children, function(b){
+    b.type = "button";
+    b.onclick = function(){
+      Array.prototype.forEach.call(el.children, function(c){ c.setAttribute("aria-pressed","false"); });
+      b.setAttribute("aria-pressed","true"); opt[key] = b.dataset.v;
+    };
+  });
+}
+seg("segQ","quality"); seg("segSun","sun");
+
+/* ============================================================
+   2.  PROJECTION + OS NATIONAL GRID
+   ============================================================ */
+var R_E = 6378137, K = 1, M0 = {x:0,y:0}, LAT0 = 0, LON0 = 0;
+function merc(lon, lat){
+  return {x: R_E*lon*Math.PI/180,
+          y: R_E*Math.log(Math.tan(Math.PI/4 + lat*Math.PI/360))};
+}
+function toWorld(lon, lat){
+  var m = merc(lon, lat);
+  return {x:(m.x-M0.x)*K, z:-(m.y-M0.y)*K};
+}
+function worldToLatLon(x, z){
+  var mx = x/K + M0.x, my = -z/K + M0.y;
+  return {lon: mx/R_E*180/Math.PI,
+          lat: (2*Math.atan(Math.exp(my/R_E)) - Math.PI/2)*180/Math.PI};
+}
+/* WGS84 -> OSGB36 -> National Grid reference (Helmert + Airy 1830 TM) */
+function osgb(lat, lon){
+  var d = Math.PI/180, phi = lat*d, lam = lon*d;
+  var a1 = 6378137, f1 = 1/298.257223563, e1 = 2*f1 - f1*f1;
+  var v1 = a1/Math.sqrt(1 - e1*Math.pow(Math.sin(phi),2));
+  var x1 = v1*Math.cos(phi)*Math.cos(lam), y1 = v1*Math.cos(phi)*Math.sin(lam),
+      z1 = (1-e1)*v1*Math.sin(phi);
+  var tx=-446.448, ty=125.157, tz=-542.060, s=20.4894e-6,
+      rx=(-0.1502/3600)*d, ry=(-0.2470/3600)*d, rz=(-0.8421/3600)*d;
+  var x2 = tx + x1*(1+s) - y1*rz + z1*ry,
+      y2 = ty + x1*rz + y1*(1+s) - z1*rx,
+      z2 = tz - x1*ry + y1*rx + z1*(1+s);
+  var a = 6377563.396, b = 6356256.909, e2 = (a*a - b*b)/(a*a);
+  var p = Math.sqrt(x2*x2 + y2*y2), ph = Math.atan2(z2, p*(1-e2)), phP = 2*Math.PI, v = a;
+  var guard = 0;
+  while(Math.abs(ph - phP) > 1e-11 && guard++ < 40){
+    v = a/Math.sqrt(1 - e2*Math.pow(Math.sin(ph),2));
+    phP = ph; ph = Math.atan2(z2 + e2*v*Math.sin(ph), p);
+  }
+  var la = Math.atan2(y2, x2);
+  var F0=0.9996012717, ph0=49*d, la0=-2*d, E0=400000, N0=-100000;
+  var n = (a-b)/(a+b), n2 = n*n, n3 = n2*n;
+  v = a*F0/Math.sqrt(1 - e2*Math.pow(Math.sin(ph),2));
+  var rho = a*F0*(1-e2)/Math.pow(1 - e2*Math.pow(Math.sin(ph),2), 1.5);
+  var eta2 = v/rho - 1;
+  var dP = ph-ph0, sP = ph+ph0;
+  var M = b*F0*((1+n+1.25*n2+1.25*n3)*dP
+        - (3*n+3*n2+2.625*n3)*Math.sin(dP)*Math.cos(sP)
+        + (1.875*n2+1.875*n3)*Math.sin(2*dP)*Math.cos(2*sP)
+        - (35/24)*n3*Math.sin(3*dP)*Math.cos(3*sP));
+  var cp = Math.cos(ph), sp = Math.sin(ph), tp = Math.tan(ph), t2 = tp*tp, t4 = t2*t2;
+  var I = M+N0, II = v/2*sp*cp, III = v/24*sp*cp*cp*cp*(5-t2+9*eta2),
+      IIIA = v/720*sp*Math.pow(cp,5)*(61-58*t2+t4);
+  var IV = v*cp, V = v/6*cp*cp*cp*(v/rho - t2),
+      VI = v/120*Math.pow(cp,5)*(5 - 18*t2 + t4 + 14*eta2 - 58*t2*eta2);
+  var dl = la-la0, d2 = dl*dl, d3 = d2*dl, d4 = d3*dl, d5 = d4*dl, d6 = d5*dl;
+  var N = I + II*d2 + III*d4 + IIIA*d6;
+  var E = E0 + IV*dl + V*d3 + VI*d5;
+  var e100 = Math.floor(E/100000), n100 = Math.floor(N/100000);
+  if(e100 < 0 || e100 > 6 || n100 < 0 || n100 > 12) return null;
+  var l1 = (19-n100) - (19-n100)%5 + Math.floor((e100+10)/5);
+  var l2 = (19-n100)*5%25 + e100%5;
+  if(l1 > 7) l1++; if(l2 > 7) l2++;
+  var letters = String.fromCharCode(l1+65) + String.fromCharCode(l2+65);
+  function pad(v){ return ("0000" + Math.floor(v)).slice(-4); }
+  return letters + " " + pad((E%100000)/10) + " " + pad((N%100000)/10);
+}
+
+function hash(a,b){ var s = Math.sin(a*12.9898 + b*78.233)*43758.5453; return s - Math.floor(s); }
+
+/* ============================================================
+   3.  HEIGHT ESTIMATION  (UK-tuned)
+   ============================================================ */
+var TYPE_H = {
+  house:7.2, detached:7.4, semidetached_house:7.2, terrace:8.4, bungalow:4.4, terraced_house:8.4,
+  residential:12, apartments:16, dormitory:18, hotel:22,
+  commercial:16, office:28, retail:8.5, supermarket:8.5, kiosk:3.2,
+  industrial:9.5, warehouse:10, factory:12, hangar:13, garage:2.8, garages:2.8,
+  shed:2.8, hut:2.8, cabin:3.6, roof:3.6, carport:2.6, greenhouse:3.6,
+  church:15, cathedral:34, chapel:9.5, mosque:14, temple:13, synagogue:13,
+  school:9.5, university:18, college:14, hospital:22, civic:14, government:20,
+  train_station:14, stadium:22, sports_hall:11, parking:12, service:3.4,
+  construction:14, tower:40, farm:6, farm_auxiliary:5.5, barn:7.5, stable:4.5,
+  pub:8, semi:7.2, static_caravan:2.8
+};
+function parseLen(v){
+  if(!v) return NaN;
+  v = String(v).trim();
+  var f = v.match(/^([\d.]+)\s*'/); if(f) return parseFloat(f[1])*0.3048;
+  var n = parseFloat(v.replace(/[^\d.\-]/g,""));
+  return isNaN(n) ? NaN : n;
+}
+function estimateHeight(tags, area, dist, seed){
+  var h = parseLen(tags.height || tags["building:height"]);
+  if(!isNaN(h) && h > 1 && h < 900) return h;
+  var lv = parseFloat(tags["building:levels"]);
+  if(!isNaN(lv) && lv > 0 && lv < 200){
+    var floor = (tags.building === "office" || tags.building === "commercial") ? 3.8 : 2.95;
+    return lv*floor + 1.4;                      /* UK storeys run lower than US */
+  }
+  var t = tags.building;
+  if(t && t !== "yes" && TYPE_H[t] != null) return TYPE_H[t]*(0.85 + hash(seed,7)*0.34);
+  if(tags.amenity && TYPE_H[tags.amenity] != null) return TYPE_H[tags.amenity];
+  if(tags.shop) return 7.5 + hash(seed,3)*3;
+  if(tags.office) return 20 + hash(seed,4)*14;
+  /* untagged building=yes: read the urban form. British stock is low —
+     terraces and semis dominate, so the curve stays flat until footprints get big. */
+  var core = 1 - Math.min(1, dist/6000);
+  var base;
+  if(area < 60)        base = 3.2 + core*1.2;          /* garages, outbuildings */
+  else if(area < 130)  base = 6.4 + core*2.2;          /* semi / terrace */
+  else if(area < 300)  base = 7.6 + core*5;            /* detached, small block */
+  else if(area < 900)  base = 9 + core*14;             /* mansion block, retail */
+  else if(area < 3000) base = 11 + core*24;            /* offices, schools */
+  else                 base = 12 + core*30;            /* sheds, malls, stations */
+  return base*(0.86 + hash(seed,11)*0.34);
+}
+function isHouse(tags, area, h){
+  var t = tags.building || "";
+  if(/^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|hut|cabin|shed|garage|garages|farm|farm_auxiliary|barn|stable|static_caravan)$/.test(t)) return true;
+  return area < 260 && h < 10.5 && !tags.shop && !tags.office && !tags.amenity;
+}
+
+/* ============================================================
+   4.  GEOMETRY BATCHING
+   ============================================================ */
+function ringToPts(geom){
+  var p = [], i, w;
+  for(i=0;i<geom.length;i++){
+    w = toWorld(geom[i].lon, geom[i].lat);
+    if(p.length && Math.abs(p[p.length-1].x-w.x)<0.05 && Math.abs(p[p.length-1].z-w.z)<0.05) continue;
+    p.push(w);
+  }
+  if(p.length>2){
+    var a=p[0], b=p[p.length-1];
+    if(Math.abs(a.x-b.x)<0.2 && Math.abs(a.z-b.z)<0.2) p.pop();
+  }
+  return p;
+}
+function signedArea(p){
+  var s=0;
+  for(var i=0,j=p.length-1;i<p.length;j=i++) s += (p[j].x*p[i].z - p[i].x*p[j].z);
+  return s/2;
+}
+function centroid(p){
+  var x=0,z=0; for(var i=0;i<p.length;i++){ x+=p[i].x; z+=p[i].z; }
+  return {x:x/p.length, z:z/p.length};
+}
+function makeShape(outer, holes){
+  var sh = new THREE.Shape();
+  var o = signedArea(outer) < 0 ? outer.slice().reverse() : outer;
+  sh.moveTo(o[0].x, -o[0].z);
+  for(var i=1;i<o.length;i++) sh.lineTo(o[i].x, -o[i].z);
+  sh.closePath();
+  if(holes) for(var k=0;k<holes.length;k++){
+    var hr = holes[k]; if(hr.length<3) continue;
+    var hh = signedArea(hr) > 0 ? hr.slice().reverse() : hr;
+    var pa = new THREE.Path();
+    pa.moveTo(hh[0].x, -hh[0].z);
+    for(var j=1;j<hh.length;j++) pa.lineTo(hh[j].x, -hh[j].z);
+    pa.closePath(); sh.holes.push(pa);
+  }
+  return sh;
+}
+function Batch(){ this.p=[]; this.n=[]; this.c=[]; }
+Batch.prototype.addGeom = function(g, col, yOffset){
+  if(g.index) g = g.toNonIndexed();
+  if(!g.attributes.normal) g.computeVertexNormals();
+  var pa = g.attributes.position.array, na = g.attributes.normal.array, ct = g.attributes.position.count;
+  var dy = yOffset||0;
+  for(var i=0;i<ct;i++){
+    this.p.push(pa[i*3], pa[i*3+1]+dy, pa[i*3+2]);
+    this.n.push(na[i*3], na[i*3+1], na[i*3+2]);
+    this.c.push(col.r, col.g, col.b);
+  }
+  g.dispose();
+};
+Batch.prototype.addTri = function(a,b,c,col){
+  var ux=b.x-a.x, uy=b.y-a.y, uz=b.z-a.z, vx=c.x-a.x, vy=c.y-a.y, vz=c.z-a.z;
+  var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+  var l=Math.sqrt(nx*nx+ny*ny+nz*nz)||1; nx/=l; ny/=l; nz/=l;
+  var t=[a,b,c];
+  for(var i=0;i<3;i++){ this.p.push(t[i].x,t[i].y,t[i].z); this.n.push(nx,ny,nz); this.c.push(col.r,col.g,col.b); }
+};
+Batch.prototype.count = function(){ return this.p.length/3; };
+Batch.prototype.mesh = function(mat){
+  var g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(this.p),3));
+  g.setAttribute("normal",   new THREE.BufferAttribute(new Float32Array(this.n),3));
+  g.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(this.c),3));
+  g.computeBoundingSphere();
+  var m = new THREE.Mesh(g, mat); m.frustumCulled = true;
+  this.p = this.n = this.c = null;
+  return m;
+};
+
+var COL = {
+  wallLo:new THREE.Color(0xc0b3a2), wallHi:new THREE.Color(0x8e99a6),
+  brick:new THREE.Color(0xa4705c),
+  roofHouse:new THREE.Color(0x554e4a), roofFlat:new THREE.Color(0x6d7480),
+  road:new THREE.Color(0x3b3f46), roadMinor:new THREE.Color(0x494d54), path:new THREE.Color(0x6b6152),
+  water:new THREE.Color(0x2c5a76), park:new THREE.Color(0x4a6b3f),
+  grass:new THREE.Color(0x5e7c4c), pitch:new THREE.Color(0x4f7a48),
+  trunk:new THREE.Color(0x453626), leaf:new THREE.Color(0x3d5f32)
+};
+function wallColour(h, seed, house){
+  var c;
+  if(house) c = COL.brick.clone().lerp(COL.wallLo, hash(seed,61)*0.65);
+  else c = COL.wallLo.clone().lerp(COL.wallHi, Math.min(1, h/70));
+  c.offsetHSL((hash(seed,31)-0.5)*0.03, 0, (hash(seed,21)-0.5)*0.13);
+  return c;
+}
+
+/* ============================================================
+   5.  DATA FETCHING
+   Two phases, five requests total — not twenty-five. Every request
+   races all three Overpass mirrors and takes whichever answers
+   first, with a hard client-side timeout so nothing can hang.
+   ============================================================ */
+var HALF_A = 1250;                 /* full-detail core: 2.5 km square */
+var HALF_B = 5000;                 /* whole world:      10 km square  */
+var GRID = 5, CELL = 2000;         /* nav-display graticule only      */
+var OVERPASS = [
+  "https://overpass.kumi.systems/api/interpreter",   /* usually the least queued */
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.osm.ch/api/interpreter"
+];
+var QUALITY = {
+  low:  {budget: 9000,  perCell: 4000,  trees: 0},
+  med:  {budget: 26000, perCell: 12000, trees: 800},
+  high: {budget: 55000, perCell: 26000, trees: 2200}
+};
+var Q, budget = 0, treeBudget = 0, statBuildings = 0, statRoadM = 0;
+var world = new THREE.Group();
+var coverage = {a:0, b:[0,0,0,0]};   /* 0 pending, 1 loading, 2 done, 3 failed */
+
+function bboxM(west, south, east, north){
+  var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
+  return [LAT0 + south/mLat, LON0 + west/mLon, LAT0 + north/mLat, LON0 + east/mLon];
+}
+function bbs(bb){
+  return bb[0].toFixed(5)+","+bb[1].toFixed(5)+","+bb[2].toFixed(5)+","+bb[3].toFixed(5);
+}
+var NOTABLE = "^(apartments|commercial|office|retail|supermarket|industrial|warehouse|factory|" +
+  "hospital|school|university|college|church|cathedral|chapel|mosque|temple|hotel|civic|public|" +
+  "government|train_station|stadium|sports_hall|hangar|tower|parking)$";
+
+function queryFull(bb){
+  var b = bbs(bb);
+  return "[out:json][timeout:45];(" +
+    'way["building"]('+b+');' +
+    'relation["building"]["type"="multipolygon"]('+b+');' +
+    'way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|pedestrian|footway|motorway_link|trunk_link|primary_link)$"]('+b+');' +
+    'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
+    'way["landuse"~"^(grass|forest|meadow|village_green|recreation_ground|cemetery|allotments)$"]('+b+');' +
+    'way["leisure"~"^(park|garden|pitch|golf_course|playground)$"]('+b+');' +
+    'node["natural"="tree"]('+b+');' +
+    ");out geom;";
+}
+function queryNotable(bb){
+  var b = bbs(bb);
+  return "[out:json][timeout:45];(" +
+    'way["building"~"'+NOTABLE+'"]('+b+');' +
+    'way["building"]["building:levels"]('+b+');' +
+    'way["highway"~"^(motorway|trunk|primary|secondary|motorway_link|trunk_link)$"]('+b+');' +
+    'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
+    'way["landuse"~"^(forest|farmland|meadow)$"]('+b+');' +
+    'way["leisure"~"^(park|golf_course|nature_reserve)$"]('+b+');' +
+    ");out geom;";
+}
+
+/* Race every mirror; first valid answer wins, the rest are aborted.
+   A hard timeout means a stalled server can never freeze the load. */
+function overpassRace(q, timeoutMs){
+  return new Promise(function(resolve, reject){
+    var ctrls = [], settled = false, fails = 0, lastErr = null;
+    function abortAll(){
+      for(var i=0;i<ctrls.length;i++){ try{ ctrls[i].abort(); }catch(e){} }
+    }
+    var timer = setTimeout(function(){
+      if(settled) return;
+      settled = true; abortAll();
+      reject(new Error("no mirror answered within " + Math.round(timeoutMs/1000) + "s"));
+    }, timeoutMs);
+    OVERPASS.forEach(function(url){
+      var ctrl = null;
+      try{ ctrl = new AbortController(); ctrls.push(ctrl); }catch(e){}
+      fetch(url, {method:"POST",
+                  signal: ctrl ? ctrl.signal : undefined,
+                  body:"data=" + encodeURIComponent(q),
+                  headers:{"Content-Type":"application/x-www-form-urlencoded"}})
+        .then(function(r){
+          if(!r.ok) throw new Error(url.split("/")[2] + " HTTP " + r.status);
+          return r.json();
+        })
+        .then(function(j){
+          if(settled) return;
+          settled = true; clearTimeout(timer); abortAll(); resolve(j);
+        })
+        .catch(function(e){
+          if(settled) return;
+          lastErr = e; fails++;
+          if(fails >= OVERPASS.length){
+            settled = true; clearTimeout(timer);
+            reject(lastErr || new Error("all mirrors failed"));
+          }
+        });
+    });
+  });
+}
+
+/* ---- mesh construction for one fetched chunk ---- */
+var matBuild, matRoof, matFlat;
+function inSkip(x, z, cell){
+  return cell.skipHalf > 0 && Math.abs(x) < cell.skipHalf && Math.abs(z) < cell.skipHalf;
+}
+function buildCell(data, cell){
+  var els = data.elements || [];
+  var bl = [], rd = [], ar = [], tr = [], i;
+  for(i=0;i<els.length;i++){
+    var e = els[i], t = e.tags || {};
+    if(e.type === "node"){ if(t.natural === "tree") tr.push(e); continue; }
+    if(t.building) bl.push(e);
+    else if(t.highway) rd.push(e);
+    else if(t.natural === "water" || t.waterway === "riverbank" || t.landuse || t.leisure) ar.push(e);
+  }
+  var g = new THREE.Group();
+  addAreas(ar, g, cell);
+  addRoads(rd, g, cell);
+  addBuildings(bl, g, cell);
+  if(cell.inner && Q.trees > 0) addTrees(tr, g);
+  world.add(g);
+  cell.group = g;
+}
+
+function addBuildings(list, group, cell){
+  var walls = new Batch(), roofs = new Batch(), prepared = [], i, o;
+  for(i=0;i<list.length;i++){
+    var e = list[i], t = e.tags || {}, rings = [];
+    if(e.type === "way" && e.geometry) rings.push({role:"outer", pts:ringToPts(e.geometry)});
+    else if(e.type === "relation" && e.members){
+      for(var m=0;m<e.members.length;m++){
+        var mem = e.members[m];
+        if(mem.type !== "way" || !mem.geometry || mem.geometry.length < 4) continue;
+        rings.push({role: mem.role === "inner" ? "inner" : "outer", pts:ringToPts(mem.geometry)});
+      }
+    }
+    var outers = rings.filter(function(r){ return r.role === "outer" && r.pts.length > 2; });
+    var inners = rings.filter(function(r){ return r.role === "inner" && r.pts.length > 2; });
+    for(o=0;o<outers.length;o++){
+      var pts = outers[o].pts, area = Math.abs(signedArea(pts));
+      if(area < 14) continue;
+      var c = centroid(pts), dist = Math.sqrt(c.x*c.x + c.z*c.z);
+      if(inSkip(c.x, c.z, cell)) continue;         /* already drawn at full detail */
+      if(!cell.inner && area < 220) continue;      /* outer ring keeps only real mass */
+      prepared.push({pts:pts, holes:(o===0?inners:null), tags:t, area:area, dist:dist,
+                     score:area/(1 + dist*0.0018)});
+    }
+  }
+  prepared.sort(function(a,b){ return b.score - a.score; });
+  var cap = Math.max(0, Math.min(Q.perCell, budget|0));
+  if(prepared.length > cap) prepared.length = cap;
+
+  var tallest = 0;
+  for(var k=0;k<prepared.length;k++){
+    var b = prepared[k];
+    var seed = Math.round(b.pts[0].x*3.7 + b.pts[0].z*1.9);
+    var h = estimateHeight(b.tags, b.area, b.dist, seed);
+    var minH = parseLen(b.tags.min_height) || 0;
+    if(!(h > minH)) h = minH + 3;
+    h = Math.min(h, 400);
+    tallest = Math.max(tallest, h);
+    var house = isHouse(b.tags, b.area, h);
+    var roofH = house ? Math.min(3.6, Math.sqrt(b.area)*0.26) : 0;
+    var wallTop = h - roofH;
+    if(wallTop < minH + 2.2) wallTop = minH + 2.2;
+
+    var shape, geo;
+    try{ shape = makeShape(b.pts, b.holes); }catch(err){ continue; }
+    try{ geo = new THREE.ExtrudeGeometry(shape, {depth:wallTop-minH, bevelEnabled:false, curveSegments:1}); }
+    catch(err){ continue; }
+    geo.rotateX(-Math.PI/2);
+    walls.addGeom(geo, wallColour(h, seed, house), minH);
+
+    if(house && roofH > 0.6 && b.pts.length < 24){
+      var cc = centroid(b.pts), apex = {x:cc.x, y:wallTop+roofH, z:cc.z};
+      var rc = COL.roofHouse.clone().offsetHSL(0,(hash(seed,41)-0.5)*0.1,(hash(seed,51)-0.5)*0.09);
+      for(var v=0;v<b.pts.length;v++){
+        var p1 = b.pts[v], p2 = b.pts[(v+1)%b.pts.length];
+        roofs.addTri({x:p1.x,y:wallTop,z:p1.z},{x:p2.x,y:wallTop,z:p2.z}, apex, rc);
+        roofs.addTri({x:p2.x,y:wallTop,z:p2.z},{x:p1.x,y:wallTop,z:p1.z}, apex, rc);
+      }
+    }
+  }
+  budget -= prepared.length;
+  statBuildings += prepared.length;
+  if(walls.count()) group.add(walls.mesh(matBuild));
+  if(roofs.count()) group.add(roofs.mesh(matRoof));
+  cell.tallest = tallest;
+}
+
+var ROAD_W = {motorway:20,trunk:15,primary:12,secondary:10,tertiary:8,residential:6,
+  unclassified:6,living_street:5,service:4,pedestrian:4.5,footway:2.2,
+  motorway_link:9,trunk_link:8,primary_link:7};
+function addRoads(list, group, cell){
+  var b = new Batch();
+  for(var i=0;i<list.length;i++){
+    var e = list[i]; if(!e.geometry) continue;
+    var hw = (e.tags && e.tags.highway) || "residential";
+    var w = (ROAD_W[hw] || 6)/2;
+    if(e.tags && e.tags.lanes){ var ln = parseFloat(e.tags.lanes); if(ln > 0) w = Math.max(w, ln*1.6); }
+    var col = (hw === "footway" || hw === "pedestrian") ? COL.path :
+              (/^(motorway|trunk|primary)/.test(hw) ? COL.road : COL.roadMinor);
+    var y = /^(motorway|trunk|primary)/.test(hw) ? 0.36 : 0.3;
+    var pts = ringToPts(e.geometry);
+    for(var j=0;j<pts.length-1;j++){
+      var a = pts[j], c = pts[j+1];
+      var dx = c.x-a.x, dz = c.z-a.z, L = Math.sqrt(dx*dx+dz*dz);
+      if(L < 0.6) continue;
+      if(inSkip((a.x+c.x)/2, (a.z+c.z)/2, cell)) continue;
+      statRoadM += L;
+      var nx = -dz/L*w, nz = dx/L*w;
+      b.addTri({x:a.x+nx,y:y,z:a.z+nz},{x:c.x+nx,y:y,z:c.z+nz},{x:c.x-nx,y:y,z:c.z-nz}, col);
+      b.addTri({x:a.x+nx,y:y,z:a.z+nz},{x:c.x-nx,y:y,z:c.z-nz},{x:a.x-nx,y:y,z:a.z-nz}, col);
+    }
+  }
+  if(b.count()) group.add(b.mesh(matFlat));
+}
+function addAreas(list, group, cell){
+  var b = new Batch();
+  for(var i=0;i<list.length;i++){
+    var e = list[i], t = e.tags||{}, rings = [];
+    if(e.type === "way" && e.geometry) rings.push(ringToPts(e.geometry));
+    else if(e.type === "relation" && e.members){
+      for(var m=0;m<e.members.length;m++){
+        var mem = e.members[m];
+        if(mem.type === "way" && mem.role === "outer" && mem.geometry && mem.geometry.length > 3)
+          rings.push(ringToPts(mem.geometry));
+      }
+    }
+    var col, y;
+    if(t.natural === "water" || t.waterway === "riverbank"){ col = COL.water; y = 0.18; }
+    else if(t.leisure === "pitch" || t.leisure === "golf_course"){ col = COL.pitch; y = 0.22; }
+    else if(t.leisure === "park" || t.leisure === "garden" || t.leisure === "nature_reserve" ||
+            t.landuse === "forest"){ col = COL.park; y = 0.2; }
+    else { col = COL.grass; y = 0.2; }
+    for(var r=0;r<rings.length;r++){
+      var pts = rings[r];
+      if(pts.length < 3 || Math.abs(signedArea(pts)) < 120) continue;
+      var ac = centroid(pts);
+      if(inSkip(ac.x, ac.z, cell)) continue;
+      var g;
+      try{ g = new THREE.ShapeGeometry(makeShape(pts, null)); }catch(err){ continue; }
+      g.rotateX(-Math.PI/2);
+      b.addGeom(g, col, y);
+    }
+  }
+  if(b.count()) group.add(b.mesh(matFlat));
+}
+function addTrees(nodes, group){
+  if(!nodes.length || treeBudget <= 0) return;
+  var n = Math.min(nodes.length, treeBudget, 900);
+  treeBudget -= n;
+  var trunk = new THREE.CylinderGeometry(0.26,0.36,2.8,5); trunk.translate(0,1.4,0);
+  var leaf = new THREE.IcosahedronGeometry(2.4,0); leaf.translate(0,4.6,0);
+  var tb = new Batch(); tb.addGeom(trunk, COL.trunk, 0); tb.addGeom(leaf, COL.leaf, 0);
+  var g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(tb.p),3));
+  g.setAttribute("normal",   new THREE.BufferAttribute(new Float32Array(tb.n),3));
+  g.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(tb.c),3));
+  var im = new THREE.InstancedMesh(g, matBuild, n);
+  var mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(),
+      pos = new THREE.Vector3(), ax = new THREE.Vector3(0,1,0);
+  for(var i=0;i<n;i++){
+    var w = toWorld(nodes[i].lon, nodes[i].lat);
+    var s = 0.7 + hash(w.x, w.z)*0.9;
+    pos.set(w.x, 0, w.z); sc.set(s, s*(0.85 + hash(w.z,w.x)*0.5), s);
+    q.setFromAxisAngle(ax, hash(w.x,3)*6.28);
+    mtx.compose(pos,q,sc); im.setMatrixAt(i, mtx);
+  }
+  im.instanceMatrix.needsUpdate = true;
+  im.frustumCulled = false;
+  group.add(im);
+}
+
+/* ---- ground imagery: coarse over the whole grid, sharp over home ---- */
+function lon2tile(lon,z){ return Math.floor((lon+180)/360*Math.pow(2,z)); }
+function lat2tile(lat,z){
+  var r = lat*Math.PI/180;
+  return Math.floor((1 - Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*Math.pow(2,z));
+}
+function tile2lon(x,z){ return x/Math.pow(2,z)*360-180; }
+function tile2lat(y,z){
+  var n = Math.PI - 2*Math.PI*y/Math.pow(2,z);
+  return 180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)));
+}
+function drapeImagery(z, halfM, y){
+  var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
+  var xs = lon2tile(LON0 - halfM/mLon, z), xe = lon2tile(LON0 + halfM/mLon, z);
+  var ys = lat2tile(LAT0 + halfM/mLat, z), ye = lat2tile(LAT0 - halfM/mLat, z);
+  var loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
+  var group = new THREE.Group(); scene.add(group);
+  for(var tx=xs; tx<=xe; tx++){
+    for(var ty=ys; ty<=ye; ty++){
+      (function(tx,ty){
+        var w0 = toWorld(tile2lon(tx,z), tile2lat(ty,z));
+        var w1 = toWorld(tile2lon(tx+1,z), tile2lat(ty+1,z));
+        var url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
+                + z + "/" + ty + "/" + tx;
+        loader.load(url, guard("Imagery tile", function(tex){
+          tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+          var m = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(w1.x-w0.x), Math.abs(w1.z-w0.z)),
+                                 new THREE.MeshBasicMaterial({map:tex}));
+          m.rotation.x = -Math.PI/2;
+          m.position.set((w0.x+w1.x)/2, y, (w0.z+w1.z)/2);
+          group.add(m);
+        }), null, function(){});
+      })(tx,ty);
+    }
+  }
+}
+
+/* ============================================================
+   6.  SCENE
+   ============================================================ */
+var SUN = {
+  noon:{sky:[0x8fb6d8,0xdfe9f2], sun:0xfff6e2, si:1.12, amb:0x9fb4c8, ai:0.64, fog:0xc6d6e4, fd:0.000105},
+  gold:{sky:[0x2f4e78,0xf0b071], sun:0xffcf8a, si:1.02, amb:0x6f6a78, ai:0.52, fog:0xe2b483, fd:0.000135},
+  dusk:{sky:[0x101a2e,0x9c5a6b], sun:0xc78a9a, si:0.45, amb:0x3d4a63, ai:0.44, fog:0x53607a, fd:0.00019}
+};
+var scene, camera, renderer, plane, propeller, clock, running = false, camMode = 0, startY = 420;
+
+function initScene(){
+  var S = SUN[opt.sun];
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(S.fog, S.fd);
+  camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.9, 40000);
+  renderer = new THREE.WebGLRenderer({antialias: innerWidth > 820, powerPreference:"high-performance"});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 820 ? 1.4 : 2));
+  renderer.setSize(innerWidth, innerHeight);
+  $("app").appendChild(renderer.domElement);
+
+  var sky = new THREE.Mesh(new THREE.SphereGeometry(30000, 24, 12), new THREE.ShaderMaterial({
+    side:THREE.BackSide, depthWrite:false, fog:false,
+    uniforms:{top:{value:new THREE.Color(S.sky[0])}, bot:{value:new THREE.Color(S.sky[1])}},
+    vertexShader:"varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+    fragmentShader:"uniform vec3 top; uniform vec3 bot; varying float h; void main(){ gl_FragColor = vec4(mix(bot, top, clamp(h*1.6+0.1,0.0,1.0)),1.0); }"
+  }));
+  scene.add(sky);
+  var sun = new THREE.DirectionalLight(S.sun, S.si);
+  sun.position.set(-1400, opt.sun === "noon" ? 2600 : 800, 1100);
+  scene.add(sun);
+  scene.add(new THREE.HemisphereLight(S.amb, 0x2f3a30, S.ai));
+
+  matBuild = new THREE.MeshLambertMaterial({vertexColors:true});
+  matRoof  = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
+  matFlat  = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide});
+
+  var base = new THREE.Mesh(new THREE.PlaneGeometry(90000,90000),
+    new THREE.MeshBasicMaterial({color: opt.sun === "dusk" ? 0x1a2130 : 0x40492f}));
+  base.rotation.x = -Math.PI/2; base.position.y = -0.8; scene.add(base);
+
+  scene.add(world);
+  buildAircraft();
+  clock = new THREE.Clock();
+  addEventListener("resize", function(){
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+}
+function buildAircraft(){
+  plane = new THREE.Group();
+  var body = new THREE.MeshLambertMaterial({color:0xe8e4dc});
+  var trim = new THREE.MeshLambertMaterial({color:0xC22A6B});
+  var dark = new THREE.MeshLambertMaterial({color:0x2b3341});
+  var fus = new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.34,7.2,10), body);
+  fus.rotation.x = Math.PI/2; plane.add(fus);
+  var nose = new THREE.Mesh(new THREE.ConeGeometry(0.62,1.5,10), trim);
+  nose.rotation.x = -Math.PI/2; nose.position.z = -4.3; plane.add(nose);
+  var canopy = new THREE.Mesh(new THREE.SphereGeometry(0.55,10,8), dark);
+  canopy.scale.set(1,0.75,1.9); canopy.position.set(0,0.42,-0.7); plane.add(canopy);
+  var wing = new THREE.Mesh(new THREE.BoxGeometry(11.5,0.18,1.7), body);
+  wing.position.set(0,0.28,-0.4); plane.add(wing);
+  var tipL = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,1.4), trim);
+  tipL.position.set(-5.8,0.4,-0.4); plane.add(tipL);
+  var tipR = tipL.clone(); tipR.position.x = 5.8; plane.add(tipR);
+  var tail = new THREE.Mesh(new THREE.BoxGeometry(4.2,0.15,1.1), body);
+  tail.position.set(0,0.2,3.2); plane.add(tail);
+  var fin = new THREE.Mesh(new THREE.BoxGeometry(0.14,1.5,1.2), trim);
+  fin.position.set(0,0.9,3.3); plane.add(fin);
+  propeller = new THREE.Mesh(new THREE.BoxGeometry(4.4,0.14,0.08), dark);
+  propeller.position.z = -5.1; plane.add(propeller);
+  scene.add(plane);
+}
+
+/* ============================================================
+   7.  LOAD ORCHESTRATION
+   Phase A  (1 request)  : 2.5 km core, every building and street.
+   Phase B  (4 parallel) : the rest of the 10 km, landmarks + A-roads.
+   You can take off the moment phase A lands.
+   ============================================================ */
+function status(txt){ $("cellState").textContent = txt; }
+function tally(){
+  $("bCount").textContent = statBuildings.toLocaleString();
+  $("rCount").textContent = Math.round(statRoadM/1000).toLocaleString();
+  var done = (coverage.a === 2 ? 1 : 0);
+  for(var i=0;i<4;i++) if(coverage.b[i] === 2) done++;
+  $("cellsDone").textContent = done;
+  $("barfill").style.width = (done/5*100) + "%";
+  drawGridSvg();
+}
+function fail(where, err){
+  var m = (err && err.message) || "unreachable";
+  $("loadnote").innerHTML = '<b style="color:#b0243f">' + where + " failed: " + m + "</b><br>" +
+    "The public Overpass servers refused or timed out. Press retry, or if every attempt fails " +
+    "the viewer is blocking outbound requests and this needs a normal browser tab.";
+  $("retry").style.display = "block";
+}
+
+$("go").onclick = function(){
+  if(!chosen) return;
+  LAT0 = chosen.lat; LON0 = chosen.lon;
+  M0 = merc(LON0, LAT0); K = Math.cos(LAT0*Math.PI/180);
+  Q = QUALITY[opt.quality]; budget = Q.budget; treeBudget = Q.trees;
+  $("setup").style.display = "none"; $("load").classList.add("on");
+  $("here").textContent = chosen.name + " · " + (osgb(LAT0, LON0) || "outside the OS grid");
+  try{
+    initScene();
+    drapeImagery(15, 5200, -0.1);
+    drapeImagery(17, 1300, 0.0);
+    drawGridSvg();
+    startLoad();
+  }catch(err){
+    report("Scene setup failed", err);
+    status("failed — see diagnostics");
+  }
+};
+$("retry").onclick = function(){
+  $("retry").style.display = "none";
+  $("loadnote").textContent = "Retrying…";
+  if(coverage.a !== 2) phaseA();
+  for(var i=0;i<4;i++) if(coverage.b[i] !== 2) phaseB(i);
+};
+
+function startLoad(){
+  phaseA();
+  /* Phase B goes out immediately alongside A — different servers, no queue behind A. */
+  setTimeout(function(){ for(var i=0;i<4;i++) phaseB(i); }, 400);
+}
+
+var QUAD = [                                   /* west, south, east, north (metres) */
+  [-HALF_B, 0, 0, HALF_B],                     /* NW */
+  [0, 0, HALF_B, HALF_B],                      /* NE */
+  [-HALF_B, -HALF_B, 0, 0],                    /* SW */
+  [0, -HALF_B, HALF_B, 0]                      /* SE */
+];
+
+function phaseA(){
+  coverage.a = 1; drawGridSvg();
+  status("fetching the core 2.5 km …");
+  var t0 = Date.now();
+  overpassRace(queryFull(bboxM(-HALF_A, -HALF_A, HALF_A, HALF_A)), 40000)
+    .then(function(data){
+      try{ buildCell(data, {inner:true, skipHalf:0, tallest:0}); }
+      catch(err){ report("Core tile", err); }
+      coverage.a = 2;
+      startY = Math.max(360, 320);
+      status("core loaded in " + ((Date.now()-t0)/1000).toFixed(1) + "s");
+      $("flynow").classList.add("on");
+      tally(); maybeFinish();
+    })
+    .catch(function(err){
+      coverage.a = 3; tally();
+      fail("Core area", err);
+    });
+}
+function phaseB(i){
+  coverage.b[i] = 1; drawGridSvg();
+  var qd = QUAD[i], t0 = Date.now();
+  overpassRace(queryNotable(bboxM(qd[0], qd[1], qd[2], qd[3])), 50000)
+    .then(function(data){
+      try{ buildCell(data, {inner:false, skipHalf:HALF_A, tallest:0}); }
+      catch(err){ report("Outer quadrant " + i, err); }
+      coverage.b[i] = 2;
+      tally(); maybeFinish();
+    })
+    .catch(function(err){
+      coverage.b[i] = 3; tally();
+      if(coverage.a === 2) status("outer quadrant unavailable — core is flying");
+      else fail("Outer area", err);
+    });
+}
+function maybeFinish(){
+  var pending = (coverage.a === 1 ? 1 : 0);
+  for(var i=0;i<4;i++) if(coverage.b[i] === 1) pending++;
+  if(pending === 0){
+    $("loadhd").textContent = "World ready";
+    status("complete");
+    if(!running && coverage.a === 2) launch();
+  }
+}
+$("flynow").onclick = function(){ if(!running && plane) launch(); };
+
+/* concentric coverage diagram: inner square = phase A, quadrants = phase B */
+function coverColour(v){
+  return v === 2 ? "#C22A6B" : v === 1 ? "#e9b8cb" : v === 3 ? "#cbc3b1" : "#f3ecdd";
+}
+function drawGridSvg(){
+  var out = "";
+  var q = [[0,0],[50,0],[0,50],[50,50]];        /* NW NE SW SE in svg space */
+  for(var i=0;i<4;i++){
+    out += '<rect x="'+q[i][0]+'" y="'+q[i][1]+'" width="50" height="50" fill="'+
+           coverColour(coverage.b[i])+'" stroke="#cdbf9d" stroke-width="0.6"/>';
+  }
+  out += '<rect x="37.5" y="37.5" width="25" height="25" fill="'+coverColour(coverage.a)+
+         '" stroke="#16202E" stroke-width="1"/>';
+  out += '<circle cx="50" cy="50" r="2.4" fill="#16202E"/>';
+  out += '<text x="50" y="8" font-size="5.5" text-anchor="middle" fill="#8a7c60" '+
+         'font-family="monospace">10 KM</text>';
+  $("gridsvg").innerHTML = out;
+}
+
+/* ============================================================
+   8.  FLIGHT
+   ============================================================ */
+var st = {speed:70, throttle:0.75, pitchIn:0, rollIn:0, yawIn:0, crashed:false};
+var vel = new THREE.Vector3(), keys = {};
+function isTyping(){
+  var a = document.activeElement;
+  return !!(a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable));
+}
+addEventListener("keydown", function(e){
+  /* Controls stay completely inert while the briefing card is up or the user
+     is typing an address — otherwise every 'r' in "Durham" fires respawn(). */
+  if(isTyping() || !running) return;
+  keys[e.code] = true;
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) >= 0) e.preventDefault();
+  if(e.code === "KeyC") cycleCam();
+  if(e.code === "KeyR") respawn();
+  if(e.code === "KeyH") goHome();
+});
+addEventListener("keyup", function(e){ keys[e.code] = false; });
+
+var touch = {x:0, y:0, active:false};
+(function(){
+  var stick = $("stick"), knob = $("knob"), id = null, rad = 46;
+  function set(e){
+    var r = stick.getBoundingClientRect();
+    var dx = e.clientX - (r.left+r.width/2), dy = e.clientY - (r.top+r.height/2);
+    var d = Math.sqrt(dx*dx+dy*dy); if(d > rad){ dx = dx/d*rad; dy = dy/d*rad; }
+    knob.style.transform = "translate("+dx+"px,"+dy+"px)";
+    touch.x = dx/rad; touch.y = dy/rad; touch.active = true;
+  }
+  stick.addEventListener("pointerdown", function(e){ id = e.pointerId; stick.setPointerCapture(id); set(e); });
+  stick.addEventListener("pointermove", function(e){ if(e.pointerId === id) set(e); });
+  function end(e){ if(e.pointerId !== id) return; id = null; touch.x = 0; touch.y = 0;
+    touch.active = false; knob.style.transform = "translate(0,0)"; }
+  stick.addEventListener("pointerup", end); stick.addEventListener("pointercancel", end);
+  var pad = $("thrpad"), fill = pad.querySelector("i"), pid = null;
+  function setT(e){
+    var r = pad.getBoundingClientRect();
+    st.throttle = Math.max(0, Math.min(1, 1 - (e.clientY - r.top)/r.height));
+  }
+  pad.addEventListener("pointerdown", function(e){ pid = e.pointerId; pad.setPointerCapture(pid); setT(e); });
+  pad.addEventListener("pointermove", function(e){ if(e.pointerId === pid) setT(e); });
+  pad.addEventListener("pointerup", function(){ pid = null; });
+  window.__thrFill = fill;
+})();
+$("bCam").onclick = cycleCam; $("bRst").onclick = respawn; $("bHome").onclick = goHome;
+function cycleCam(){ if(!plane) return; camMode = (camMode+1)%3; }
+function respawn(){
+  if(!plane) return;
+  plane.position.set(0, startY, 3400); plane.quaternion.identity();
+  st.speed = 85; st.throttle = 0.75; st.crashed = false;
+  flash("Reset", "Nose on the home point");
+}
+function goHome(){
+  if(!plane) return;
+  plane.position.set(0, Math.max(startY, plane.position.y), 2200);
+  plane.quaternion.identity(); st.speed = Math.max(st.speed, 80); st.crashed = false;
+  flash("Returned to home point", chosen ? chosen.name : "");
+}
+var msgTimer = null;
+function flash(a, b){
+  var m = $("msg"); m.innerHTML = a + (b ? "<small>"+b+"</small>" : "");
+  m.classList.add("on"); clearTimeout(msgTimer);
+  msgTimer = setTimeout(function(){ m.classList.remove("on"); }, 2800);
+}
+
+var AX = new THREE.Vector3(1,0,0), AY = new THREE.Vector3(0,1,0), AZ = new THREE.Vector3(0,0,1);
+var fwd = new THREE.Vector3(), up = new THREE.Vector3(), right = new THREE.Vector3();
+var qTmp = new THREE.Quaternion();
+var LIMIT = HALF_B*1.15;
+
+function physics(dt){
+  var p = 0, r = 0, y = 0;
+  if(keys.ArrowUp) p -= 1; if(keys.ArrowDown) p += 1;
+  if(keys.ArrowLeft) r += 1; if(keys.ArrowRight) r -= 1;
+  if(keys.KeyA) y += 1; if(keys.KeyD) y -= 1;
+  if(keys.KeyW) st.throttle = Math.min(1, st.throttle + dt*0.55);
+  if(keys.KeyS) st.throttle = Math.max(0, st.throttle - dt*0.55);
+  if(touch.active){ p += touch.y; r -= touch.x; }
+  p = Math.max(-1,Math.min(1,p)); r = Math.max(-1,Math.min(1,r));
+  st.pitchIn += (p - st.pitchIn)*Math.min(1, dt*7);
+  st.rollIn  += (r - st.rollIn) *Math.min(1, dt*7);
+  st.yawIn   += (y - st.yawIn)  *Math.min(1, dt*6);
+
+  fwd.set(0,0,-1).applyQuaternion(plane.quaternion);
+  up.set(0,1,0).applyQuaternion(plane.quaternion);
+  right.set(1,0,0).applyQuaternion(plane.quaternion);
+
+  st.speed += (st.throttle*52 - 0.0052*st.speed*st.speed - 9.81*fwd.y*1.15)*dt;
+  st.speed = Math.max(0, Math.min(210, st.speed));
+  var auth = Math.min(1.15, st.speed/58);
+  plane.quaternion.multiply(qTmp.setFromAxisAngle(AX, st.pitchIn*1.25*auth*dt));
+  plane.quaternion.multiply(qTmp.setFromAxisAngle(AZ, st.rollIn*2.1*auth*dt));
+  plane.quaternion.multiply(qTmp.setFromAxisAngle(AY, st.yawIn*0.7*auth*dt));
+  plane.rotateOnWorldAxis(AY, -right.y*0.55*auth*dt);
+  if(Math.abs(r) < 0.05 && !touch.active) plane.rotateOnAxis(AZ, -right.y*0.5*dt);
+
+  vel.copy(fwd).multiplyScalar(st.speed);
+  vel.y -= Math.max(0, 1 - st.speed/44)*32;
+  plane.position.addScaledVector(vel, dt);
+  if(propeller) propeller.rotation.z += dt*(6 + st.throttle*70);
+
+  if(plane.position.y < 3.5){
+    plane.position.y = 3.5;
+    if(!st.crashed && st.speed > 30){
+      st.crashed = true; st.speed *= 0.25;
+      flash("Ground contact", "R to reset · H to return home");
+    }
+  } else if(plane.position.y > 6) st.crashed = false;
+  if(plane.position.y > 12000) plane.position.y = 12000;
+
+  var d = Math.sqrt(plane.position.x*plane.position.x + plane.position.z*plane.position.z);
+  if(d > LIMIT){
+    plane.position.x -= plane.position.x/d*(d-LIMIT)*dt*2.2;
+    plane.position.z -= plane.position.z/d*(d-LIMIT)*dt*2.2;
+  }
+}
+
+var camPos = new THREE.Vector3(), camAim = new THREE.Vector3(), tmp = new THREE.Vector3();
+function updateCam(dt){
+  if(camMode === 2){
+    camera.position.copy(plane.position).addScaledVector(up, 0.75).addScaledVector(fwd, 0.4);
+    camera.quaternion.copy(plane.quaternion); return;
+  }
+  var back = camMode === 0 ? 26 : 62, hgt = camMode === 0 ? 7.5 : 17;
+  tmp.copy(plane.position).addScaledVector(fwd, -back).addScaledVector(up, hgt);
+  camPos.lerp(tmp, Math.min(1, dt*4.2));
+  if(camPos.y < 4) camPos.y = 4;
+  camera.position.copy(camPos);
+  camAim.lerp(plane.position, Math.min(1, dt*7));
+  camera.up.copy(up).lerp(AY, 0.55).normalize();
+  camera.lookAt(camAim);
+}
+
+var COMPASS = ["NORTH","NE","EAST","SE","SOUTH","SW","WEST","NW"];
+var hudT = 0, navCtx = null;
+function updateHud(dt){
+  hudT += dt; if(hudT < 0.12) return; hudT = 0;
+  $("spd").textContent = Math.round(st.speed*1.944);
+  $("alt").textContent = Math.round(plane.position.y*3.281).toLocaleString();
+  var h = (Math.atan2(fwd.x, -fwd.z)*180/Math.PI + 360) % 360;
+  $("hdg").textContent = ("00"+Math.round(h)).slice(-3);
+  $("hdgname").textContent = COMPASS[Math.round(h/45)%8];
+  $("thrfill").style.height = (st.throttle*100)+"%";
+  if(window.__thrFill) window.__thrFill.style.height = (st.throttle*100)+"%";
+  var ll = worldToLatLon(plane.position.x, plane.position.z);
+  $("osgb").textContent = osgb(ll.lat, ll.lon) || ll.lat.toFixed(4)+", "+ll.lon.toFixed(4);
+  drawNav(h);
+}
+function drawNav(h){
+  if(!navCtx) navCtx = $("navc").getContext("2d");
+  var c = navCtx, S = 236, m = S/2, ext = HALF_B;
+  c.clearRect(0,0,S,S);
+  function tint(v){
+    return v === 2 ? "rgba(194,42,107,.26)" : v === 1 ? "rgba(194,42,107,.10)" :
+           v === 3 ? "rgba(150,150,150,.10)" : "rgba(231,222,201,.04)";
+  }
+  var q = [[0,0],[m,0],[0,m],[m,m]];
+  for(var i=0;i<4;i++){ c.fillStyle = tint(coverage.b[i]); c.fillRect(q[i][0], q[i][1], m, m); }
+  var inner = S*(HALF_A/ext)/2;
+  c.fillStyle = tint(coverage.a);
+  c.fillRect(m-inner, m-inner, inner*2, inner*2);
+  c.strokeStyle = "rgba(231,222,201,.22)"; c.lineWidth = 1;
+  for(var k=1;k<GRID;k++){
+    c.beginPath(); c.moveTo(k*S/GRID,0); c.lineTo(k*S/GRID,S); c.stroke();
+    c.beginPath(); c.moveTo(0,k*S/GRID); c.lineTo(S,k*S/GRID); c.stroke();
+  }
+  c.strokeStyle = "rgba(231,222,201,.55)";
+  c.strokeRect(m-inner, m-inner, inner*2, inner*2);
+  c.fillStyle = "rgba(231,222,201,.9)";
+  c.beginPath(); c.arc(m, m, 3.5, 0, 6.284); c.fill();
+  var px = m + plane.position.x/(ext*2)*S, py = m + plane.position.z/(ext*2)*S;
+  px = Math.max(7, Math.min(S-7, px)); py = Math.max(7, Math.min(S-7, py));
+  c.save(); c.translate(px, py); c.rotate(h*Math.PI/180);
+  c.fillStyle = "#C22A6B"; c.beginPath();
+  c.moveTo(0,-11); c.lineTo(7.5,9); c.lineTo(0,4.5); c.lineTo(-7.5,9); c.closePath(); c.fill();
+  c.restore();
+}
+function loop(){
+  if(!frameFailed) requestAnimationFrame(loop);
+  if(!running) return;
+  try{
+    var dt = Math.min(clock.getDelta(), 0.05);
+    physics(dt); updateCam(dt); updateHud(dt);
+    renderer.render(scene, camera);
+  }catch(err){
+    frameFailed = true; running = false;
+    report("Render loop", err);
+  }
+}
+function launch(){
+  $("brief").style.display = "none";
+  $("hud").classList.add("on"); $("ctl").classList.add("on");
+  plane.position.set(0, startY, 3400);
+  camPos.copy(plane.position).add(new THREE.Vector3(0,12,34));
+  camAim.copy(plane.position);
+  running = true; loop();
+  flash("Airborne", "Inbound to " + (chosen ? chosen.name : "home") + " · tiles still loading");
+}
+
+};
+</script>
+
+<script>
+/* ============================================================
+   BOOTSTRAP + DIAGNOSTICS
+   The artifact viewer runs this page on an opaque origin, so any
+   uncaught error is reported to the console as a bare
+   "Script error." with no message, file or line. This panel
+   catches errors inside the page and prints the real one.
+   ============================================================ */
+(function(){
+  function diag(kind, detail, fatal){
+    var d = document.getElementById("diag");
+    if(!d){
+      d = document.createElement("div");
+      d.id = "diag";
+      d.innerHTML = '<b style="display:block;font:800 10px/1 Helvetica,Arial;letter-spacing:.24em;'+
+        'color:#C22A6B;margin-bottom:8px">DIAGNOSTICS</b><div id="diagbody"></div>';
+      d.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;max-height:48%;"+
+        "overflow:auto;background:#1b0d15;border-top:2px solid #C22A6B;color:#E7DEC9;"+
+        "padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);"+
+        "font:11px/1.65 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;"+
+        "word-break:break-word";
+      document.body.appendChild(d);
+    }
+    var line = document.createElement("div");
+    line.style.marginBottom = "6px";
+    line.textContent = (fatal ? "✕ " : "· ") + kind + " — " + detail;
+    if(fatal) line.style.color = "#ff9ec0";
+    document.getElementById("diagbody").appendChild(line);
+  }
+  window.__diag = diag;
+
+  window.addEventListener("error", function(e){
+    var m = e.message || "(masked by cross-origin)";
+    diag("Runtime error", m + (e.filename ? "  @ " + e.filename + ":" + e.lineno : ""), true);
+  }, true);
+  window.addEventListener("unhandledrejection", function(e){
+    var r = e.reason;
+    diag("Network / promise", (r && (r.message || r)) || "unknown", false);
+  });
+
+  /* WebGL has to exist before three.js is worth loading */
+  var gl = null;
+  try{
+    var c = document.createElement("canvas");
+    gl = c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl");
+  }catch(err){}
+  if(!gl){
+    diag("WebGL unavailable",
+      "This viewer can't create a 3D context. Open the artifact in a new browser tab "+
+      "(or on desktop) and it should work.", true);
+    return;
+  }
+
+  var CDN = [
+    "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js",
+    "https://unpkg.com/three@0.128.0/build/three.min.js"
+  ];
+  function boot(){
+    try{ window.__APP(); }
+    catch(err){ diag("Startup failed", (err && (err.stack || err.message)) || String(err), true); }
+  }
+  (function load(i){
+    if(window.THREE) return boot();
+    if(i >= CDN.length){
+      diag("three.js blocked",
+        "None of the three CDN mirrors loaded. The viewer is blocking external scripts — "+
+        "try opening this file in a normal browser tab.", true);
+      return;
+    }
+    var s = document.createElement("script");
+    s.src = CDN[i];
+    s.crossOrigin = "anonymous";          /* so errors report their real message */
+    s.onload = function(){ window.THREE ? boot() : load(i+1); };
+    s.onerror = function(){ diag("CDN unreachable", CDN[i]); load(i+1); };
+    document.head.appendChild(s);
+  })(0);
+})();
+</script>
+</body>
+</html>
