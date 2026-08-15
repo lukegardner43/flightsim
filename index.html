@@ -220,8 +220,9 @@
       </div>
       <button id="flynow" type="button">Take off now — keep loading</button>
       <button id="retry" type="button" class="linky" style="display:none">Retry failed requests</button>
-      <p class="fine" id="loadnote">Five requests, not twenty-five: one for the detailed 2.5 km core, four for the surrounding
-        10 km. Each races all three Overpass mirrors and gives up after 40–50 seconds rather than hanging.</p>
+      <p class="fine" id="loadnote">Five requests, not twenty-five: one for the detailed 2.5 km core, then four for the
+        surrounding 10 km, two at a time. Each falls back through the Overpass mirrors in turn and gives up after
+        40–50 seconds rather than hanging.</p>
     </div>
   </div>
 </div>
@@ -704,22 +705,36 @@ function queryNotable(bb){
     ");out geom;";
 }
 
-/* Race every mirror; first valid answer wins, the rest are aborted.
-   A hard timeout means a stalled server can never freeze the load. */
+/* Mirrors are tried in a staggered race: the next one joins a few seconds
+   later, or immediately if the one before it fails. First valid answer wins
+   and the rest are aborted. Hitting all three at once for all five requests
+   means fifteen simultaneous queries from one address, which is exactly what
+   the public servers answer with 429, so the stagger is what keeps them
+   talking to us. A hard timeout means a stalled server can never freeze the
+   load either way. */
+var MIRROR_STAGGER = 2500;
 function overpassRace(q, timeoutMs){
   return new Promise(function(resolve, reject){
-    var ctrls = [], settled = false, fails = 0, lastErr = null;
-    function abortAll(){
+    var ctrls = [], timers = [], settled = false, started = 0, fails = 0, lastErr = null;
+    function cleanup(){
       for(var i=0;i<ctrls.length;i++){ try{ ctrls[i].abort(); }catch(e){} }
+      for(var t=0;t<timers.length;t++) clearTimeout(timers[t]);
     }
     var timer = setTimeout(function(){
       if(settled) return;
-      settled = true; abortAll();
+      settled = true; cleanup();
       reject(new Error("no mirror answered within " + Math.round(timeoutMs/1000) + "s"));
     }, timeoutMs);
-    OVERPASS.forEach(function(url){
-      var ctrl = null;
+    timers.push(timer);
+
+    function tryMirror(i){
+      if(settled || i >= OVERPASS.length) return;
+      if(i < started) return;                    /* already running */
+      started = i + 1;
+      var url = OVERPASS[i], ctrl = null;
       try{ ctrl = new AbortController(); ctrls.push(ctrl); }catch(e){}
+      /* the next mirror joins in on its own if this one is merely slow */
+      timers.push(setTimeout(function(){ tryMirror(i+1); }, MIRROR_STAGGER));
       fetch(url, {method:"POST",
                   signal: ctrl ? ctrl.signal : undefined,
                   body:"data=" + encodeURIComponent(q),
@@ -730,17 +745,29 @@ function overpassRace(q, timeoutMs){
         })
         .then(function(j){
           if(settled) return;
-          settled = true; clearTimeout(timer); abortAll(); resolve(j);
+          settled = true; clearTimeout(timer); cleanup(); resolve(j);
         })
         .catch(function(e){
           if(settled) return;
           lastErr = e; fails++;
+          tryMirror(started);                    /* don't wait out the stagger on a failure */
           if(fails >= OVERPASS.length){
-            settled = true; clearTimeout(timer);
+            settled = true; cleanup();
             reject(lastErr || new Error("all mirrors failed"));
           }
         });
-    });
+    }
+    tryMirror(0);
+  });
+}
+
+/* One free retry: a 429 or 504 from Overpass means "slot busy, come back",
+   not "no data here", and a short wait usually clears it. */
+function overpassTry(q, timeoutMs, retries, waitMs){
+  return overpassRace(q, timeoutMs).catch(function(err){
+    if(retries <= 0) throw err;
+    return new Promise(function(res){ setTimeout(res, waitMs); })
+      .then(function(){ return overpassTry(q, timeoutMs, retries-1, waitMs*2); });
   });
 }
 
@@ -964,6 +991,7 @@ var SUN = {
   dusk:{sky:[0x101a2e,0x9c5a6b], sun:0xc78a9a, si:0.45, amb:0x3d4a63, ai:0.44, fog:0x53607a, fd:0.00019}
 };
 var scene, camera, renderer, plane, propeller, clock, running = false, camMode = 0, startY = 420;
+var frameFailed = false;      /* set only when a frame throws, so the loop stops cleanly */
 
 function initScene(){
   var S = SUN[opt.sun];
@@ -1073,14 +1101,23 @@ $("go").onclick = function(){
 $("retry").onclick = function(){
   $("retry").style.display = "none";
   $("loadnote").textContent = "Retrying…";
-  if(coverage.a !== 2) phaseA();
-  for(var i=0;i<4;i++) if(coverage.b[i] !== 2) phaseB(i);
+  if(coverage.a !== 2 && coverage.a !== 1) phaseA();
+  for(var i=0;i<4;i++) if(coverage.b[i] === 0 || coverage.b[i] === 3) queueB(i);
 };
+
+/* The core comes first and alone; the outer quadrants follow two at a time.
+   Overpass gives each address a couple of slots, so queueing beats blasting:
+   five requests fired at once mostly come back as 429 and nothing loads. */
+var bQueue = [], bActive = 0, B_MAX = 2;
+function queueB(i){ if(bQueue.indexOf(i) < 0) bQueue.push(i); pumpB(); }
+function pumpB(){
+  while(bActive < B_MAX && bQueue.length){ bActive++; phaseB(bQueue.shift()); }
+}
+function bDone(){ bActive = Math.max(0, bActive-1); pumpB(); }
 
 function startLoad(){
   phaseA();
-  /* Phase B goes out immediately alongside A — different servers, no queue behind A. */
-  setTimeout(function(){ for(var i=0;i<4;i++) phaseB(i); }, 400);
+  setTimeout(function(){ for(var i=0;i<4;i++) queueB(i); }, 1200);
 }
 
 var QUAD = [                                   /* west, south, east, north (metres) */
@@ -1094,7 +1131,7 @@ function phaseA(){
   coverage.a = 1; drawGridSvg();
   status("fetching the core 2.5 km …");
   var t0 = Date.now();
-  overpassRace(queryFull(bboxM(-HALF_A, -HALF_A, HALF_A, HALF_A)), 40000)
+  overpassTry(queryFull(bboxM(-HALF_A, -HALF_A, HALF_A, HALF_A)), 40000, 1, 4000)
     .then(function(data){
       try{ buildCell(data, {inner:true, skipHalf:0, tallest:0}); }
       catch(err){ report("Core tile", err); }
@@ -1112,17 +1149,18 @@ function phaseA(){
 function phaseB(i){
   coverage.b[i] = 1; drawGridSvg();
   var qd = QUAD[i], t0 = Date.now();
-  overpassRace(queryNotable(bboxM(qd[0], qd[1], qd[2], qd[3])), 50000)
+  overpassTry(queryNotable(bboxM(qd[0], qd[1], qd[2], qd[3])), 50000, 1, 4000)
     .then(function(data){
       try{ buildCell(data, {inner:false, skipHalf:HALF_A, tallest:0}); }
       catch(err){ report("Outer quadrant " + i, err); }
       coverage.b[i] = 2;
-      tally(); maybeFinish();
+      bDone(); tally(); maybeFinish();
     })
     .catch(function(err){
-      coverage.b[i] = 3; tally();
+      coverage.b[i] = 3; bDone(); tally();
       if(coverage.a === 2) status("outer quadrant unavailable — core is flying");
-      else fail("Outer area", err);
+      else if(coverage.a === 3) fail("Outer area", err);
+      /* core still in flight: leave the note alone, it has the better story */
     });
 }
 function maybeFinish(){
@@ -1346,14 +1384,21 @@ function loop(){
     report("Render loop", err);
   }
 }
+/* Wrapped: launch() is called from inside a promise chain, so an exception here
+   would otherwise vanish into an unhandled rejection and leave a black screen. */
 function launch(){
-  $("brief").style.display = "none";
-  $("hud").classList.add("on"); $("ctl").classList.add("on");
-  plane.position.set(0, startY, 3400);
-  camPos.copy(plane.position).add(new THREE.Vector3(0,12,34));
-  camAim.copy(plane.position);
-  running = true; loop();
-  flash("Airborne", "Inbound to " + (chosen ? chosen.name : "home") + " · tiles still loading");
+  try{
+    $("brief").style.display = "none";
+    $("hud").classList.add("on"); $("ctl").classList.add("on");
+    plane.position.set(0, startY, 3400);
+    camPos.copy(plane.position).add(new THREE.Vector3(0,12,34));
+    camAim.copy(plane.position);
+    running = true; loop();
+    flash("Airborne", "Inbound to " + (chosen ? chosen.name : "home") + " · tiles still loading");
+  }catch(err){
+    running = false;
+    report("Launch", err);
+  }
 }
 
 };
