@@ -203,7 +203,8 @@
       <button id="go" disabled>Find a place first</button>
       <p class="fine">Map data © OpenStreetMap contributors (ODbL) via Overpass. Postcode geocoding by
         Postcodes.io; place search by Nominatim. Aerial imagery © Esri and its sources. Terrain heights from
-        Terrarium DEM tiles (AWS open elevation data). Building heights are estimated where OSM has none —
+        Terrarium DEM tiles (AWS open elevation data). Buildings use whatever the map actually holds: a
+        modelled 3D shape where one exists, else a tagged height, else an estimate from the footprint —
         not for navigation.</p>
     </div>
 
@@ -214,6 +215,7 @@
         <div class="gs">
           <div><b id="cellsDone">0</b> / 9 requests · <span id="cellState">contacting Overpass</span></div>
           <div style="margin-top:6px"><b id="bCount">0</b> buildings</div>
+          <div id="tiers">—</div>
           <div><b id="rCount">0</b> km of road</div>
           <div style="margin-top:6px;color:#8a7c60" id="here"></div>
           <div class="bar"><i id="barfill"></i></div>
@@ -615,6 +617,19 @@ Batch.prototype.addGeom = function(g, col, yOffset, drape){
   }
   g.dispose();
 };
+/* Same as addTri, but the winding is flipped when the face normal points back
+   toward `ref` (a point inside the solid). MeshLambertMaterial shades per
+   vertex, so gl_FrontFacing cannot rescue an inward normal the way it does on
+   a per-fragment material — a roof slope with a downward normal is simply lit
+   as though it faced the ground. Every roof face has to be wound outward. */
+Batch.prototype.addTriOut = function(a,b,c,col,ref){
+  var nx = (b.y-a.y)*(c.z-a.z) - (b.z-a.z)*(c.y-a.y);
+  var ny = (b.z-a.z)*(c.x-a.x) - (b.x-a.x)*(c.z-a.z);
+  var nz = (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x);
+  var dx = (a.x+b.x+c.x)/3 - ref.x, dy = (a.y+b.y+c.y)/3 - ref.y, dz = (a.z+b.z+c.z)/3 - ref.z;
+  if(nx*dx + ny*dy + nz*dz < 0) this.addTri(a, c, b, col);
+  else this.addTri(a, b, c, col);
+};
 Batch.prototype.addTri = function(a,b,c,col){
   var ux=b.x-a.x, uy=b.y-a.y, uz=b.z-a.z, vx=c.x-a.x, vy=c.y-a.y, vz=c.z-a.z;
   var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
@@ -791,6 +806,7 @@ var QUALITY = {
   high: {core: 26000, mid: 11000, outer: 5000, trees: 2200, midHalf: 3600}
 };
 var Q, treeBudget = 0, statBuildings = 0, statRoadM = 0;
+var statModelled = 0, statMeasured = 0, statEstimated = 0;   /* the three tiers */
 var world = new THREE.Group();
 /* 0 pending, 1 loading, 2 done, 3 failed */
 var coverage = {a:0, m:[0,0,0,0], b:[0,0,0,0]};
@@ -811,6 +827,8 @@ function queryFull(bb){
   return "[out:json][timeout:45];(" +
     'way["building"]('+b+');' +
     'relation["building"]["type"="multipolygon"]('+b+');' +
+    'way["building:part"]('+b+');' +                  /* Simple 3D Buildings */
+    'relation["building:part"]('+b+');' +
     'way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|pedestrian|footway|motorway_link|trunk_link|primary_link)$"]('+b+');' +
     'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
     'way["landuse"~"^(grass|forest|meadow|village_green|recreation_ground|cemetery|allotments)$"]('+b+');' +
@@ -825,6 +843,8 @@ function queryMid(bb){
   return "[out:json][timeout:45];(" +
     'way["building"]('+b+');' +
     'relation["building"]["type"="multipolygon"]('+b+');' +
+    'way["building:part"]('+b+');' +
+    'relation["building:part"]('+b+');' +
     'way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|motorway_link|trunk_link|primary_link)$"]('+b+');' +
     'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
     'way["landuse"~"^(grass|forest|meadow|village_green|recreation_ground|cemetery)$"]('+b+');' +
@@ -836,6 +856,8 @@ function queryNotable(bb){
   return "[out:json][timeout:45];(" +
     'way["building"~"'+NOTABLE+'"]('+b+');' +
     'way["building"]["building:levels"]('+b+');' +
+    'way["building:part"]('+b+');' +                  /* landmarks are the point of this ring */
+    'relation["building:part"]('+b+');' +
     'way["highway"~"^(motorway|trunk|primary|secondary|motorway_link|trunk_link)$"]('+b+');' +
     'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
     'way["landuse"~"^(forest|farmland|meadow)$"]('+b+');' +
@@ -920,6 +942,122 @@ function overpassTry(q, timeoutMs, retries, waitMs){
   });
 }
 
+/* ============================================================
+   5.5  ROOFS AND MATERIALS
+   The top of the model cascade. Where OSM carries a real roof shape
+   we build that shape; where it doesn't we read the footprint and
+   give it the roof a British building of those proportions has.
+   Everything here works off an oriented box fitted to the footprint,
+   which is what makes a terrace look like a terrace instead of a row
+   of pyramids.
+   ============================================================ */
+function orientedBox(pts, dirRad){
+  var i, d = dirRad, best = -1;
+  if(d == null){                                   /* longest edge sets the ridge */
+    for(i=0;i<pts.length;i++){
+      var a = pts[i], b = pts[(i+1)%pts.length];
+      var L = (b.x-a.x)*(b.x-a.x) + (b.z-a.z)*(b.z-a.z);
+      if(L > best){ best = L; d = Math.atan2(b.z-a.z, b.x-a.x); }
+    }
+    if(best <= 0) return null;
+  }
+  var ux = Math.cos(d), uz = Math.sin(d);
+  var lo1 = 1e9, hi1 = -1e9, lo2 = 1e9, hi2 = -1e9;
+  for(i=0;i<pts.length;i++){
+    var pu = pts[i].x*ux + pts[i].z*uz, pv = -pts[i].x*uz + pts[i].z*ux;
+    if(pu < lo1) lo1 = pu; if(pu > hi1) hi1 = pu;
+    if(pv < lo2) lo2 = pv; if(pv > hi2) hi2 = pv;
+  }
+  var cu = (lo1+hi1)/2, cv = (lo2+hi2)/2, hu = (hi1-lo1)/2, hv = (hi2-lo2)/2;
+  var box = {cx: cu*ux - cv*uz, cz: cu*uz + cv*ux, ux:ux, uz:uz, hu:hu, hv:hv};
+  if(hv > hu){ box = {cx:box.cx, cz:box.cz, ux:-uz, uz:ux, hu:hv, hv:hu}; }
+  box.area = 4*box.hu*box.hv;
+  return box;
+}
+function boxPoint(box, su, sv, y){
+  return {x: box.cx + su*box.hu*box.ux - sv*box.hv*box.uz, y: y,
+          z: box.cz + su*box.hu*box.uz + sv*box.hv*box.ux};
+}
+function roofRidged(b, box, y, h, hipped, col){
+  var ru = hipped && box.hu > 0 ? Math.max(0, 1 - box.hv/box.hu) : 1;
+  var c00 = boxPoint(box,-1,-1,y), c10 = boxPoint(box,1,-1,y),
+      c11 = boxPoint(box,1,1,y),   c01 = boxPoint(box,-1,1,y);
+  var rA = boxPoint(box,-ru,0,y+h), rB = boxPoint(box,ru,0,y+h);
+  var ref = {x:box.cx, y:y-1, z:box.cz};
+  b.addTriOut(c00, c10, rB, col, ref); b.addTriOut(c00, rB, rA, col, ref);   /* one slope */
+  b.addTriOut(c11, c01, rA, col, ref); b.addTriOut(c11, rA, rB, col, ref);   /* the other */
+  b.addTriOut(c00, rA, c01, col, ref); b.addTriOut(c10, c11, rB, col, ref);  /* ends/hips */
+}
+function roofSkillion(b, box, y, h, col){
+  var c00 = boxPoint(box,-1,-1,y), c10 = boxPoint(box,1,-1,y),
+      c11 = boxPoint(box,1,1,y),   c01 = boxPoint(box,-1,1,y);
+  var r00 = boxPoint(box,-1,-1,y+h), r10 = boxPoint(box,1,-1,y+h);
+  var ref = {x:box.cx, y:y-1, z:box.cz};
+  b.addTriOut(c01, c11, r10, col, ref); b.addTriOut(c01, r10, r00, col, ref);
+  b.addTriOut(c00, r00, c01, col, ref); b.addTriOut(c10, c11, r10, col, ref);
+}
+function roofPyramid(b, pts, y, h, col){
+  var c = centroid(pts), apex = {x:c.x, y:y+h, z:c.z}, ref = {x:c.x, y:y-1, z:c.z};
+  for(var i=0;i<pts.length;i++){
+    var p1 = pts[i], p2 = pts[(i+1)%pts.length];
+    b.addTriOut({x:p1.x,y:y,z:p1.z}, {x:p2.x,y:y,z:p2.z}, apex, col, ref);
+  }
+}
+/* Dome and onion: rings shrunk toward the centre along a curved profile. A
+   footprint with only a few corners is domed over its inscribed ellipse —
+   a five-step staircase is not what "roof:shape=dome" means. */
+function roofDome(b, pts, box, y, h, onion, col){
+  var base = pts, i, k;
+  if(pts.length < 10 && box){
+    base = [];
+    for(i=0;i<20;i++){
+      var a = i/20*Math.PI*2;
+      base.push(boxPoint(box, Math.cos(a), Math.sin(a), y));
+    }
+  }
+  var c = centroid(base), ref = {x:c.x, y:y-1, z:c.z}, N = 6;
+  var prev = base.map(function(p){ return {x:p.x, y:y, z:p.z}; });
+  for(k=1;k<=N;k++){
+    var th = k/N*Math.PI/2;
+    var s = Math.cos(th), hy = y + Math.sin(th)*h;
+    if(onion){ s = Math.cos(th)*(1 + 0.42*Math.sin(th*2)); hy = y + Math.pow(Math.sin(th), 0.72)*h; }
+    var ring = [];
+    for(i=0;i<base.length;i++)
+      ring.push({x:c.x + (base[i].x-c.x)*s, y:hy, z:c.z + (base[i].z-c.z)*s});
+    for(i=0;i<base.length;i++){
+      var j = (i+1)%base.length;
+      b.addTriOut(prev[i], prev[j], ring[j], col, ref);
+      b.addTriOut(prev[i], ring[j], ring[i], col, ref);
+    }
+    prev = ring;
+  }
+}
+
+var ROOF_MAT = {
+  tile:0x8a4a3a, tiles:0x8a4a3a, roof_tiles:0x8a4a3a, clay:0x9a5238,
+  slate:0x3c434c, metal:0x8d949c, copper:0x4e8f78, zinc:0x8a9099, lead:0x77797e,
+  tar_paper:0x33353a, asphalt:0x35383d, bitumen:0x33353a, concrete:0x8e8d88,
+  glass:0x7fa3b5, thatch:0xb08d4e, wood:0x7a5c3c, eternit:0x8e8d88, gravel:0x8b8579
+};
+var WALL_MAT = {
+  brick:0xa4705c, red_brick:0x9e5f4a, sandstone:0xc0a878, limestone:0xcfc6ac,
+  stone:0xa9a294, concrete:0xa8a69f, glass:0x8fb0c4, metal:0x9aa1a8,
+  wood:0x9a7d58, plaster:0xd6cfc0, render:0xd6cfc0, cement_block:0xa8a69f,
+  timber_framing:0xbfae92, granite:0x8f8c88, marble:0xdcd6ca
+};
+function osmColour(v){
+  if(!v) return null;
+  var s = String(v).trim().toLowerCase();
+  if(/^#[0-9a-f]{3}$|^#[0-9a-f]{6}$/.test(s)) return new THREE.Color(s);
+  if(THREE.Color.NAMES && THREE.Color.NAMES[s] != null) return new THREE.Color(THREE.Color.NAMES[s]);
+  return null;
+}
+function matColour(table, v){
+  if(!v) return null;
+  var s = String(v).trim().toLowerCase();
+  return table[s] != null ? new THREE.Color(table[s]) : null;
+}
+
 /* ---- mesh construction for one fetched chunk ---- */
 var matBuild, matRoof, matFlat;
 function inSkip(x, z, cell){
@@ -927,64 +1065,185 @@ function inSkip(x, z, cell){
 }
 function buildCell(data, cell){
   var els = data.elements || [];
-  var bl = [], rd = [], ar = [], tr = [], i;
+  var bl = [], pt = [], rd = [], ar = [], tr = [], i;
   for(i=0;i<els.length;i++){
     var e = els[i], t = e.tags || {};
     if(e.type === "node"){ if(t.natural === "tree") tr.push(e); continue; }
-    if(t.building) bl.push(e);
+    if(t["building:part"]) pt.push(e);          /* a modelled volume wins over its outline */
+    else if(t.building) bl.push(e);
     else if(t.highway) rd.push(e);
     else if(t.natural === "water" || t.waterway === "riverbank" || t.landuse || t.leisure) ar.push(e);
   }
   var g = new THREE.Group();
   addAreas(ar, g, cell);
   addRoads(rd, g, cell);
-  addBuildings(bl, g, cell);
+  addBuildings(bl, pt, g, cell);
   if(cell.inner && Q.trees > 0) addTrees(tr, g);
   world.add(g);
   cell.group = g;
 }
 
-function addBuildings(list, group, cell){
-  var walls = new Batch(), roofs = new Batch(), prepared = [], i, o;
-  for(i=0;i<list.length;i++){
-    var e = list[i], t = e.tags || {}, rings = [];
-    if(e.type === "way" && e.geometry) rings.push({role:"outer", pts:ringToPts(e.geometry)});
-    else if(e.type === "relation" && e.members){
-      for(var m=0;m<e.members.length;m++){
-        var mem = e.members[m];
-        if(mem.type !== "way" || !mem.geometry || mem.geometry.length < 4) continue;
-        rings.push({role: mem.role === "inner" ? "inner" : "outer", pts:ringToPts(mem.geometry)});
-      }
-    }
-    var outers = rings.filter(function(r){ return r.role === "outer" && r.pts.length > 2; });
-    var inners = rings.filter(function(r){ return r.role === "inner" && r.pts.length > 2; });
-    for(o=0;o<outers.length;o++){
-      var pts = outers[o].pts, area = Math.abs(signedArea(pts));
-      if(area < 14) continue;
-      var c = centroid(pts), dist = Math.sqrt(c.x*c.x + c.z*c.z);
-      if(inSkip(c.x, c.z, cell)) continue;         /* already drawn at full detail */
-      if(area < cell.minArea) continue;
-      prepared.push({pts:pts, holes:(o===0?inners:null), tags:t, area:area, dist:dist,
-                     score:area/(1 + dist*0.0018)});
+/* Pull the outer/inner rings out of a way or multipolygon relation. */
+function ringsOf(e){
+  var rings = [];
+  if(e.type === "way" && e.geometry) rings.push({role:"outer", pts:ringToPts(e.geometry)});
+  else if(e.type === "relation" && e.members){
+    for(var m=0;m<e.members.length;m++){
+      var mem = e.members[m];
+      if(mem.type !== "way" || !mem.geometry || mem.geometry.length < 4) continue;
+      rings.push({role: mem.role === "inner" ? "inner" : "outer", pts:ringToPts(mem.geometry)});
     }
   }
-  prepared.sort(function(a,b){ return b.score - a.score; });
-  var cap = Math.max(0, cell.cap|0);
-  if(prepared.length > cap) prepared.length = cap;
+  return rings;
+}
+function bboxOf(pts){
+  var x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+  for(var i=0;i<pts.length;i++){
+    if(pts[i].x < x0) x0 = pts[i].x; if(pts[i].x > x1) x1 = pts[i].x;
+    if(pts[i].z < z0) z0 = pts[i].z; if(pts[i].z > z1) z1 = pts[i].z;
+  }
+  return [x0, z0, x1, z1];
+}
+function pointInPoly(p, pts){
+  var inside = false;
+  for(var i=0, j=pts.length-1; i<pts.length; j=i++){
+    if((pts[i].z > p.z) !== (pts[j].z > p.z) &&
+       p.x < (pts[j].x - pts[i].x)*(p.z - pts[i].z)/(pts[j].z - pts[i].z) + pts[i].x) inside = !inside;
+  }
+  return inside;
+}
+
+/* THE CASCADE.  Every volume falls into one of three tiers:
+     modelled  - an OSM building:part, i.e. somebody has actually modelled
+                 this building in 3D. Rendered exactly as tagged.
+     measured  - a real height or storey count in the tags.
+     estimated - nothing but a footprint; the UK-tuned guess in section 3.
+   Roof shape follows the same idea: tagged shape if there is one, else the
+   shape the footprint's proportions imply. */
+var LEVEL_H = 2.95;
+function volumeOf(t, area, dist, seed){
+  var v = {tier:"estimated"};
+  var explicit = parseLen(t.height || t["building:height"]);
+  var lv = parseFloat(t["building:levels"]);
+  if(!isNaN(explicit) && explicit > 1 && explicit < 900){ v.h = explicit; v.tier = "measured"; }
+  else if(!isNaN(lv) && lv > 0 && lv < 200){
+    var fh = (t.building === "office" || t.building === "commercial") ? 3.8 : LEVEL_H;
+    v.h = lv*fh + 1.4; v.tier = "measured";
+  }else{
+    v.h = estimateHeight(t, area, dist, seed);
+  }
+  v.minH = parseLen(t.min_height);
+  if(isNaN(v.minH)){
+    var ml = parseFloat(t["building:min_level"]);
+    v.minH = !isNaN(ml) ? ml*LEVEL_H : 0;
+  }
+  v.roofH = parseLen(t["roof:height"]);
+  if(isNaN(v.roofH)){
+    var rl = parseFloat(t["roof:levels"]);
+    v.roofH = !isNaN(rl) ? rl*2.6 : NaN;
+  }
+  return v;
+}
+var ROOF_ALIAS = {
+  "half-hipped":"hipped", gambrel:"hipped", mansard:"hipped", round:"dome",
+  onion:"onion", spire:"cone", cone:"cone", pyramidal:"pyramidal", dome:"dome",
+  gabled:"gabled", hipped:"hipped", skillion:"skillion", "pitched":"gabled",
+  "double_saltbox":"gabled", saltbox:"gabled", flat:"flat"
+};
+function roofPlan(t, pts, box, area, house, roofH){
+  var s = ROOF_ALIAS[String(t["roof:shape"] || "").trim().toLowerCase()];
+  var tagged = !!s;
+  var boxy = box && box.area > 0 && area/box.area > 0.72;   /* is it really a rectangle? */
+  if(!s){
+    /* untagged: a long narrow footprint is a terrace or semi and wants a
+       ridge, a squat one wants a hip, anything big and flat-roofed stays flat */
+    if(!house) s = "flat";
+    else if(boxy && box.hu/Math.max(0.6, box.hv) > 1.25) s = "gabled";
+    else if(boxy) s = "hipped";
+    else s = "pyramidal";
+  }
+  if((s === "gabled" || s === "hipped" || s === "skillion") && !boxy) s = "pyramidal";
+  if(isNaN(roofH)){
+    if(s === "flat") roofH = 0;
+    else if(s === "skillion") roofH = Math.min(3.5, box ? box.hv*0.6 : 2);
+    else if(s === "gabled" || s === "hipped") roofH = Math.min(6, (box ? box.hv : Math.sqrt(area)/2)*0.95);
+    else if(s === "cone") roofH = Math.min(30, Math.sqrt(area)*1.6);
+    else if(s === "dome" || s === "onion") roofH = box ? box.hv*1.1 : Math.sqrt(area)*0.5;
+    else roofH = Math.min(12, Math.sqrt(area)*0.55);        /* pyramidal */
+    if(!tagged && house) roofH = Math.min(roofH, 4.2);
+  }
+  return {shape:s, h:Math.max(0, roofH)};
+}
+function roofColour(t, seed, shape){
+  var c = osmColour(t["roof:colour"]) || matColour(ROOF_MAT, t["roof:material"]);
+  if(c) return c;
+  c = (shape === "flat" ? COL.roofFlat : COL.roofHouse).clone();
+  return c.offsetHSL(0, (hash(seed,41)-0.5)*0.1, (hash(seed,51)-0.5)*0.09);
+}
+
+function addBuildings(list, parts, group, cell){
+  var walls = new Batch(), roofs = new Batch();
+  var outlines = [], modelled = [], i, o, r;
+
+  function collect(src, into, isPart){
+    for(var n=0;n<src.length;n++){
+      var e = src[n], t = e.tags || {}, rings = ringsOf(e);
+      var outers = rings.filter(function(x){ return x.role === "outer" && x.pts.length > 2; });
+      var inners = rings.filter(function(x){ return x.role === "inner" && x.pts.length > 2; });
+      for(var k=0;k<outers.length;k++){
+        var pts = outers[k].pts, area = Math.abs(signedArea(pts));
+        if(area < (isPart ? 6 : 14)) continue;
+        var c = centroid(pts), dist = Math.sqrt(c.x*c.x + c.z*c.z);
+        if(inSkip(c.x, c.z, cell)) continue;       /* already drawn at full detail */
+        if(!isPart && area < cell.minArea) continue;
+        into.push({pts:pts, holes:(k===0 ? inners : null), tags:t, area:area, dist:dist, c:c,
+                   part:isPart, bb:isPart ? null : bboxOf(pts),
+                   score:area/(1 + dist*0.0018)});
+      }
+    }
+  }
+  collect(list, outlines, false);
+  collect(parts || [], modelled, true);
+
+  /* An outline with modelled parts inside it is replaced by them — otherwise
+     the plain box would sit inside the detailed model and poke through it. */
+  for(i=0;i<modelled.length;i++){
+    var pc = modelled[i].c;
+    for(o=0;o<outlines.length;o++){
+      var ol = outlines[o];
+      if(ol.dead) continue;
+      if(pc.x < ol.bb[0] || pc.x > ol.bb[2] || pc.z < ol.bb[1] || pc.z > ol.bb[3]) continue;
+      if(pointInPoly(pc, ol.pts)) ol.dead = true;
+    }
+  }
+  var live = [];
+  for(o=0;o<outlines.length;o++) if(!outlines[o].dead) live.push(outlines[o]);
+  live.sort(function(a,b){ return b.score - a.score; });
+  var cap = Math.max(0, (cell.cap|0) - modelled.length);
+  if(live.length > cap) live.length = cap;
+  var prepared = modelled.concat(live);
 
   var tallest = 0;
-  for(var k=0;k<prepared.length;k++){
-    var b = prepared[k];
+  for(var k2=0;k2<prepared.length;k2++){
+    var b = prepared[k2];
     var seed = Math.round(b.pts[0].x*3.7 + b.pts[0].z*1.9);
-    var h = estimateHeight(b.tags, b.area, b.dist, seed);
-    var minH = parseLen(b.tags.min_height) || 0;
+    var v = volumeOf(b.tags, b.area, b.dist, seed);
+    if(b.part) v.tier = "modelled";
+    var h = Math.min(v.h, 400), minH = v.minH;
     if(!(h > minH)) h = minH + 3;
-    h = Math.min(h, 400);
     tallest = Math.max(tallest, h);
+
     var house = isHouse(b.tags, b.area, h);
-    var roofH = house ? Math.min(3.6, Math.sqrt(b.area)*0.26) : 0;
+    var box = b.pts.length < 60 ? orientedBox(b.pts, null) : null;
+    if(b.tags["roof:direction"] !== undefined){
+      var rd = parseFloat(b.tags["roof:direction"]);
+      /* roof:direction is a compass bearing of the slope; the ridge runs across it */
+      if(!isNaN(rd)) box = orientedBox(b.pts, (90 - rd)*Math.PI/180 + Math.PI/2);
+    }
+    var plan = roofPlan(b.tags, b.pts, box, b.area, house, v.roofH);
+    var roofH = Math.min(plan.h, Math.max(0, h - minH - 1.2));
     var wallTop = h - roofH;
-    if(wallTop < minH + 2.2) wallTop = minH + 2.2;
+    if(wallTop < minH + 1.2) wallTop = minH + 1.2;
 
     /* One ground height per building: a building sits on a level pad, it
        doesn't shear to follow the hillside. */
@@ -995,18 +1254,20 @@ function addBuildings(list, group, cell){
     try{ geo = new THREE.ExtrudeGeometry(shape, {depth:wallTop-minH, bevelEnabled:false, curveSegments:1}); }
     catch(err){ continue; }
     geo.rotateX(-Math.PI/2);
-    walls.addGeom(geo, wallColour(h, seed, house), pad + minH);
+    var wc = osmColour(b.tags["building:colour"]) || matColour(WALL_MAT, b.tags["building:material"]) ||
+             wallColour(h, seed, house);
+    walls.addGeom(geo, wc, pad + minH);
 
-    if(house && roofH > 0.6 && b.pts.length < 24){
-      var top = pad + wallTop;
-      var cc = centroid(b.pts), apex = {x:cc.x, y:top+roofH, z:cc.z};
-      var rc = COL.roofHouse.clone().offsetHSL(0,(hash(seed,41)-0.5)*0.1,(hash(seed,51)-0.5)*0.09);
-      for(var v=0;v<b.pts.length;v++){
-        var p1 = b.pts[v], p2 = b.pts[(v+1)%b.pts.length];
-        roofs.addTri({x:p1.x,y:top,z:p1.z},{x:p2.x,y:top,z:p2.z}, apex, rc);
-        roofs.addTri({x:p2.x,y:top,z:p2.z},{x:p1.x,y:top,z:p1.z}, apex, rc);
-      }
+    if(roofH > 0.4 && plan.shape !== "flat"){
+      var top = pad + wallTop, rc = roofColour(b.tags, seed, plan.shape);
+      if(plan.shape === "gabled" || plan.shape === "hipped") roofRidged(roofs, box, top, roofH, plan.shape === "hipped", rc);
+      else if(plan.shape === "skillion") roofSkillion(roofs, box, top, roofH, rc);
+      else if(plan.shape === "dome" || plan.shape === "onion") roofDome(roofs, b.pts, box, top, roofH, plan.shape === "onion", rc);
+      else if(b.pts.length < 40) roofPyramid(roofs, b.pts, top, roofH, rc);   /* pyramidal, cone, spire */
     }
+    if(v.tier === "modelled") statModelled++;
+    else if(v.tier === "measured") statMeasured++;
+    else statEstimated++;
   }
   statBuildings += prepared.length;
   if(walls.count()) group.add(walls.mesh(matBuild));
@@ -1260,8 +1521,19 @@ function buildAircraft(){
    ============================================================ */
 var CELLS = 9;                      /* 1 core + 4 mid + 4 outer */
 function status(txt){ $("cellState").textContent = txt; }
+/* Which tier of the model cascade this place actually landed on. */
+function tierLine(){
+  if(!statBuildings) return "—";
+  var out = [];
+  if(statModelled) out.push(statModelled.toLocaleString() + " 3D-modelled");
+  else out.push("no 3D models here");
+  if(statMeasured) out.push(statMeasured.toLocaleString() + " measured");
+  if(statEstimated) out.push(statEstimated.toLocaleString() + " estimated");
+  return out.join(" · ");
+}
 function tally(){
   $("bCount").textContent = statBuildings.toLocaleString();
+  $("tiers").textContent = tierLine();
   $("rCount").textContent = Math.round(statRoadM/1000).toLocaleString();
   var done = (coverage.a === 2 ? 1 : 0), i;
   for(i=0;i<4;i++) if(coverage.m[i] === 2) done++;
@@ -1396,6 +1668,7 @@ function maybeFinish(){
     $("loadhd").textContent = "World ready";
     status("complete");
     if(!running && coverage.a === 2) launch();
+    else if(running) flash("World complete", tierLine());
   }
 }
 $("flynow").onclick = function(){ if(!running && plane) launch(); };
@@ -1662,7 +1935,9 @@ window.__sim = {
   camera: function(){ return camera; },
   plane: function(){ return plane; },
   stats: function(){ return {buildings: statBuildings, roadKm: Math.round(statRoadM/1000),
-                             relief: HF.ready ? Math.round(HF.max - HF.min) : null}; },
+                             relief: HF.ready ? Math.round(HF.max - HF.min) : null,
+                             modelled: statModelled, measured: statMeasured,
+                             estimated: statEstimated}; },
   freeze: function(){ running = false; },
   draw:   function(){ if(renderer && scene && camera) renderer.render(scene, camera); }
 };
