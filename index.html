@@ -289,6 +289,13 @@ function reportText(){
          statMeasured + " measured + " + statEstimated + " estimated;  " +
          Math.round(statRoadM/1000) + " km road;  " + statSkipped + " skipped;  " +
          statStreamed + " squares streamed in");
+  var ip = IMG_LAYERS.map(function(x){
+    var n = 0; for(var k in x.tiles) n++;
+    var live = 0; for(k in x.tiles) if(x.tiles[k].mesh) live++;
+    return "z" + x.z + " " + live + "/" + n;
+  }).join("  ");
+  L.push("imagery  " + (ip || "(none)") + "   asked " + imgStat.req + ", drew " + imgStat.ok +
+         ", refused " + imgStat.fail + ", cached " + imgStat.hit + ", queued " + imgQ.length);
   L.push("webgl    " + (renderer ? (renderer.capabilities.isWebGL2 ? "webgl2" : "webgl1") : "no renderer") +
          "   three " + (window.THREE ? THREE.REVISION : "?"));
   L.push("requests");
@@ -697,6 +704,52 @@ function makeShape(outer, holes){
   }
   return sh;
 }
+/* Shrink a ring inward by d metres along each vertex's angle bisector. Used to
+   give a green area a soft edge instead of the hard cartoon boundary that made
+   parks look like paint spilled on the photograph. Concave and skinny rings
+   can self-intersect when offset, so the result is checked and thrown away if
+   it collapsed or flipped. */
+function insetRing(pts, d){
+  var n = pts.length;
+  if(n < 3 || !(d > 0)) return null;
+  var a0 = signedArea(pts);
+  if(!isFinite(a0) || Math.abs(a0) < 1) return null;
+  var sgn = a0 > 0 ? 1 : -1, out = [], i;
+  for(i=0;i<n;i++){
+    var p = pts[i], a = pts[(i-1+n)%n], c = pts[(i+1)%n];
+    var v1x = p.x-a.x, v1z = p.z-a.z, l1 = Math.sqrt(v1x*v1x + v1z*v1z);
+    var v2x = c.x-p.x, v2z = c.z-p.z, l2 = Math.sqrt(v2x*v2x + v2z*v2z);
+    if(!(l1 > 1e-6) || !(l2 > 1e-6)) return null;
+    v1x/=l1; v1z/=l1; v2x/=l2; v2z/=l2;
+    /* left normals of the two edges; for a positively wound ring they point in */
+    var n1x = -v1z*sgn, n1z = v1x*sgn, n2x = -v2z*sgn, n2z = v2x*sgn;
+    var bx = n1x+n2x, bz = n1z+n2z, bl = Math.sqrt(bx*bx + bz*bz);
+    if(!(bl > 1e-4)) return null;                 /* a spike: no sane offset */
+    bx/=bl; bz/=bl;
+    var k = d/Math.max(0.4, bx*n1x + bz*n1z);     /* longer at sharp corners */
+    out.push({x:p.x + bx*k, z:p.z + bz*k});
+  }
+  var a1 = signedArea(out);
+  if(!isFinite(a1) || a1*a0 <= 0 || Math.abs(a1) < Math.abs(a0)*0.25) return null;
+  return out;
+}
+/* 0 at the outline, 1 a few metres inside. Read as the vegetation alpha map,
+   so a wood fades into the aerial photograph rather than butting against it. */
+var vegRampTex = null;
+function vegRamp(){
+  if(vegRampTex) return vegRampTex;
+  var c = document.createElement("canvas");
+  c.width = 64; c.height = 1;
+  var x = c.getContext("2d");
+  for(var i=0;i<64;i++){
+    var t = i/63, s = t*t*(3-2*t), v = Math.round(255*s);
+    x.fillStyle = "rgb(" + v + "," + v + "," + v + ")";
+    x.fillRect(i, 0, 1, 1);
+  }
+  vegRampTex = new THREE.CanvasTexture(c);
+  vegRampTex.wrapS = vegRampTex.wrapT = THREE.ClampToEdgeWrapping;
+  return vegRampTex;
+}
 function Batch(uv){ this.p=[]; this.n=[]; this.c=[]; this.uv = uv ? [] : null; }
 
 /* A wall is not a flat slab of colour. Sides get the facade texture and are
@@ -732,7 +785,7 @@ function addExtrusion(g, wallCol, roofCol, dy, walls, roofs){
 }
 /* drape: lift every vertex onto the terrain instead of by a flat offset,
    which is what keeps parks, water and fields lying on the hillside. */
-Batch.prototype.addGeom = function(g, col, yOffset, drape){
+Batch.prototype.addGeom = function(g, col, yOffset, drape, u){
   if(g.index) g = g.toNonIndexed();
   if(!g.attributes.normal) g.computeVertexNormals();
   var pa = g.attributes.position.array, na = g.attributes.normal.array, ct = g.attributes.position.count;
@@ -742,8 +795,15 @@ Batch.prototype.addGeom = function(g, col, yOffset, drape){
     else this.p.push(pa[i*3], pa[i*3+1]+dy, pa[i*3+2]);
     this.n.push(na[i*3], na[i*3+1], na[i*3+2]);
     this.c.push(col.r, col.g, col.b);
+    if(this.uv) this.uv.push(u === undefined ? 1 : u, 0.5);
   }
   g.dispose();
+};
+/* addTri with a per-vertex u, which the vegetation ramp reads as "how far
+   inside the polygon am I". */
+Batch.prototype.addTriU = function(a,b,c,col,ua,ub,uc){
+  this.addTri(a, b, c, col);
+  if(this.uv) this.uv.push(ua, 0.5, ub, 0.5, uc, 0.5);
 };
 /* Same as addTri, but the winding is flipped when the face normal points back
    toward `ref` (a point inside the solid). MeshLambertMaterial shades per
@@ -792,8 +852,9 @@ var COL = {
   roofHouse:new THREE.Color(0x554e4a), roofFlat:new THREE.Color(0x6d7480),
   road:new THREE.Color(0x3b3f46), roadMinor:new THREE.Color(0x494d54), path:new THREE.Color(0x6b6152),
   ballast:new THREE.Color(0x574f47), rail:new THREE.Color(0x9aa0a6),
-  water:new THREE.Color(0x2c5a76), park:new THREE.Color(0x4a6b3f),
-  grass:new THREE.Color(0x5e7c4c), pitch:new THREE.Color(0x4f7a48),
+  water:new THREE.Color(0x2c5a76), park:new THREE.Color(0x5b7a44),
+  grass:new THREE.Color(0x6d8b52), wood:new THREE.Color(0x40603a),
+  pitch:new THREE.Color(0x54804a),
   trunk:new THREE.Color(0x453626), leaf:new THREE.Color(0x3d5f32)
 };
 function wallColour(h, seed, house){
@@ -1461,7 +1522,7 @@ function updateTraffic(dt){
 }
 
 /* ---- mesh construction for one fetched chunk ---- */
-var matBuild, matRoof, matFlat, matTree;
+var matBuild, matRoof, matFlat, matTree, matVeg;
 function inSkip(x, z, cell){
   return cell.skipHalf > 0 && Math.abs(x) < cell.skipHalf && Math.abs(z) < cell.skipHalf;
 }
@@ -1748,14 +1809,21 @@ function oneRoad(e, b, cell){
       addPath(traffic.roads, pts, 120);
   }
 }
+/* Water is worth painting: the photograph of a river is usually a brown or
+   near-black smear and a blue surface reads better from the air. Vegetation is
+   not — the aerial photograph already shows exactly where the grass is, and
+   covering it with flat opaque green threw away the one thing that looked
+   real. Green areas are now a soft-edged translucent tint over the imagery,
+   with the actual sense of "park" carried by the trees standing in it. */
 function addAreas(list, group, cell){
-  var b = new Batch();
+  var b = new Batch(), v = new Batch(true);
   for(var i=0;i<list.length;i++){
-    try{ oneArea(list[i], b, cell); }catch(err){ statSkipped++; }
+    try{ oneArea(list[i], b, v, cell); }catch(err){ statSkipped++; }
   }
   if(b.count()) group.add(b.mesh(matFlat));
+  if(v.count()) group.add(v.mesh(matVeg));
 }
-function oneArea(e, b, cell){
+function oneArea(e, b, v, cell){
   {
     var t = e.tags||{}, rings = [];
     if(e.type === "way" && e.geometry) rings.push(ringToPts(e.geometry));
@@ -1766,21 +1834,49 @@ function oneArea(e, b, cell){
           rings.push(ringToPts(mem.geometry));
       }
     }
-    var col, y;
-    if(t.natural === "water" || t.waterway === "riverbank"){ col = COL.water; y = 0.5; }
+    var col, y, veg = true;
+    if(t.natural === "water" || t.waterway === "riverbank"){ col = COL.water; y = 0.5; veg = false; }
     else if(t.leisure === "pitch" || t.leisure === "golf_course"){ col = COL.pitch; y = 0.6; }
-    else if(t.leisure === "park" || t.leisure === "garden" || t.leisure === "nature_reserve" ||
-            t.landuse === "forest"){ col = COL.park; y = 0.55; }
+    else if(t.natural === "wood" || t.landuse === "forest"){ col = COL.wood; y = 0.55; }
+    else if(t.leisure === "park" || t.leisure === "garden" || t.leisure === "nature_reserve"){
+      col = COL.park; y = 0.55;
+    }
     else { col = COL.grass; y = 0.55; }
     for(var r=0;r<rings.length;r++){
       var pts = rings[r];
       if(pts.length < 3 || Math.abs(signedArea(pts)) < 120) continue;
       var ac = centroid(pts);
       if(inSkip(ac.x, ac.z, cell)) continue;
-      var g;
-      try{ g = new THREE.ShapeGeometry(makeShape(pts, null)); }catch(err){ continue; }
+      if(!veg){
+        var gw;
+        try{ gw = new THREE.ShapeGeometry(makeShape(pts, null)); }catch(err){ continue; }
+        gw.rotateX(-Math.PI/2);
+        b.addGeom(gw, col, y, true);
+        continue;
+      }
+      /* a little colour variation per polygon, so a run of adjacent fields
+         does not read as one flat sheet of the same green */
+      var tint = col.clone().offsetHSL((hash(ac.x, ac.z)-0.5)*0.035, 0,
+                                       (hash(ac.z, ac.x)-0.5)*0.09);
+      var area = Math.abs(signedArea(pts));
+      var fade = Math.min(14, Math.max(3, Math.sqrt(area)*0.12));
+      var inner = insetRing(pts, fade);
+      if(inner){
+        /* skirt: alpha 0 on the outline, 1 on the inset ring */
+        for(var i=0, j=pts.length-1; i<pts.length; j=i++){
+          var o0 = pts[j], o1 = pts[i], i0 = inner[j], i1 = inner[i];
+          var yo0 = terrainY(o0.x,o0.z)+y, yo1 = terrainY(o1.x,o1.z)+y;
+          var yi0 = terrainY(i0.x,i0.z)+y, yi1 = terrainY(i1.x,i1.z)+y;
+          v.addTriU({x:o0.x,y:yo0,z:o0.z}, {x:o1.x,y:yo1,z:o1.z}, {x:i1.x,y:yi1,z:i1.z},
+                    tint, 0, 0, 1);
+          v.addTriU({x:o0.x,y:yo0,z:o0.z}, {x:i1.x,y:yi1,z:i1.z}, {x:i0.x,y:yi0,z:i0.z},
+                    tint, 0, 1, 1);
+        }
+      }
+      var core = inner || pts, g;
+      try{ g = new THREE.ShapeGeometry(makeShape(core, null)); }catch(err){ continue; }
       g.rotateX(-Math.PI/2);
-      b.addGeom(g, col, y, true);
+      v.addGeom(g, tint, y, true, 1);
     }
   }
 }
@@ -1953,17 +2049,33 @@ function tile2lat(y,z){
    Instead the sharp layers are small windows that travel with you and release
    tiles behind you, while a coarse static layer fills the horizon. */
 var IMG_LAYERS = [], imgLoader = null;
+var imgQ = [], imgBusy = 0, IMG_PAR = 6;
+var imgStat = {req:0, ok:0, fail:0, hit:0};
+var texCache = {}, texOrder = [], TEX_KEEP = 240;
+
+function tileMetres(z){ return 40075017*Math.cos(LAT0*Math.PI/180)/Math.pow(2, z); }
 function imageryPlan(){
-  if(opt.quality === "low")
-    return [{z:16, half:1300, follow:true, max:44}, {z:13, half:6200, follow:false, max:24}];
-  if(opt.quality === "high")
-    return [{z:18, half:420, follow:true, max:56}, {z:17, half:1100, follow:true, max:90},
-            {z:15, half:3000, follow:true, max:56}, {z:13, half:6400, follow:false, max:24}];
-  return [{z:17, half:850, follow:true, max:72}, {z:15, half:2700, follow:true, max:56},
-          {z:13, half:6200, follow:false, max:24}];
+  /* [zoom, tiles across]. Windows are measured in TILES, not metres: a metre
+     window changes tile count with latitude, and the old fixed per-layer cap
+     was smaller than the window needed at every quality — the tiles over the
+     cap were simply never requested, and that hole in the ground never filled.
+     The last layer is anchored at home and wide enough to cover the whole
+     world, so a sharp tile still loading (or refused) shows coarse ground
+     underneath rather than nothing. */
+  var spec = opt.quality === "low"  ? [[16,7],[13,5]]
+           : opt.quality === "high" ? [[18,7],[16,8],[13,5]]
+           :                          [[17,7],[15,6],[13,5]];
+  return spec.map(function(s, i){
+    var n = s[1];
+    /* +2 across: the window straddles tile boundaries, so it can need one more
+       row and column than it nominally spans. The cap must never be the thing
+       that decides what gets drawn. */
+    return {z:s[0], half:n*tileMetres(s[0])/2, follow: i < spec.length-1, max:(n+2)*(n+2)};
+  });
 }
 function initImagery(){
   imgLoader = new THREE.TextureLoader(); imgLoader.setCrossOrigin("anonymous");
+  imgQ = []; imgBusy = 0;
   IMG_LAYERS = imageryPlan().map(function(L, i, arr){
     L.tiles = {};
     L.group = new THREE.Group();
@@ -1973,10 +2085,38 @@ function initImagery(){
        by construction. So the layers are painted instead: coarsest first, each
        sharper one over the top, and only the sharpest writes depth. */
     L.order = -(i + 1);
+    L.idx = i;
     scene.add(L.group);
     return L;
   });
   updateImagery(0, 0, true);
+}
+function tileURL(z, tx, ty){
+  return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
+       + z + "/" + ty + "/" + tx;
+}
+/* Turning round used to re-download everything behind you. Textures outlive
+   their tile meshes now, so a circuit over the same town is free. */
+function texGet(k){
+  var t = texCache[k];
+  if(!t) return null;
+  var i = texOrder.indexOf(k);
+  if(i >= 0){ texOrder.splice(i, 1); texOrder.push(k); }
+  return t;
+}
+function texPut(k, tex){
+  if(texCache[k]) return;
+  texCache[k] = tex; texOrder.push(k);
+  while(texOrder.length > TEX_KEEP){
+    var old = texOrder.shift(), t = texCache[old];
+    delete texCache[old];
+    if(t && !(t.__use > 0)) t.dispose();        /* still on a mesh? let the mesh free it */
+  }
+}
+function texRelease(k, tex){
+  if(!tex) return;
+  tex.__use = (tex.__use || 1) - 1;
+  if(tex.__use <= 0 && texCache[k] !== tex) tex.dispose();
 }
 function tileBounds(z, tx, ty){
   var w0 = toWorld(tile2lon(tx, z), tile2lat(ty, z));
@@ -1984,30 +2124,67 @@ function tileBounds(z, tx, ty){
   return {x0:Math.min(w0.x,w1.x), x1:Math.max(w0.x,w1.x),
           z0:Math.min(w0.z,w1.z), z1:Math.max(w0.z,w1.z)};
 }
-function tileMesh(L, tx, ty){
+function buildTileMesh(L, tx, ty, rec, tex){
   var bb = tileBounds(L.z, tx, ty);
-  var x0 = bb.x0, x1 = bb.x1, z0 = bb.z0, z1 = bb.z1;
-  var url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
-          + L.z + "/" + ty + "/" + tx;
-  var rec = {mesh:null, cx:(x0+x1)/2, cz:(z0+z1)/2};
-  imgLoader.load(url, guard("Imagery tile", function(tex){
-    if(rec.dead){ tex.dispose(); return; }
-    tex.minFilter = THREE.LinearMipmapLinearFilter; tex.anisotropy = 4;
-    var w = x1-x0, d = z1-z0, cx = rec.cx, cz = rec.cz;
-    var seg = HF.ready ? Math.max(1, Math.min(24, Math.round(Math.max(w,d)/50))) : 1;
-    var g = new THREE.PlaneGeometry(w, d, seg, seg);
-    g.rotateX(-Math.PI/2);
-    var pa = g.attributes.position.array;
-    for(var i=0;i<pa.length;i+=3) pa[i+1] = terrainY(cx+pa[i], cz+pa[i+2]) + L.lift;
-    g.computeVertexNormals();                   /* lit ground: hillsides shade */
-    var m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({map:tex,
-      depthWrite: L.order === -1}));
-    m.position.set(cx, 0, cz);
-    m.renderOrder = L.order;
-    rec.mesh = m;
-    L.group.add(m);
-  }), null, function(){});
+  var w = bb.x1-bb.x0, d = bb.z1-bb.z0, cx = rec.cx, cz = rec.cz;
+  tex.minFilter = THREE.LinearMipmapLinearFilter; tex.anisotropy = 4;
+  tex.__use = (tex.__use || 0) + 1;
+  var seg = HF.ready ? Math.max(1, Math.min(24, Math.round(Math.max(w,d)/50))) : 1;
+  var g = new THREE.PlaneGeometry(w, d, seg, seg);
+  g.rotateX(-Math.PI/2);
+  var pa = g.attributes.position.array;
+  for(var i=0;i<pa.length;i+=3) pa[i+1] = terrainY(cx+pa[i], cz+pa[i+2]) + L.lift;
+  g.computeVertexNormals();                     /* lit ground: hillsides shade */
+  var m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({map:tex,
+    depthWrite: L.order === -1}));
+  m.position.set(cx, 0, cz);
+  m.renderOrder = L.order;
+  rec.mesh = m; rec.tex = tex;
+  L.group.add(m);
+}
+function tileMesh(L, tx, ty, prio){
+  var bb = tileBounds(L.z, tx, ty);
+  var key = L.z + "/" + tx + "/" + ty;
+  var rec = {mesh:null, key:key, cx:(bb.x0+bb.x1)/2, cz:(bb.z0+bb.z1)/2, tries:0};
+  var cached = texGet(key);
+  if(cached){ imgStat.hit++; buildTileMesh(L, tx, ty, rec, cached); return rec; }
+  rec.job = {L:L, tx:tx, ty:ty, rec:rec, key:key, prio:prio, tries:0};
+  imgQ.push(rec.job);
+  pumpImagery();
   return rec;
+}
+/* A browser will only open six connections to one host. Firing 150 tile
+   requests at once therefore does not make them arrive sooner — it puts the
+   ground you are flying over behind the horizon you cannot see. So they go
+   through a queue, nearest first. */
+function pumpImagery(){
+  if(!imgLoader) return;
+  if(imgQ.length > 1) imgQ.sort(function(a, b){ return a.prio - b.prio; });
+  while(imgBusy < IMG_PAR && imgQ.length){
+    var job = imgQ.shift();
+    if(job.rec.dead) continue;
+    startTile(job);
+  }
+}
+function startTile(job){
+  imgBusy++; imgStat.req++;
+  imgLoader.load(tileURL(job.L.z, job.tx, job.ty),
+    function(tex){
+      imgBusy--; imgStat.ok++;
+      guard("Imagery tile", function(){
+        if(job.rec.dead){ tex.dispose(); return; }
+        texPut(job.key, tex);
+        buildTileMesh(job.L, job.tx, job.ty, job.rec, tex);
+      })();
+      pumpImagery();
+    }, null,
+    function(){
+      imgBusy--; imgStat.fail++;
+      /* One refused tile used to leave a hole that never healed. Ask again,
+         twice, behind everything else in the queue. */
+      if(!job.rec.dead && job.tries < 2){ job.tries++; job.prio += 40000; imgQ.push(job); }
+      pumpImagery();
+    });
 }
 function dropTile(L, key){
   var rec = L.tiles[key];
@@ -2016,48 +2193,51 @@ function dropTile(L, key){
   if(rec.mesh){
     L.group.remove(rec.mesh);
     rec.mesh.geometry.dispose();
-    if(rec.mesh.material.map) rec.mesh.material.map.dispose();
     rec.mesh.material.dispose();
+    texRelease(rec.key, rec.tex);
   }
   delete L.tiles[key];
 }
 function updateImagery(px, pz, force){
   if(!IMG_LAYERS.length) return;
   var li, L;
-  /* where each layer currently sits, so a coarse tile can tell whether a
-     sharper one has it completely covered */
   for(li=0; li<IMG_LAYERS.length; li++){
     L = IMG_LAYERS[li];
     L.cx = L.follow ? px : 0; L.cz = L.follow ? pz : 0;
   }
-  function coveredBySharper(li, b){
-    for(var k=0; k<li; k++){
-      var S = IMG_LAYERS[k];
-      if(b.x0 >= S.cx - S.half && b.x1 <= S.cx + S.half &&
-         b.z0 >= S.cz - S.half && b.z1 <= S.cz + S.half) return true;
-    }
-    return false;
-  }
+  /* The coarse layers are no longer punched out under the sharp window. They
+     cost a handful of tiles and they are the reason a gap in the sharp layer
+     is now blurry ground instead of a hole. */
   for(li=0; li<IMG_LAYERS.length; li++){
     L = IMG_LAYERS[li];
-    /* a coarse layer has to be re-evaluated whenever a sharper window moves,
-       even if the coarse layer itself is anchored */
-    if(!L.follow && !force && li === 0) continue;
+    if(!L.follow && !force && L.seeded) continue;   /* anchored: built once, kept */
+    L.seeded = true;
     var ll = worldToLatLon(L.cx, L.cz);
     var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
     var xs = lon2tile(ll.lon - L.half/mLon, L.z), xe = lon2tile(ll.lon + L.half/mLon, L.z);
     var ys = lat2tile(ll.lat + L.half/mLat, L.z), ye = lat2tile(ll.lat - L.half/mLat, L.z);
-    var wanted = {}, tx, ty, key, n = 0;
+    var wanted = {}, tx, ty, key, kk, n = 0;
+    L.rng = (xe-xs+1) + "x" + (ye-ys+1);
+    for(tx=xs; tx<=xe; tx++)
+      for(ty=ys; ty<=ye; ty++) wanted[tx + "/" + ty] = 1;
+    /* Release first, then fill. Counting tiles that are about to be dropped
+       against the cap let a window that had moved starve itself: the ground
+       behind the aeroplane held the budget the ground ahead of it needed, and
+       one 200 m step could take the sharp layer from 64 tiles to 17. That is
+       what "patchy" looked like from the cockpit. */
+    for(key in L.tiles) if(!wanted[key]) dropTile(L, key);
+    for(kk in L.tiles) n++;
     for(tx=xs; tx<=xe; tx++){
       for(ty=ys; ty<=ye; ty++){
         key = tx + "/" + ty;
-        if(coveredBySharper(li, tileBounds(L.z, tx, ty))) continue;
-        wanted[key] = 1;
-        n = 0; for(var kk in L.tiles) n++;
-        if(!L.tiles[key] && n < L.max) L.tiles[key] = tileMesh(L, tx, ty);
+        if(L.tiles[key] || n >= L.max) continue;
+        var b = tileBounds(L.z, tx, ty);
+        var dx = (b.x0+b.x1)/2 - px, dz = (b.z0+b.z1)/2 - pz;
+        /* nearest first, sharp window before the horizon */
+        L.tiles[key] = tileMesh(L, tx, ty, Math.sqrt(dx*dx + dz*dz) + li*1500);
+        n++;
       }
     }
-    for(key in L.tiles) if(!wanted[key]) dropTile(L, key);
   }
 }
 
@@ -2097,7 +2277,11 @@ function initScene(){
     vertexShader:"varying float h; void main(){ h = normalize(position).y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
     fragmentShader:"uniform vec3 top; uniform vec3 bot; varying float h; void main(){ gl_FragColor = vec4(mix(bot, top, clamp(h*1.6+0.1,0.0,1.0)),1.0); }"
   }));
-  sky.renderOrder = -2;
+  /* Far in front of everything. A depthTest:false dome that covers the whole
+     screen erases whatever was drawn before it, and at -2 that was the coarse
+     imagery layers — the horizon was sky-blue paint over perfectly good
+     photographs, which is most of what "patchy" was. */
+  sky.renderOrder = -30;
   sky.frustumCulled = false;
   scene.add(sky);
   var sun = new THREE.DirectionalLight(S.sun, S.si);
@@ -2112,6 +2296,12 @@ function initScene(){
      get a polygon offset and a later render order rather than a fixed lift. */
   matFlat  = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide,
     polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-8});
+  /* Green areas tint the aerial photograph rather than replacing it: mostly
+     transparent, faded out at the edges by the ramp, and no depth writing so
+     two overlapping fields cannot fight. */
+  matVeg   = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide,
+    transparent:true, opacity:0.42, depthWrite:false, alphaMap:vegRamp(),
+    polygonOffset:true, polygonOffsetFactor:-5, polygonOffsetUnits:-10});
 
   /* Backdrop beyond the imagery. It has to stay inside the sky sphere and the
      far plane, and just under the lowest ground, or it shows through valleys. */
@@ -2119,7 +2309,11 @@ function initScene(){
     new THREE.MeshBasicMaterial({color: opt.sun === "dusk" ? 0x1a2130 : 0x40492f}));
   base.rotation.x = -Math.PI/2;
   base.position.y = (HF.ready ? HF.min : 0) - 1.2;
-  base.renderOrder = -1;
+  /* Behind every imagery layer. Only the sharpest layer writes depth, so at -1
+     this opaque plane was painted straight over the coarse tiles everywhere
+     outside the sharp window — dark green where there should have been aerial
+     photography. */
+  base.renderOrder = -20;
   scene.add(base);
 
   scene.add(world);
@@ -2360,11 +2554,15 @@ function takeOffWhenReady(){
 /* The rings are a snapshot around home; fly a mile and you are past them. This
    keeps asking for the next square of buildings ahead of the aeroplane, one at
    a time and slowly, so the city carries on instead of stopping dead. */
-var STREAM = {cell:800, asked:{}, active:false, last:0, fails:0};
+var STREAM = {cell:800, asked:{}, active:0, last:0, fails:0, par:2, gap:2500};
 function streamTick(){
-  if(!running || STREAM.active || STREAM.fails > 3) return;
+  if(!running || STREAM.active >= STREAM.par) return;
   if(cq.length || cqActive || coverage.a === 1) return;      /* let the plan finish first */
-  if(Date.now() - STREAM.last < 6000) return;
+  /* One square every six seconds is slower than the aeroplane. Two in flight
+     every two and a half is about as hard as a public Overpass mirror will
+     take, and it backs off instead of stopping for good — three unlucky
+     squares used to end streaming for the rest of the flight. */
+  if(Date.now() - STREAM.last < STREAM.gap*Math.pow(2, Math.min(5, STREAM.fails))) return;
   var cs = STREAM.cell, ahead = 600;
   var px = plane.position.x + fwd.x*ahead, pz = plane.position.z + fwd.z*ahead;
   var bi = Math.round(px/cs), bj = Math.round(pz/cs), best = null, bd = 1e9, i, j;
@@ -2379,7 +2577,7 @@ function streamTick(){
     }
   }
   if(!best || bd > 3400*3400) return;
-  STREAM.asked[best.k] = 1; STREAM.active = true; STREAM.last = Date.now();
+  STREAM.asked[best.k] = 1; STREAM.active++; STREAM.last = Date.now();
   var h = cs/2;
   overpassTry(queryBuildings(bboxM(best.cx-h, best.cz-h, best.cx+h, best.cz+h)), 45000, 0, 3000,
               "str" + best.k)
@@ -2388,9 +2586,12 @@ function streamTick(){
         buildCell(data, {inner:false, skipHalf:0, cap:Q.mid, minArea:20, tallest:0});
         statStreamed++;
       }catch(err){ report("Streamed square", err); }
-      STREAM.active = false; STREAM.fails = 0; tally();
+      STREAM.active--; STREAM.fails = 0; tally();
     }); })
-    .catch(function(){ STREAM.active = false; STREAM.fails++; });
+    .catch(function(){
+      STREAM.active--; STREAM.fails++;
+      delete STREAM.asked[best.k];              /* let a refused square come round again */
+    });
 }
 
 function anyLoaded(){
@@ -2720,6 +2921,16 @@ window.__sim = {
   plane: function(){ return plane; },
   plan: function(){ return {density: DENSITY, dense: DENSE, halfA: HALF_A, halfM: HALF_M,
                             quality: opt.quality}; },
+  imagery: function(){
+    return {layers: IMG_LAYERS.map(function(L){
+              var want = 0, live = 0;
+              for(var k in L.tiles){ want++; if(L.tiles[k].mesh) live++; }
+              return {z:L.z, half:Math.round(L.half), follow:!!L.follow, max:L.max, rng:L.rng,
+                      wanted:want, drawn:live};
+            }),
+            queued: imgQ.length, inflight: imgBusy, stat: imgStat,
+            cached: texOrder.length};
+  },
   traffic: function(){
     var s = [];
     for(var i=0;i<3;i++){
