@@ -223,6 +223,7 @@
       </div>
       <button id="flynow" type="button">Take off now — keep loading</button>
       <button id="retry" type="button" class="linky" style="display:none">Retry failed requests</button>
+      <button id="showrep" type="button" class="linky">What happened? — copy a report</button>
       <p class="fine" id="loadnote">Terrain first, then nine map requests, two at a time: the detailed 2.5 km core,
         a mid ring out to 6 km that keeps every building, and an outer ring of landmarks to 10 km. Each falls back
         through the Overpass mirrors in turn and gives up after 40–50 seconds rather than hanging.</p>
@@ -250,7 +251,7 @@
   <button class="btn" id="bCam">CAM</button>
   <button class="btn" id="bRst">RST</button>
   <button class="btn" id="bHome">HOME</button>
-  <div id="keys">↑↓ PITCH · ←→ ROLL<br>A/D RUDDER · W/S THROTTLE<br>C CAM · R RESET · H HOME</div>
+  <div id="keys">↑↓ PITCH · ←→ ROLL<br>A/D RUDDER · W/S THROTTLE<br>C CAM · R RESET · H HOME · P REPORT</div>
 </div>
 
 <script>
@@ -264,9 +265,69 @@ var $ = function(id){ return document.getElementById(id); };
 function report(label, err){
   var m = (err && (err.message || String(err))) || "unknown";
   var s = (err && err.stack) ? "\n" + String(err.stack).split("\n").slice(0,5).join("\n") : "";
+  if(errLog.length < 20) errLog.push(label + ": " + m);
   if(window.__diag) window.__diag(label, m + s, true);
   else if(window.console) console.error(label, err);
 }
+
+/* One paste-able account of what actually happened. This is the thing to send
+   when the world comes up empty. */
+function reportText(){
+  var L = [];
+  L.push("TERRAFLIGHT report  " + new Date().toISOString());
+  L.push("place    " + (chosen ? chosen.name : "?") + "  " + LAT0.toFixed(5) + "," + LON0.toFixed(5));
+  L.push("quality  " + opt.quality + "   density " + (DENSITY == null ? "unknown" : Math.round(DENSITY) + "/km2") +
+         "   dense " + DENSE);
+  L.push("rings    core " + HALF_A + "m  mid " + HALF_M + "m  outer " + HALF_B + "m");
+  L.push("terrain  " + (HF.ready ? "ok, ground " + Math.round(HF.elev0) + "m, relief " +
+                                   Math.round(HF.max-HF.min) + "m" : "none"));
+  L.push("cells    core=" + coverage.a + " mid=" + coverage.m.join("") + " outer=" + coverage.b.join("") +
+         "   (0 pending 1 loading 2 done 3 failed)");
+  L.push("drawn    " + statBuildings + " buildings = " + statModelled + " modelled + " +
+         statMeasured + " measured + " + statEstimated + " estimated;  " +
+         Math.round(statRoadM/1000) + " km road;  " + statSkipped + " skipped");
+  L.push("webgl    " + (renderer ? (renderer.capabilities.isWebGL2 ? "webgl2" : "webgl1") : "no renderer") +
+         "   three " + (window.THREE ? THREE.REVISION : "?"));
+  L.push("requests");
+  if(!netLog.length) L.push("   (none completed)");
+  netLog.forEach(function(n){
+    L.push("   " + String(n.tag||"?").padEnd(9) + String(n.host).slice(0,26).padEnd(27) +
+           String(n.status).padEnd(6) + (n.ms+"ms").padStart(7) +
+           (n.kb != null ? ("  " + n.kb + "KB").padStart(9) : "") +
+           (n.els != null ? "  " + n.els + " elements" : ""));
+  });
+  if(errLog.length){ L.push("errors"); errLog.forEach(function(e){ L.push("   " + e); }); }
+  return L.join("\n");
+}
+function showReport(){
+  var box = $("repwrap");
+  if(!box){
+    box = document.createElement("div");
+    box.id = "repwrap";
+    box.style.cssText = "position:fixed;inset:auto 0 0 0;max-height:70%;z-index:60;overflow:auto;" +
+      "background:#0d1420;border-top:2px solid #C22A6B;padding:10px 12px";
+    box.innerHTML = '<div style="display:flex;gap:8px;margin-bottom:8px">' +
+      '<button id="repcopy" style="border:0;background:#C22A6B;color:#fff;padding:7px 12px;' +
+      'font:700 10px/1 ui-monospace,monospace;letter-spacing:.14em;cursor:pointer">COPY</button>' +
+      '<button id="repclose" style="border:1px solid #55606f;background:transparent;color:#E7DEC9;' +
+      'padding:7px 12px;font:700 10px/1 ui-monospace,monospace;letter-spacing:.14em;cursor:pointer">CLOSE</button>' +
+      '</div><pre id="reptext" style="margin:0;color:#E7DEC9;font:11px/1.5 ui-monospace,Menlo,monospace;' +
+      'white-space:pre-wrap;word-break:break-word"></pre>';
+    document.body.appendChild(box);
+    $("repclose").onclick = function(){ box.style.display = "none"; };
+    $("repcopy").onclick = function(){
+      var t = $("reptext").textContent;
+      if(navigator.clipboard) navigator.clipboard.writeText(t);
+      else { var r = document.createRange(); r.selectNode($("reptext"));
+             window.getSelection().removeAllRanges(); window.getSelection().addRange(r); }
+      $("repcopy").textContent = "COPIED";
+      setTimeout(function(){ $("repcopy").textContent = "COPY"; }, 1500);
+    };
+  }
+  box.style.display = "block";
+  $("reptext").textContent = reportText();
+}
+window.__report = showReport;
 function guard(label, fn){
   return function(){
     try{ return fn.apply(this, arguments); }
@@ -909,7 +970,7 @@ var DENSITY = null, DENSE = false;
 function densityProbe(){
   var half = 1000;                                    /* 2 x 2 km = 4 km² */
   var q = "[out:json][timeout:25];way[\"building\"](" + bbs(bboxM(-half,-half,half,half)) + ");out count;";
-  return overpassRace(q, 25000).then(function(j){
+  return overpassTry(q, 25000, 1, 2500, "probe").then(function(j){
     var els = j.elements || [], i, n;
     for(i=0;i<els.length;i++){
       if(els[i].type === "count" && els[i].tags){
@@ -932,7 +993,12 @@ function applyProfile(d){
     HALF_M = Math.max(HALF_A + 400,
              Math.min(Q.midHalf, Math.round(500*Math.sqrt(4*Q.mid/d + coreKm*coreKm))));
   }else{
-    DENSE = false; HALF_A = 1250; HALF_M = Q.midHalf;
+    /* Probe didn't answer, which is no evidence either way. Pull the rings in
+       so even a city centre fits — the old default of the full 2.5 km core was
+       a request London could never answer — but keep the full detail, because
+       a failed probe must not cost a village its footpaths and trees. If the
+       area turns out to be busy after all, the retry ladder shrinks it. */
+    DENSE = false; HALF_A = 900; HALF_M = Math.min(Q.midHalf, 2000);
   }
   RING_M = ringRects(HALF_A, HALF_M);
   RING_B = ringRects(HALF_M, HALF_B);
@@ -956,8 +1022,14 @@ function ringRects(inner, outer){
    the public servers answer with 429, so the stagger is what keeps them
    talking to us. A hard timeout means a stalled server can never freeze the
    load either way. */
+/* Every request is logged so the sim can say exactly what happened without
+   anyone having to open dev tools on a phone. */
+var netLog = [], errLog = [];
+function logNet(o){ netLog.push(o); if(netLog.length > 80) netLog.shift(); }
+function hostOf(u){ return u.split("/")[2] || u; }
+
 var MIRROR_STAGGER = 2500;
-function overpassRace(q, timeoutMs){
+function overpassRace(q, timeoutMs, tag){
   return new Promise(function(resolve, reject){
     var ctrls = [], timers = [], settled = false, started = 0, fails = 0, lastErr = null;
     function cleanup(){
@@ -975,7 +1047,7 @@ function overpassRace(q, timeoutMs){
       if(settled || i >= OVERPASS.length) return;
       if(i < started) return;                    /* already running */
       started = i + 1;
-      var url = OVERPASS[i], ctrl = null;
+      var url = OVERPASS[i], ctrl = null, t0 = Date.now();
       try{ ctrl = new AbortController(); ctrls.push(ctrl); }catch(e){}
       /* the next mirror joins in on its own if this one is merely slow */
       timers.push(setTimeout(function(){ tryMirror(i+1); }, MIRROR_STAGGER));
@@ -984,15 +1056,23 @@ function overpassRace(q, timeoutMs){
                   body:"data=" + encodeURIComponent(q),
                   headers:{"Content-Type":"application/x-www-form-urlencoded"}})
         .then(function(r){
-          if(!r.ok) throw new Error(url.split("/")[2] + " HTTP " + r.status);
-          return r.json();
+          if(!r.ok){
+            logNet({tag:tag, host:hostOf(url), status:r.status, ms:Date.now()-t0});
+            throw new Error(hostOf(url) + " HTTP " + r.status);
+          }
+          return r.text();
         })
-        .then(function(j){
+        .then(function(txt){
           if(settled) return;
+          var j = JSON.parse(txt);
+          logNet({tag:tag, host:hostOf(url), status:200, ms:Date.now()-t0,
+                  kb:Math.round(txt.length/1024), els:(j.elements||[]).length});
           settled = true; clearTimeout(timer); cleanup(); resolve(j);
         })
         .catch(function(e){
           if(settled) return;
+          if(e && e.name !== "AbortError" && !/HTTP/.test(e.message||""))
+            logNet({tag:tag, host:hostOf(url), status:(e.message||"failed").slice(0,40), ms:Date.now()-t0});
           lastErr = e; fails++;
           tryMirror(started);                    /* don't wait out the stagger on a failure */
           if(fails >= OVERPASS.length){
@@ -1007,11 +1087,11 @@ function overpassRace(q, timeoutMs){
 
 /* One free retry: a 429 or 504 from Overpass means "slot busy, come back",
    not "no data here", and a short wait usually clears it. */
-function overpassTry(q, timeoutMs, retries, waitMs){
-  return overpassRace(q, timeoutMs).catch(function(err){
+function overpassTry(q, timeoutMs, retries, waitMs, tag){
+  return overpassRace(q, timeoutMs, tag).catch(function(err){
     if(retries <= 0) throw err;
     return new Promise(function(res){ setTimeout(res, waitMs); })
-      .then(function(){ return overpassTry(q, timeoutMs, retries-1, waitMs*2); });
+      .then(function(){ return overpassTry(q, timeoutMs, retries-1, waitMs*2, tag); });
   });
 }
 
@@ -1694,6 +1774,7 @@ function raceTimeout(p, ms, fallback){
 function whenGround(fn){
   return (terrainReady || Promise.resolve(false)).then(fn);
 }
+$("showrep").onclick = showReport;
 $("retry").onclick = function(){
   $("retry").style.display = "none";
   $("loadnote").textContent = "Retrying…";
@@ -1747,20 +1828,29 @@ function startLoad(){
 var RING_M = ringRects(HALF_A, HALF_M);      /* rebuilt in startLoad once the */
 var RING_B = ringRects(HALF_M, HALF_B);      /* quality setting is known      */
 
-function phaseA(){
+/* If a cell is too big for the server, asking again changes nothing. Each
+   retry asks for less: a smaller square, then a lighter query, then landmarks
+   only. Something always fits. */
+function phaseA(step){
+  step = step || 0;
   coverage.a = 1; drawGridSvg();
-  status("fetching the core 2.5 km …");
+  var half = Math.round(HALF_A*(step === 0 ? 1 : (step === 1 ? 0.6 : 0.35)));
+  var bb = bboxM(-half, -half, half, half);
+  var q = step === 0 ? queryFull(bb) : (step === 1 ? queryMid(bb) : queryNotable(bb));
+  status(step === 0 ? "fetching the core " + (half*2/1000).toFixed(1) + " km …"
+                    : "core too big — retrying at " + (half*2/1000).toFixed(1) + " km");
   var t0 = Date.now();
-  overpassTry(queryFull(bboxM(-HALF_A, -HALF_A, HALF_A, HALF_A)), 70000, 1, 4000)
+  overpassTry(q, 70000, step === 0 ? 1 : 0, 4000, "core" + step)
     .then(function(data){ return whenGround(function(){
       try{ buildCell(data, {inner:true, skipHalf:0, cap:Q.core, minArea:14, tallest:0}); }
       catch(err){ report("Core tile", err); }
       coverage.a = 2;
       status("core loaded in " + ((Date.now()-t0)/1000).toFixed(1) + "s");
       $("flynow").classList.add("on");
-      tally(); maybeFinish();
+      tally(); takeOffWhenReady(); maybeFinish();
     }); })
     .catch(function(err){
+      if(step < 2){ return phaseA(step + 1); }
       coverage.a = 3; tally();
       fail("Core area", err);
     });
@@ -1768,25 +1858,46 @@ function phaseA(){
 
 /* One cell of a ring. The mid ring keeps every building down to 45 m²; the
    outer ring keeps landmarks, which is all that reads from 5 km up anyway. */
-function ringCell(kind, i){
+function ringCell(kind, i, step){
+  step = step || 0;
   var mid = kind === "m", cov = mid ? coverage.m : coverage.b;
-  var r = (mid ? RING_M : RING_B)[i], bb = bboxM(r[0], r[1], r[2], r[3]);
+  var r = (mid ? RING_M : RING_B)[i];
+  if(step > 0){                                  /* shrink the strip toward home */
+    var f = step === 1 ? 0.6 : 0.35;
+    r = [r[0]*f, r[1]*f, r[2]*f, r[3]*f];
+  }
+  var bb = bboxM(r[0], r[1], r[2], r[3]);
   cov[i] = 1; drawGridSvg();
-  overpassTry(mid ? queryMid(bb) : queryNotable(bb), 70000, 1, 4000)
+  overpassTry(mid && step === 0 ? queryMid(bb) : queryNotable(bb), 70000, step === 0 ? 1 : 0, 4000,
+              kind + i + "/" + step)
     .then(function(data){ return whenGround(function(){
       try{
         buildCell(data, {inner:false, skipHalf: mid ? HALF_A : HALF_M,
                          cap: mid ? Q.mid : Q.outer, minArea: mid ? 45 : 220, tallest:0});
       }catch(err){ report((mid ? "Mid" : "Outer") + " section " + i, err); }
-      cov[i] = 2; cellDone(); tally(); maybeFinish();
+      cov[i] = 2; cellDone(); tally();
       $("flynow").classList.add("on");
+      takeOffWhenReady(); maybeFinish();
     }); })
     .catch(function(err){
+      if(step < 2) return ringCell(kind, i, step + 1);
       cov[i] = 3; cellDone(); tally();
       if(coverage.a === 2) status("a " + (mid ? "mid" : "outer") + " section is unavailable — the rest is flying");
       else if(coverage.a === 3) fail(mid ? "Mid ring" : "Outer ring", err);
       /* core still in flight: leave the note alone, it has the better story */
     });
+}
+/* Don't make anyone watch a loading card while a slow cell grinds through the
+   retry ladder. The moment there is a world to fly over, fly. The rest of it
+   appears around you as it lands. */
+var takeoffTimer = null;
+function takeOffWhenReady(){
+  if(running || takeoffTimer || !anyLoaded()) return;
+  var wait = coverage.a === 2 ? 400 : 6000;     /* give the core a moment to win */
+  takeoffTimer = setTimeout(function(){
+    takeoffTimer = null;
+    if(!running && anyLoaded()) launch();
+  }, wait);
 }
 function anyLoaded(){
   if(coverage.a === 2) return true;
@@ -1853,6 +1964,7 @@ addEventListener("keydown", function(e){
   if(e.code === "KeyC") cycleCam();
   if(e.code === "KeyR") respawn();
   if(e.code === "KeyH") goHome();
+  if(e.code === "KeyP") showReport();
 });
 addEventListener("keyup", function(e){ keys[e.code] = false; });
 
