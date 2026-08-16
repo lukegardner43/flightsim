@@ -287,7 +287,8 @@ function reportText(){
          "   (0 pending 1 loading 2 done 3 failed)");
   L.push("drawn    " + statBuildings + " buildings = " + statModelled + " modelled + " +
          statMeasured + " measured + " + statEstimated + " estimated;  " +
-         Math.round(statRoadM/1000) + " km road;  " + statSkipped + " skipped");
+         Math.round(statRoadM/1000) + " km road;  " + statSkipped + " skipped;  " +
+         statStreamed + " squares streamed in");
   L.push("webgl    " + (renderer ? (renderer.capabilities.isWebGL2 ? "webgl2" : "webgl1") : "no renderer") +
          "   three " + (window.THREE ? THREE.REVISION : "?"));
   L.push("requests");
@@ -696,7 +697,39 @@ function makeShape(outer, holes){
   }
   return sh;
 }
-function Batch(){ this.p=[]; this.n=[]; this.c=[]; }
+function Batch(uv){ this.p=[]; this.n=[]; this.c=[]; this.uv = uv ? [] : null; }
+
+/* A wall is not a flat slab of colour. Sides get the facade texture and are
+   shaded down toward the pavement; lids go to the roof batch instead, so a
+   flat roof reads as a roof rather than as the top of a grey box. Splitting by
+   normal is safe because computeVertexNormals on non-indexed geometry gives
+   all three vertices of a face the same normal. */
+function addExtrusion(g, wallCol, roofCol, dy, walls, roofs){
+  if(g.index) g = g.toNonIndexed();
+  if(!g.attributes.normal) g.computeVertexNormals();
+  var pa = g.attributes.position.array, na = g.attributes.normal.array;
+  var ua = g.attributes.uv ? g.attributes.uv.array : null;
+  var ct = g.attributes.position.count, i, y;
+  var minY = 1e9, maxY = -1e9;
+  for(i=0;i<ct;i++){ y = pa[i*3+1]; if(y < minY) minY = y; if(y > maxY) maxY = y; }
+  var span = Math.max(3, (maxY-minY)*0.8);
+  for(i=0;i<ct;i++){
+    y = pa[i*3+1];
+    if(Math.abs(na[i*3+1]) > 0.9){
+      roofs.p.push(pa[i*3], y+dy, pa[i*3+2]);
+      roofs.n.push(na[i*3], na[i*3+1], na[i*3+2]);
+      roofs.c.push(roofCol.r, roofCol.g, roofCol.b);
+      if(roofs.uv) roofs.uv.push(0, 0);
+    }else{
+      var ao = 0.62 + 0.38*Math.min(1, (y-minY)/span);      /* darker at the base */
+      walls.p.push(pa[i*3], y+dy, pa[i*3+2]);
+      walls.n.push(na[i*3], na[i*3+1], na[i*3+2]);
+      walls.c.push(wallCol.r*ao, wallCol.g*ao, wallCol.b*ao);
+      if(walls.uv) walls.uv.push(ua ? ua[i*2] : 0, ua ? ua[i*2+1] : 0);
+    }
+  }
+  g.dispose();
+}
 /* drape: lift every vertex onto the terrain instead of by a flat offset,
    which is what keeps parks, water and fields lying on the hillside. */
 Batch.prototype.addGeom = function(g, col, yOffset, drape){
@@ -738,7 +771,9 @@ Batch.prototype.mesh = function(mat){
   g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(this.p),3));
   g.setAttribute("normal",   new THREE.BufferAttribute(new Float32Array(this.n),3));
   g.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(this.c),3));
+  if(this.uv) g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(this.uv),2));
   g.computeBoundingSphere();
+  this.uv = null;
   var m = new THREE.Mesh(g, mat);
   /* A single non-finite vertex makes the bounding sphere NaN, every frustum
      test fail, and the whole batch — thousands of good buildings — disappear
@@ -910,6 +945,7 @@ var QUALITY = {
 var Q, treeBudget = 0, statBuildings = 0, statRoadM = 0;
 var statModelled = 0, statMeasured = 0, statEstimated = 0;   /* the three tiers */
 var statSkipped = 0;                                         /* elements OSM gave us that we couldn't use */
+var statStreamed = 0, drawnIds = {};                         /* one OSM id is drawn exactly once */
 var world = new THREE.Group();
 /* 0 pending, 1 loading, 2 done, 3 failed */
 var coverage = {a:0, m:[0,0,0,0], b:[0,0,0,0]};
@@ -1025,6 +1061,16 @@ function applyProfile(d){
   }
   RING_M = ringRects(HALF_A, HALF_M);
   RING_B = ringRects(HALF_M, HALF_B);
+}
+
+/* Buildings only, for the squares streamed in around the aeroplane. */
+function queryBuildings(bb){
+  var b = bbs(bb);
+  return "[out:json][timeout:"+TMO+"];(" +
+    'way["building"]('+b+');' +
+    'relation["building"]["type"="multipolygon"]('+b+');' +
+    'way["building:part"]('+b+');' +
+    ");out geom;";
 }
 
 /* A ring is four rectangles that meet but never overlap, so nothing inside
@@ -1241,6 +1287,33 @@ function roofDome(b, pts, box, y, h, onion, col){
   }
 }
 
+/* One storey of facade, 4 m wide by 3.2 m tall, drawn once and repeated in
+   world units so every window lines up with a floor. White where the wall
+   shows through, because the vertex colour is what carries brick or stone. */
+function facadeTexture(){
+  var c = document.createElement("canvas");
+  c.width = 64; c.height = 64;
+  var x = c.getContext("2d");
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 64, 64);
+  x.fillStyle = "rgba(0,0,0,.10)"; x.fillRect(0, 46, 64, 18);      /* spandrel  */
+  x.fillStyle = "rgba(0,0,0,.05)"; x.fillRect(0, 0, 64, 3);        /* floor line */
+  for(var w=0; w<2; w++){
+    var wx = 7 + w*30, wy = 9, ww = 20, wh = 32;
+    var g = x.createLinearGradient(0, wy, 0, wy+wh);
+    g.addColorStop(0, "rgba(28,36,48,.86)");
+    g.addColorStop(0.55, "rgba(52,64,78,.80)");
+    g.addColorStop(1, "rgba(96,108,120,.62)");                     /* sky in the glass */
+    x.fillStyle = g; x.fillRect(wx, wy, ww, wh);
+    x.fillStyle = "rgba(255,255,255,.30)"; x.fillRect(wx, wy, ww, 2);
+    x.fillStyle = "rgba(0,0,0,.18)"; x.fillRect(wx + ww/2 - 1, wy, 2, wh);
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1/4, 1/3.2);                    /* UVs come out of ExtrudeGeometry in metres */
+  t.anisotropy = 4;
+  return t;
+}
+
 var ROOF_MAT = {
   tile:0x8a4a3a, tiles:0x8a4a3a, roof_tiles:0x8a4a3a, clay:0x9a5238,
   slate:0x3c434c, metal:0x8d949c, copper:0x4e8f78, zinc:0x8a9099, lead:0x77797e,
@@ -1390,7 +1463,7 @@ function roofColour(t, seed, shape){
 }
 
 function addBuildings(list, parts, group, cell){
-  var walls = new Batch(), roofs = new Batch();
+  var walls = new Batch(true), roofs = new Batch();
   var outlines = [], modelled = [], i, o, r;
 
   /* Per element, not per cell: a single unusable way must cost us that way
@@ -1411,6 +1484,11 @@ function addBuildings(list, parts, group, cell){
       if(!isFinite(c.x) || !isFinite(c.z)) continue;
       if(inSkip(c.x, c.z, cell)) continue;         /* already drawn at full detail */
       if(!isPart && area < cell.minArea) continue;
+      /* Cells overlap — the rings, and anything streamed in later. One id is
+         drawn once, or the same wall gets built twice and fights itself. */
+      var oid = (e.type === "relation" ? "r" : "w") + e.id + (k ? "_" + k : "");
+      if(drawnIds[oid]) continue;
+      drawnIds[oid] = 1;
       into.push({pts:pts, holes:(k===0 ? inners : null), tags:t, area:area, dist:dist, c:c,
                  part:isPart, bb:isPart ? null : bboxOf(pts),
                  score:area/(1 + dist*0.0018)});
@@ -1473,14 +1551,23 @@ function addBuildings(list, parts, group, cell){
     geo.rotateX(-Math.PI/2);
     var wc = osmColour(b.tags["building:colour"]) || matColour(WALL_MAT, b.tags["building:material"]) ||
              wallColour(h, seed, house);
-    walls.addGeom(geo, wc, pad + minH);
+    var rc = roofColour(b.tags, seed, plan.shape);
+    addExtrusion(geo, wc, rc, pad + minH, walls, roofs);
 
+    var top = pad + wallTop;
     if(roofH > 0.4 && plan.shape !== "flat"){
-      var top = pad + wallTop, rc = roofColour(b.tags, seed, plan.shape);
       if(plan.shape === "gabled" || plan.shape === "hipped") roofRidged(roofs, box, top, roofH, plan.shape === "hipped", rc);
       else if(plan.shape === "skillion") roofSkillion(roofs, box, top, roofH, rc);
       else if(plan.shape === "dome" || plan.shape === "onion") roofDome(roofs, b.pts, box, top, roofH, plan.shape === "onion", rc);
       else if(b.pts.length < 40) roofPyramid(roofs, b.pts, top, roofH, rc);   /* pyramidal, cone, spire */
+    }else if(plan.shape === "flat" && b.area > 260 && b.dist < 3500 && b.pts.length < 26){
+      /* A parapet is the difference between a roof and the top of a box. */
+      var ph = 0.7 + Math.min(1.4, b.area/2600), pc = rc.clone().offsetHSL(0, 0, -0.06);
+      for(var e2=0;e2<b.pts.length;e2++){
+        var q1 = b.pts[e2], q2 = b.pts[(e2+1)%b.pts.length];
+        roofs.addTri({x:q1.x,y:top,z:q1.z}, {x:q2.x,y:top,z:q2.z}, {x:q2.x,y:top+ph,z:q2.z}, pc);
+        roofs.addTri({x:q1.x,y:top,z:q1.z}, {x:q2.x,y:top+ph,z:q2.z}, {x:q1.x,y:top+ph,z:q1.z}, pc);
+      }
     }
     if(v.tier === "modelled") statModelled++;
     else if(v.tier === "measured") statMeasured++;
@@ -1601,59 +1688,117 @@ function tile2lat(y,z){
   var n = Math.PI - 2*Math.PI*y/Math.pow(2,z);
   return 180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)));
 }
-/* Each imagery tile becomes a subdivided sheet pushed onto the heightfield,
-   so the aerial photograph wraps the actual hills. The two layers used to be
-   flat planes 0.1 m apart, which is what made the ground flicker: coplanar
-   surfaces cannot be ordered by a depth buffer. Now the sharp layer sits on
-   a small lift with a polygon offset and its own render order, and coarse
-   tiles that it completely covers are never built at all. */
-function drapeImagery(z, halfM, o){
-  o = o || {};
-  var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
-  var xs = lon2tile(LON0 - halfM/mLon, z), xe = lon2tile(LON0 + halfM/mLon, z);
-  var ys = lat2tile(LAT0 + halfM/mLat, z), ye = lat2tile(LAT0 - halfM/mLat, z);
-  /* Tile count grows with the square of the zoom; at z17 a 2.5 km box is
-     nearly 200 requests. Step the zoom down rather than flooding the server. */
-  var guardCount = 0;
-  while((xe-xs+1)*(ye-ys+1) > 150 && z > 12){
-    z--; guardCount++;
-    xs = lon2tile(LON0 - halfM/mLon, z); xe = lon2tile(LON0 + halfM/mLon, z);
-    ys = lat2tile(LAT0 + halfM/mLat, z); ye = lat2tile(LAT0 - halfM/mLat, z);
-    if(guardCount > 6) break;
+/* Imagery follows the aeroplane. Covering the whole 10 km square at z17 would
+   be ~200 tiles, so the old code quietly stepped the zoom down until it fitted
+   — which is why the ground was a blurry z14 smear wherever you actually flew.
+   Instead the sharp layers are small windows that travel with you and release
+   tiles behind you, while a coarse static layer fills the horizon. */
+var IMG_LAYERS = [], imgLoader = null;
+function imageryPlan(){
+  if(opt.quality === "low")
+    return [{z:16, half:1300, follow:true, max:44}, {z:13, half:6200, follow:false, max:24}];
+  if(opt.quality === "high")
+    return [{z:18, half:420, follow:true, max:56}, {z:17, half:1100, follow:true, max:90},
+            {z:15, half:3000, follow:true, max:56}, {z:13, half:6400, follow:false, max:24}];
+  return [{z:17, half:850, follow:true, max:72}, {z:15, half:2700, follow:true, max:56},
+          {z:13, half:6200, follow:false, max:24}];
+}
+function initImagery(){
+  imgLoader = new THREE.TextureLoader(); imgLoader.setCrossOrigin("anonymous");
+  IMG_LAYERS = imageryPlan().map(function(L, i, arr){
+    L.tiles = {};
+    L.group = new THREE.Group();
+    L.lift = 0.26 - i*0.07;                     /* sharper sits fractionally higher */
+    /* Windows overlap at their edges, and two coplanar photographs of the same
+       ground cannot be separated by a depth test at 7 km — that is z-fighting
+       by construction. So the layers are painted instead: coarsest first, each
+       sharper one over the top, and only the sharpest writes depth. */
+    L.order = -(i + 1);
+    scene.add(L.group);
+    return L;
+  });
+  updateImagery(0, 0, true);
+}
+function tileBounds(z, tx, ty){
+  var w0 = toWorld(tile2lon(tx, z), tile2lat(ty, z));
+  var w1 = toWorld(tile2lon(tx+1, z), tile2lat(ty+1, z));
+  return {x0:Math.min(w0.x,w1.x), x1:Math.max(w0.x,w1.x),
+          z0:Math.min(w0.z,w1.z), z1:Math.max(w0.z,w1.z)};
+}
+function tileMesh(L, tx, ty){
+  var bb = tileBounds(L.z, tx, ty);
+  var x0 = bb.x0, x1 = bb.x1, z0 = bb.z0, z1 = bb.z1;
+  var url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
+          + L.z + "/" + ty + "/" + tx;
+  var rec = {mesh:null, cx:(x0+x1)/2, cz:(z0+z1)/2};
+  imgLoader.load(url, guard("Imagery tile", function(tex){
+    if(rec.dead){ tex.dispose(); return; }
+    tex.minFilter = THREE.LinearMipmapLinearFilter; tex.anisotropy = 4;
+    var w = x1-x0, d = z1-z0, cx = rec.cx, cz = rec.cz;
+    var seg = HF.ready ? Math.max(1, Math.min(24, Math.round(Math.max(w,d)/50))) : 1;
+    var g = new THREE.PlaneGeometry(w, d, seg, seg);
+    g.rotateX(-Math.PI/2);
+    var pa = g.attributes.position.array;
+    for(var i=0;i<pa.length;i+=3) pa[i+1] = terrainY(cx+pa[i], cz+pa[i+2]) + L.lift;
+    g.computeVertexNormals();                   /* lit ground: hillsides shade */
+    var m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({map:tex,
+      depthWrite: L.order === -1}));
+    m.position.set(cx, 0, cz);
+    m.renderOrder = L.order;
+    rec.mesh = m;
+    L.group.add(m);
+  }), null, function(){});
+  return rec;
+}
+function dropTile(L, key){
+  var rec = L.tiles[key];
+  if(!rec) return;
+  rec.dead = true;
+  if(rec.mesh){
+    L.group.remove(rec.mesh);
+    rec.mesh.geometry.dispose();
+    if(rec.mesh.material.map) rec.mesh.material.map.dispose();
+    rec.mesh.material.dispose();
   }
-  var loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
-  var group = new THREE.Group(); scene.add(group);
-  var ex = o.excludeHalf || 0, lift = o.lift || 0;
-  for(var tx=xs; tx<=xe; tx++){
-    for(var ty=ys; ty<=ye; ty++){
-      (function(tx,ty){
-        var w0 = toWorld(tile2lon(tx,z), tile2lat(ty,z));
-        var w1 = toWorld(tile2lon(tx+1,z), tile2lat(ty+1,z));
-        var x0 = Math.min(w0.x,w1.x), x1 = Math.max(w0.x,w1.x);
-        var z0 = Math.min(w0.z,w1.z), z1 = Math.max(w0.z,w1.z);
-        if(ex && x0 >= -ex && x1 <= ex && z0 >= -ex && z1 <= ex) return;
-        var url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"
-                + z + "/" + ty + "/" + tx;
-        loader.load(url, guard("Imagery tile", function(tex){
-          tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
-          var w = x1-x0, d = z1-z0, cx = (x0+x1)/2, cz = (z0+z1)/2;
-          var seg = HF.ready ? Math.max(1, Math.min(28, Math.round(Math.max(w,d)/45))) : 1;
-          var g = new THREE.PlaneGeometry(w, d, seg, seg);
-          g.rotateX(-Math.PI/2);
-          var pa = g.attributes.position.array;
-          for(var i=0;i<pa.length;i+=3) pa[i+1] = terrainY(cx+pa[i], cz+pa[i+2]) + lift;
-          g.computeVertexNormals();                 /* lit ground: hillsides shade */
-          var mat = new THREE.MeshLambertMaterial({map:tex});
-          if(o.offset){
-            mat.polygonOffset = true; mat.polygonOffsetFactor = -2; mat.polygonOffsetUnits = -4;
-          }
-          var m = new THREE.Mesh(g, mat);
-          m.position.set(cx, 0, cz);
-          m.renderOrder = o.order || 0;
-          group.add(m);
-        }), null, function(){});
-      })(tx,ty);
+  delete L.tiles[key];
+}
+function updateImagery(px, pz, force){
+  if(!IMG_LAYERS.length) return;
+  var li, L;
+  /* where each layer currently sits, so a coarse tile can tell whether a
+     sharper one has it completely covered */
+  for(li=0; li<IMG_LAYERS.length; li++){
+    L = IMG_LAYERS[li];
+    L.cx = L.follow ? px : 0; L.cz = L.follow ? pz : 0;
+  }
+  function coveredBySharper(li, b){
+    for(var k=0; k<li; k++){
+      var S = IMG_LAYERS[k];
+      if(b.x0 >= S.cx - S.half && b.x1 <= S.cx + S.half &&
+         b.z0 >= S.cz - S.half && b.z1 <= S.cz + S.half) return true;
     }
+    return false;
+  }
+  for(li=0; li<IMG_LAYERS.length; li++){
+    L = IMG_LAYERS[li];
+    /* a coarse layer has to be re-evaluated whenever a sharper window moves,
+       even if the coarse layer itself is anchored */
+    if(!L.follow && !force && li === 0) continue;
+    var ll = worldToLatLon(L.cx, L.cz);
+    var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
+    var xs = lon2tile(ll.lon - L.half/mLon, L.z), xe = lon2tile(ll.lon + L.half/mLon, L.z);
+    var ys = lat2tile(ll.lat + L.half/mLat, L.z), ye = lat2tile(ll.lat - L.half/mLat, L.z);
+    var wanted = {}, tx, ty, key, n = 0;
+    for(tx=xs; tx<=xe; tx++){
+      for(ty=ys; ty<=ye; ty++){
+        key = tx + "/" + ty;
+        if(coveredBySharper(li, tileBounds(L.z, tx, ty))) continue;
+        wanted[key] = 1;
+        n = 0; for(var kk in L.tiles) n++;
+        if(!L.tiles[key] && n < L.max) L.tiles[key] = tileMesh(L, tx, ty);
+      }
+    }
+    for(key in L.tiles) if(!wanted[key]) dropTile(L, key);
   }
 }
 
@@ -1701,7 +1846,7 @@ function initScene(){
   scene.add(sun);
   scene.add(new THREE.HemisphereLight(S.amb, 0x2f3a30, S.ai));
 
-  matBuild = new THREE.MeshLambertMaterial({vertexColors:true});
+  matBuild = new THREE.MeshLambertMaterial({vertexColors:true, map:facadeTexture()});
   matRoof  = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
   /* Roads, water and parks lie on the same terrain as the imagery, so they
      get a polygon offset and a later render order rather than a fixed lift. */
@@ -1867,10 +2012,7 @@ function startLoad(){
       if(DENSE) status("dense city centre — pulling the detail in close");
     }
     whenGround(function(){
-      try{
-        drapeImagery(15, 5600, {excludeHalf:HALF_A, order:0});
-        drapeImagery(17, HALF_A, {order:1, lift:0.4, offset:true});
-      }catch(err){ report("Imagery", err); }
+      try{ initImagery(); }catch(err){ report("Imagery", err); }
     });
     phaseA();
     setTimeout(function(){
@@ -1954,6 +2096,42 @@ function takeOffWhenReady(){
     if(!running && anyLoaded()) launch();
   }, wait);
 }
+/* The rings are a snapshot around home; fly a mile and you are past them. This
+   keeps asking for the next square of buildings ahead of the aeroplane, one at
+   a time and slowly, so the city carries on instead of stopping dead. */
+var STREAM = {cell:800, asked:{}, active:false, last:0, fails:0};
+function streamTick(){
+  if(!running || STREAM.active || STREAM.fails > 3) return;
+  if(cq.length || cqActive || coverage.a === 1) return;      /* let the plan finish first */
+  if(Date.now() - STREAM.last < 6000) return;
+  var cs = STREAM.cell, ahead = 600;
+  var px = plane.position.x + fwd.x*ahead, pz = plane.position.z + fwd.z*ahead;
+  var bi = Math.round(px/cs), bj = Math.round(pz/cs), best = null, bd = 1e9, i, j;
+  for(i=bi-4;i<=bi+4;i++){
+    for(j=bj-4;j<=bj+4;j++){
+      var k = i + "," + j;
+      if(STREAM.asked[k]) continue;
+      var cx = i*cs, cz = j*cs;
+      if(Math.abs(cx) > LIMIT || Math.abs(cz) > LIMIT) continue;
+      var d = (cx-px)*(cx-px) + (cz-pz)*(cz-pz);
+      if(d < bd){ bd = d; best = {k:k, cx:cx, cz:cz}; }
+    }
+  }
+  if(!best || bd > 3400*3400) return;
+  STREAM.asked[best.k] = 1; STREAM.active = true; STREAM.last = Date.now();
+  var h = cs/2;
+  overpassTry(queryBuildings(bboxM(best.cx-h, best.cz-h, best.cx+h, best.cz+h)), 45000, 0, 3000,
+              "str" + best.k)
+    .then(function(data){ return whenGround(function(){
+      try{
+        buildCell(data, {inner:false, skipHalf:0, cap:Q.mid, minArea:20, tallest:0});
+        statStreamed++;
+      }catch(err){ report("Streamed square", err); }
+      STREAM.active = false; STREAM.fails = 0; tally();
+    }); })
+    .catch(function(){ STREAM.active = false; STREAM.fails++; });
+}
+
 function anyLoaded(){
   if(coverage.a === 2) return true;
   for(var i=0;i<4;i++) if(coverage.m[i] === 2 || coverage.b[i] === 2) return true;
@@ -2178,10 +2356,17 @@ function updateCam(dt){
   camera.lookAt(camAim);
 }
 /* Backdrop follows the aeroplane so neither the dome nor the ground plane
-   can ever wander out past the far clip. */
+   can ever wander out past the far clip, and the sharp imagery is re-centred
+   on it every couple of hundred metres. */
+var lastImgX = 1e9, lastImgZ = 1e9;
 function followCam(){
   if(sky) sky.position.copy(camera.position);
   if(base) base.position.set(camera.position.x, base.position.y, camera.position.z);
+  var dx = plane.position.x - lastImgX, dz = plane.position.z - lastImgZ;
+  if(dx*dx + dz*dz > 40000){                    /* every 200 m of travel */
+    lastImgX = plane.position.x; lastImgZ = plane.position.z;
+    try{ updateImagery(lastImgX, lastImgZ); }catch(err){ report("Imagery", err); }
+  }
 }
 
 var COMPASS = ["NORTH","NE","EAST","SE","SOUTH","SW","WEST","NW"];
@@ -2239,7 +2424,7 @@ function loop(){
   if(!running) return;
   try{
     var dt = Math.min(clock.getDelta(), 0.05);
-    physics(dt); updateCam(dt); followCam(); updateHud(dt);
+    physics(dt); updateCam(dt); followCam(); updateHud(dt); streamTick();
     renderer.render(scene, camera);
   }catch(err){
     frameFailed = true; running = false;
