@@ -822,25 +822,32 @@ var NOTABLE = "^(apartments|commercial|office|retail|supermarket|industrial|ware
   "hospital|school|university|college|church|cathedral|chapel|mosque|temple|hotel|civic|public|" +
   "government|train_station|stadium|sports_hall|hangar|tower|parking)$";
 
+var TMO = 60;                                       /* server-side seconds */
 function queryFull(bb){
   var b = bbs(bb);
-  return "[out:json][timeout:45];(" +
+  /* In a dense city centre the footways, service roads and street trees are a
+     bigger download than the buildings themselves, and they are what turns a
+     central London request into a timeout. Drop them when it is busy. */
+  var roads = DENSE
+    ? "^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|motorway_link|trunk_link|primary_link)$"
+    : "^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|pedestrian|footway|motorway_link|trunk_link|primary_link)$";
+  return "[out:json][timeout:"+TMO+"];(" +
     'way["building"]('+b+');' +
     'relation["building"]["type"="multipolygon"]('+b+');' +
     'way["building:part"]('+b+');' +                  /* Simple 3D Buildings */
     'relation["building:part"]('+b+');' +
-    'way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|pedestrian|footway|motorway_link|trunk_link|primary_link)$"]('+b+');' +
+    'way["highway"~"'+roads+'"]('+b+');' +
     'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
     'way["landuse"~"^(grass|forest|meadow|village_green|recreation_ground|cemetery|allotments)$"]('+b+');' +
     'way["leisure"~"^(park|garden|pitch|golf_course|playground)$"]('+b+');' +
-    'node["natural"="tree"]('+b+');' +
+    (DENSE ? "" : 'node["natural"="tree"]('+b+');') +
     ");out geom;";
 }
 /* Mid ring: still every building, but without the footway/service clutter
    that makes the core query heavy. This is the ring that used to be empty. */
 function queryMid(bb){
   var b = bbs(bb);
-  return "[out:json][timeout:45];(" +
+  return "[out:json][timeout:"+TMO+"];(" +
     'way["building"]('+b+');' +
     'relation["building"]["type"="multipolygon"]('+b+');' +
     'way["building:part"]('+b+');' +
@@ -851,9 +858,22 @@ function queryMid(bb){
     'way["leisure"~"^(park|garden|pitch|golf_course)$"]('+b+');' +
     ");out geom;";
 }
+/* Outer ring. "Notable" means half of central London, so when it is dense the
+   ring narrows to genuine landmarks and anything six storeys and up. */
+var LANDMARK = "^(cathedral|church|chapel|mosque|temple|synagogue|stadium|train_station|" +
+  "hospital|university|college|tower|hangar|government|civic|castle|museum)$";
 function queryNotable(bb){
   var b = bbs(bb);
-  return "[out:json][timeout:45];(" +
+  if(DENSE){
+    return "[out:json][timeout:"+TMO+"];(" +
+      'way["building"~"'+LANDMARK+'"]('+b+');' +
+      'way["building"]["building:levels"~"^([6-9]|[1-9][0-9]+)$"]('+b+');' +
+      'way["highway"~"^(motorway|trunk|primary)$"]('+b+');' +
+      'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
+      'way["leisure"~"^(park|golf_course)$"]('+b+');' +
+      ");out geom;";
+  }
+  return "[out:json][timeout:"+TMO+"];(" +
     'way["building"~"'+NOTABLE+'"]('+b+');' +
     'way["building"]["building:levels"]('+b+');' +
     'way["building:part"]('+b+');' +                  /* landmarks are the point of this ring */
@@ -863,6 +883,40 @@ function queryNotable(bb){
     'way["landuse"~"^(forest|farmland|meadow)$"]('+b+');' +
     'way["leisure"~"^(park|golf_course|nature_reserve)$"]('+b+');' +
     ");out geom;";
+}
+
+/* ---- how built-up is it here? one cheap count decides the whole plan ---- */
+var DENSITY = null, DENSE = false;
+function densityProbe(){
+  var half = 1000;                                    /* 2 x 2 km = 4 km² */
+  var q = "[out:json][timeout:25];way[\"building\"](" + bbs(bboxM(-half,-half,half,half)) + ");out count;";
+  return overpassRace(q, 25000).then(function(j){
+    var els = j.elements || [], i, n;
+    for(i=0;i<els.length;i++){
+      if(els[i].type === "count" && els[i].tags){
+        n = parseInt(els[i].tags.ways || els[i].tags.total, 10);
+        if(!isNaN(n)) return n/4;
+      }
+    }
+    return null;
+  }).catch(function(){ return null; });
+}
+/* Size each ring so the download is about what we were going to draw anyway.
+   Sparse countryside keeps the full 10 km; a city centre pulls the detail in
+   close and leaves landmarks further out. */
+function applyProfile(d){
+  DENSITY = d;
+  if(d != null && d > 20){
+    DENSE = d > 1800;
+    HALF_A = Math.max(650, Math.min(1250, Math.round(500*Math.sqrt(Q.core/d))));
+    var coreKm = 2*HALF_A/1000;
+    HALF_M = Math.max(HALF_A + 400,
+             Math.min(Q.midHalf, Math.round(500*Math.sqrt(4*Q.mid/d + coreKm*coreKm))));
+  }else{
+    DENSE = false; HALF_A = 1250; HALF_M = Q.midHalf;
+  }
+  RING_M = ringRects(HALF_A, HALF_M);
+  RING_B = ringRects(HALF_M, HALF_B);
 }
 
 /* A ring is four rectangles that meet but never overlap, so nothing inside
@@ -1384,6 +1438,15 @@ function drapeImagery(z, halfM, o){
   var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
   var xs = lon2tile(LON0 - halfM/mLon, z), xe = lon2tile(LON0 + halfM/mLon, z);
   var ys = lat2tile(LAT0 + halfM/mLat, z), ye = lat2tile(LAT0 - halfM/mLat, z);
+  /* Tile count grows with the square of the zoom; at z17 a 2.5 km box is
+     nearly 200 requests. Step the zoom down rather than flooding the server. */
+  var guardCount = 0;
+  while((xe-xs+1)*(ye-ys+1) > 150 && z > 12){
+    z--; guardCount++;
+    xs = lon2tile(LON0 - halfM/mLon, z); xe = lon2tile(LON0 + halfM/mLon, z);
+    ys = lat2tile(LAT0 + halfM/mLat, z); ye = lat2tile(LAT0 - halfM/mLat, z);
+    if(guardCount > 6) break;
+  }
   var loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
   var group = new THREE.Group(); scene.add(group);
   var ex = o.excludeHalf || 0, lift = o.lift || 0;
@@ -1520,6 +1583,7 @@ function buildAircraft(){
    You can take off the moment phase A lands.
    ============================================================ */
 var CELLS = 9;                      /* 1 core + 4 mid + 4 outer */
+var terrainReady = null;
 function status(txt){ $("cellState").textContent = txt; }
 /* Which tier of the model cascade this place actually landed on. */
 function tierLine(){
@@ -1544,9 +1608,12 @@ function tally(){
 }
 function fail(where, err){
   var m = (err && err.message) || "unreachable";
-  $("loadnote").innerHTML = '<b style="color:#b0243f">' + where + " failed: " + m + "</b><br>" +
-    "The public Overpass servers refused or timed out. Press retry, or if every attempt fails " +
-    "the viewer is blocking outbound requests and this needs a normal browser tab.";
+  var extra = DENSITY != null
+    ? "This area has about " + Math.round(DENSITY).toLocaleString() + " buildings per km², so the " +
+      "requests are large. Retry, or drop the detail budget to LOW to ask for less."
+    : "The public Overpass servers refused or timed out. Retry, or if every attempt fails the " +
+      "viewer is blocking outbound requests and this needs a normal browser tab.";
+  $("loadnote").innerHTML = '<b style="color:#b0243f">' + where + " failed: " + m + "</b><br>" + extra;
   $("retry").style.display = "block";
 }
 
@@ -1557,30 +1624,37 @@ $("go").onclick = function(){
   Q = QUALITY[opt.quality]; treeBudget = Q.trees;
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (osgb(LAT0, LON0) || "outside the OS grid");
-  status("reading terrain heights …");
   drawGridSvg();
-  /* Terrain first: it is nine small PNGs against Overpass's tens of seconds,
-     and every mesh built afterwards needs to know where the ground is. */
-  loadTerrain().catch(function(err){ report("Terrain", err); return false; })
+  try{ initScene(); }
+  catch(err){ report("Scene setup failed", err); status("failed — see diagnostics"); return; }
+
+  /* Terrain and map data go out together. The DEM used to gate everything,
+     which meant a slow or blocked elevation server held up the whole world;
+     now only the mesh building waits for it. */
+  status("reading terrain heights …");
+  terrainReady = raceTimeout(loadTerrain(), 15000, false)
+    .catch(function(err){ report("Terrain", err); return false; })
     .then(function(ok){
       try{
         if(ok){
           startY = Math.max(360, HF.max + 280);
+          if(base) base.position.y = HF.min - 1.2;
           $("here").textContent += " · ground " + Math.round(HF.elev0) + " m, relief " +
                                    Math.round(HF.max - HF.min) + " m";
-        }else{
-          status("no terrain data — flat ground");
         }
-        initScene();
-        drapeImagery(15, 5600, {excludeHalf:HALF_A, order:0});
-        drapeImagery(17, HALF_A, {order:1, lift:0.4, offset:true});
-        startLoad();
-      }catch(err){
-        report("Scene setup failed", err);
-        status("failed — see diagnostics");
-      }
+      }catch(err){ report("Terrain", err); }
+      return ok;
     });
+  startLoad();
 };
+function raceTimeout(p, ms, fallback){
+  return Promise.race([p, new Promise(function(res){ setTimeout(function(){ res(fallback); }, ms); })]);
+}
+/* Nothing may build geometry before the heightfield has settled one way or
+   the other, or half the world would sit at sea level. */
+function whenGround(fn){
+  return (terrainReady || Promise.resolve(false)).then(fn);
+}
 $("retry").onclick = function(){
   $("retry").style.display = "none";
   $("loadnote").textContent = "Retrying…";
@@ -1609,14 +1683,26 @@ function pumpCells(){
 function cellDone(){ cqActive = Math.max(0, cqActive-1); pumpCells(); }
 
 function startLoad(){
-  HALF_M = Q.midHalf;
-  RING_M = ringRects(HALF_A, HALF_M);
-  RING_B = ringRects(HALF_M, HALF_B);
-  phaseA();
-  setTimeout(function(){
-    for(var i=0;i<4;i++) queueCell("m", i);       /* nearest ring first */
-    for(var j=0;j<4;j++) queueCell("b", j);
-  }, 1200);
+  applyProfile(null);                             /* safe defaults if the probe fails */
+  status("checking how built-up this is …");
+  densityProbe().then(function(d){
+    applyProfile(d);
+    if(d != null){
+      $("here").textContent += " · " + Math.round(d).toLocaleString() + " buildings/km²";
+      if(DENSE) status("dense city centre — pulling the detail in close");
+    }
+    whenGround(function(){
+      try{
+        drapeImagery(15, 5600, {excludeHalf:HALF_A, order:0});
+        drapeImagery(17, HALF_A, {order:1, lift:0.4, offset:true});
+      }catch(err){ report("Imagery", err); }
+    });
+    phaseA();
+    setTimeout(function(){
+      for(var i=0;i<4;i++) queueCell("m", i);     /* nearest ring first */
+      for(var j=0;j<4;j++) queueCell("b", j);
+    }, 1200);
+  });
 }
 
 var RING_M = ringRects(HALF_A, HALF_M);      /* rebuilt in startLoad once the */
@@ -1626,15 +1712,15 @@ function phaseA(){
   coverage.a = 1; drawGridSvg();
   status("fetching the core 2.5 km …");
   var t0 = Date.now();
-  overpassTry(queryFull(bboxM(-HALF_A, -HALF_A, HALF_A, HALF_A)), 40000, 1, 4000)
-    .then(function(data){
+  overpassTry(queryFull(bboxM(-HALF_A, -HALF_A, HALF_A, HALF_A)), 70000, 1, 4000)
+    .then(function(data){ return whenGround(function(){
       try{ buildCell(data, {inner:true, skipHalf:0, cap:Q.core, minArea:14, tallest:0}); }
       catch(err){ report("Core tile", err); }
       coverage.a = 2;
       status("core loaded in " + ((Date.now()-t0)/1000).toFixed(1) + "s");
       $("flynow").classList.add("on");
       tally(); maybeFinish();
-    })
+    }); })
     .catch(function(err){
       coverage.a = 3; tally();
       fail("Core area", err);
@@ -1647,14 +1733,15 @@ function ringCell(kind, i){
   var mid = kind === "m", cov = mid ? coverage.m : coverage.b;
   var r = (mid ? RING_M : RING_B)[i], bb = bboxM(r[0], r[1], r[2], r[3]);
   cov[i] = 1; drawGridSvg();
-  overpassTry(mid ? queryMid(bb) : queryNotable(bb), 50000, 1, 4000)
-    .then(function(data){
+  overpassTry(mid ? queryMid(bb) : queryNotable(bb), 70000, 1, 4000)
+    .then(function(data){ return whenGround(function(){
       try{
         buildCell(data, {inner:false, skipHalf: mid ? HALF_A : HALF_M,
                          cap: mid ? Q.mid : Q.outer, minArea: mid ? 45 : 220, tallest:0});
       }catch(err){ report((mid ? "Mid" : "Outer") + " section " + i, err); }
       cov[i] = 2; cellDone(); tally(); maybeFinish();
-    })
+      $("flynow").classList.add("on");
+    }); })
     .catch(function(err){
       cov[i] = 3; cellDone(); tally();
       if(coverage.a === 2) status("a " + (mid ? "mid" : "outer") + " section is unavailable — the rest is flying");
@@ -1662,12 +1749,18 @@ function ringCell(kind, i){
       /* core still in flight: leave the note alone, it has the better story */
     });
 }
+function anyLoaded(){
+  if(coverage.a === 2) return true;
+  for(var i=0;i<4;i++) if(coverage.m[i] === 2 || coverage.b[i] === 2) return true;
+  return false;
+}
 function maybeFinish(){
   var pending = (coverage.a === 1 ? 1 : 0) + cq.length + cqActive;
   if(pending === 0){
-    $("loadhd").textContent = "World ready";
-    status("complete");
-    if(!running && coverage.a === 2) launch();
+    $("loadhd").textContent = anyLoaded() ? "World ready" : "Nothing loaded";
+    status(anyLoaded() ? "complete" : "every request failed");
+    /* the core is the nicest cell, not a required one — fly on whatever landed */
+    if(!running && anyLoaded()) launch();
     else if(running) flash("World complete", tierLine());
   }
 }
@@ -1934,6 +2027,8 @@ window.__sim = {
   scene: function(){ return scene; },
   camera: function(){ return camera; },
   plane: function(){ return plane; },
+  plan: function(){ return {density: DENSITY, dense: DENSE, halfA: HALF_A, halfM: HALF_M,
+                            quality: opt.quality}; },
   stats: function(){ return {buildings: statBuildings, roadKm: Math.round(statRoadM/1000),
                              relief: HF.ready ? Math.round(HF.max - HF.min) : null,
                              modelled: statModelled, measured: statMeasured,
