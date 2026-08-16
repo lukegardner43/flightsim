@@ -296,7 +296,8 @@ function reportText(){
     L.push("   " + String(n.tag||"?").padEnd(9) + String(n.host).slice(0,26).padEnd(27) +
            String(n.status).padEnd(6) + (n.ms+"ms").padStart(7) +
            (n.kb != null ? ("  " + n.kb + "KB").padStart(9) : "") +
-           (n.els != null ? "  " + n.els + " elements" : ""));
+           (n.els != null ? "  " + n.els + " elements" : "") +
+           (n.remark ? "\n              remark: " + n.remark : ""));
   });
   if(errLog.length){ L.push("errors"); errLog.forEach(function(e){ L.push("   " + e); }); }
   return L.join("\n");
@@ -1050,10 +1051,26 @@ var netLog = [], errLog = [];
 function logNet(o){ netLog.push(o); if(netLog.length > 80) netLog.shift(); }
 function hostOf(u){ return u.split("/")[2] || u; }
 
+/* Overpass reports its own failures as HTTP 200 with an empty elements array
+   and a "remark" — a timed-out query, an out-of-memory query, a mirror whose
+   database dispatcher is down. Taking that at face value is how the sim came
+   to believe central London contains no buildings: one mirror answered
+   instantly with nothing, and because a fast empty answer wins a race against
+   slow real ones, it won every time. An empty answer is now only believed
+   when every mirror agrees on it. */
+function badRemark(r){
+  return !!r && /error|timed?\s*out|out of memory|dispatcher|not available|refused/i.test(r);
+}
+function demote(url){                              /* misbehaving mirror goes last */
+  var i = OVERPASS.indexOf(url);
+  if(i >= 0 && i < OVERPASS.length - 1) OVERPASS.push(OVERPASS.splice(i, 1)[0]);
+}
+
 var MIRROR_STAGGER = 2500;
 function overpassRace(q, timeoutMs, tag){
   return new Promise(function(resolve, reject){
     var ctrls = [], timers = [], settled = false, started = 0, fails = 0, lastErr = null;
+    var emptyAnswer = null;                        /* kept in case they all say empty */
     function cleanup(){
       for(var i=0;i<ctrls.length;i++){ try{ ctrls[i].abort(); }catch(e){} }
       for(var t=0;t<timers.length;t++) clearTimeout(timers[t]);
@@ -1087,8 +1104,23 @@ function overpassRace(q, timeoutMs, tag){
         .then(function(txt){
           if(settled) return;
           var j = JSON.parse(txt);
+          var els = (j.elements || []).length, rem = j.remark || "";
           logNet({tag:tag, host:hostOf(url), status:200, ms:Date.now()-t0,
-                  kb:Math.round(txt.length/1024), els:(j.elements||[]).length});
+                  kb:Math.round(txt.length/1024), els:els, remark:rem.slice(0,90)});
+          if(badRemark(rem) || els === 0){
+            /* not an answer we can trust — keep it only as a last resort */
+            if(!emptyAnswer) emptyAnswer = j;
+            if(badRemark(rem)) demote(url);
+            lastErr = new Error(hostOf(url) + (rem ? ": " + rem.slice(0,70) : " returned nothing"));
+            fails++;
+            tryMirror(started);
+            if(fails >= OVERPASS.length){
+              settled = true; clearTimeout(timer); cleanup();
+              /* every mirror said empty, so the area really is empty */
+              resolve(emptyAnswer);
+            }
+            return;
+          }
           settled = true; clearTimeout(timer); cleanup(); resolve(j);
         })
         .catch(function(e){
@@ -1099,7 +1131,8 @@ function overpassRace(q, timeoutMs, tag){
           tryMirror(started);                    /* don't wait out the stagger on a failure */
           if(fails >= OVERPASS.length){
             settled = true; cleanup();
-            reject(lastErr || new Error("all mirrors failed"));
+            if(emptyAnswer) resolve(emptyAnswer);
+            else reject(lastErr || new Error("all mirrors failed"));
           }
         });
     }
