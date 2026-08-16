@@ -563,10 +563,21 @@ function isHouse(tags, area, h){
 /* ============================================================
    4.  GEOMETRY BATCHING
    ============================================================ */
+/* Overpass puts a null in the geometry array for every node it could not
+   resolve — routine in dense areas and around relations. Reading .lon off one
+   of those threw, and because a cell is built in a single try block, one bad
+   node took every building in that cell down with it. Nothing in here may
+   assume a point is usable. */
 function ringToPts(geom){
-  var p = [], i, w;
+  var p = [], i, w, g, lat, lon;
+  if(!geom || !geom.length) return p;
   for(i=0;i<geom.length;i++){
-    w = toWorld(geom[i].lon, geom[i].lat);
+    g = geom[i];
+    if(!g) continue;
+    lat = +g.lat; lon = +g.lon;
+    if(!isFinite(lat) || !isFinite(lon)) continue;
+    w = toWorld(lon, lat);
+    if(!isFinite(w.x) || !isFinite(w.z)) continue;
     if(p.length && Math.abs(p[p.length-1].x-w.x)<0.05 && Math.abs(p[p.length-1].z-w.z)<0.05) continue;
     p.push(w);
   }
@@ -644,7 +655,14 @@ Batch.prototype.mesh = function(mat){
   g.setAttribute("normal",   new THREE.BufferAttribute(new Float32Array(this.n),3));
   g.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(this.c),3));
   g.computeBoundingSphere();
-  var m = new THREE.Mesh(g, mat); m.frustumCulled = true;
+  var m = new THREE.Mesh(g, mat);
+  /* A single non-finite vertex makes the bounding sphere NaN, every frustum
+     test fail, and the whole batch — thousands of good buildings — disappear
+     with no error anywhere. Draw it rather than lose it. */
+  if(!g.boundingSphere || !isFinite(g.boundingSphere.radius)){
+    m.frustumCulled = false;
+    statSkipped++;
+  }else m.frustumCulled = true;
   this.p = this.n = this.c = null;
   return m;
 };
@@ -807,6 +825,7 @@ var QUALITY = {
 };
 var Q, treeBudget = 0, statBuildings = 0, statRoadM = 0;
 var statModelled = 0, statMeasured = 0, statEstimated = 0;   /* the three tiers */
+var statSkipped = 0;                                         /* elements OSM gave us that we couldn't use */
 var world = new THREE.Group();
 /* 0 pending, 1 loading, 2 done, 3 failed */
 var coverage = {a:0, m:[0,0,0,0], b:[0,0,0,0]};
@@ -1239,21 +1258,27 @@ function addBuildings(list, parts, group, cell){
   var walls = new Batch(), roofs = new Batch();
   var outlines = [], modelled = [], i, o, r;
 
+  /* Per element, not per cell: a single unusable way must cost us that way
+     and nothing else. */
   function collect(src, into, isPart){
     for(var n=0;n<src.length;n++){
-      var e = src[n], t = e.tags || {}, rings = ringsOf(e);
-      var outers = rings.filter(function(x){ return x.role === "outer" && x.pts.length > 2; });
-      var inners = rings.filter(function(x){ return x.role === "inner" && x.pts.length > 2; });
-      for(var k=0;k<outers.length;k++){
-        var pts = outers[k].pts, area = Math.abs(signedArea(pts));
-        if(area < (isPart ? 6 : 14)) continue;
-        var c = centroid(pts), dist = Math.sqrt(c.x*c.x + c.z*c.z);
-        if(inSkip(c.x, c.z, cell)) continue;       /* already drawn at full detail */
-        if(!isPart && area < cell.minArea) continue;
-        into.push({pts:pts, holes:(k===0 ? inners : null), tags:t, area:area, dist:dist, c:c,
-                   part:isPart, bb:isPart ? null : bboxOf(pts),
-                   score:area/(1 + dist*0.0018)});
-      }
+      try{ collectOne(src[n], into, isPart); }catch(err){ statSkipped++; }
+    }
+  }
+  function collectOne(e, into, isPart){
+    var t = e.tags || {}, rings = ringsOf(e);
+    var outers = rings.filter(function(x){ return x.role === "outer" && x.pts.length > 2; });
+    var inners = rings.filter(function(x){ return x.role === "inner" && x.pts.length > 2; });
+    for(var k=0;k<outers.length;k++){
+      var pts = outers[k].pts, area = Math.abs(signedArea(pts));
+      if(!isFinite(area) || area < (isPart ? 6 : 14)) continue;
+      var c = centroid(pts), dist = Math.sqrt(c.x*c.x + c.z*c.z);
+      if(!isFinite(c.x) || !isFinite(c.z)) continue;
+      if(inSkip(c.x, c.z, cell)) continue;         /* already drawn at full detail */
+      if(!isPart && area < cell.minArea) continue;
+      into.push({pts:pts, holes:(k===0 ? inners : null), tags:t, area:area, dist:dist, c:c,
+                 part:isPart, bb:isPart ? null : bboxOf(pts),
+                 score:area/(1 + dist*0.0018)});
     }
   }
   collect(list, outlines, false);
@@ -1279,7 +1304,9 @@ function addBuildings(list, parts, group, cell){
 
   var tallest = 0;
   for(var k2=0;k2<prepared.length;k2++){
-    var b = prepared[k2];
+    try{ raise(prepared[k2]); }catch(err){ statSkipped++; }
+  }
+  function raise(b){
     var seed = Math.round(b.pts[0].x*3.7 + b.pts[0].z*1.9);
     var v = volumeOf(b.tags, b.area, b.dist, seed);
     if(b.part) v.tier = "modelled";
@@ -1304,9 +1331,10 @@ function addBuildings(list, parts, group, cell){
     var pad = terrainY(b.pts[0].x, b.pts[0].z);
 
     var shape, geo;
-    try{ shape = makeShape(b.pts, b.holes); }catch(err){ continue; }
+    if(!isFinite(pad) || !isFinite(wallTop) || !isFinite(minH)) return;
+    try{ shape = makeShape(b.pts, b.holes); }catch(err){ return; }
     try{ geo = new THREE.ExtrudeGeometry(shape, {depth:wallTop-minH, bevelEnabled:false, curveSegments:1}); }
-    catch(err){ continue; }
+    catch(err){ return; }
     geo.rotateX(-Math.PI/2);
     var wc = osmColour(b.tags["building:colour"]) || matColour(WALL_MAT, b.tags["building:material"]) ||
              wallColour(h, seed, house);
@@ -1322,8 +1350,8 @@ function addBuildings(list, parts, group, cell){
     if(v.tier === "modelled") statModelled++;
     else if(v.tier === "measured") statMeasured++;
     else statEstimated++;
+    statBuildings++;
   }
-  statBuildings += prepared.length;
   if(walls.count()) group.add(walls.mesh(matBuild));
   if(roofs.count()) group.add(roofs.mesh(matRoof));
   cell.tallest = tallest;
@@ -1335,7 +1363,13 @@ var ROAD_W = {motorway:20,trunk:15,primary:12,secondary:10,tertiary:8,residentia
 function addRoads(list, group, cell){
   var b = new Batch();
   for(var i=0;i<list.length;i++){
-    var e = list[i]; if(!e.geometry) continue;
+    try{ oneRoad(list[i], b, cell); }catch(err){ statSkipped++; }
+  }
+  if(b.count()) group.add(b.mesh(matFlat));
+}
+function oneRoad(e, b, cell){
+  {
+    if(!e.geometry) return;
     var hw = (e.tags && e.tags.highway) || "residential";
     var w = (ROAD_W[hw] || 6)/2;
     if(e.tags && e.tags.lanes){ var ln = parseFloat(e.tags.lanes); if(ln > 0) w = Math.max(w, ln*1.6); }
@@ -1357,12 +1391,17 @@ function addRoads(list, group, cell){
       b.addTri({x:a.x+nx,y:ya,z:a.z+nz},{x:c.x-nx,y:yc,z:c.z-nz},{x:a.x-nx,y:ya,z:a.z-nz}, col);
     }
   }
-  if(b.count()) group.add(b.mesh(matFlat));
 }
 function addAreas(list, group, cell){
   var b = new Batch();
   for(var i=0;i<list.length;i++){
-    var e = list[i], t = e.tags||{}, rings = [];
+    try{ oneArea(list[i], b, cell); }catch(err){ statSkipped++; }
+  }
+  if(b.count()) group.add(b.mesh(matFlat));
+}
+function oneArea(e, b, cell){
+  {
+    var t = e.tags||{}, rings = [];
     if(e.type === "way" && e.geometry) rings.push(ringToPts(e.geometry));
     else if(e.type === "relation" && e.members){
       for(var m=0;m<e.members.length;m++){
@@ -1388,9 +1427,9 @@ function addAreas(list, group, cell){
       b.addGeom(g, col, y, true);
     }
   }
-  if(b.count()) group.add(b.mesh(matFlat));
 }
 function addTrees(nodes, group){
+  nodes = nodes.filter(function(t){ return t && isFinite(+t.lat) && isFinite(+t.lon); });
   if(!nodes.length || treeBudget <= 0) return;
   var n = Math.min(nodes.length, treeBudget, 900);
   treeBudget -= n;
