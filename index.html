@@ -183,6 +183,12 @@
 
       <button class="linky" id="probe" type="button">Run connection test</button>
       <div id="probeout"></div>
+      <div class="find" style="margin-top:8px">
+        <input id="ovurl" placeholder="Overpass server (optional) — e.g. https://overpass.private.coffee/api/interpreter"
+               autocomplete="off" spellcheck="false">
+      </div>
+      <p class="note">Leave blank unless the connection test says the built-in servers are blocked or
+        returning nothing. Anything you put here is tried first.</p>
 
       <div class="row">
         <div class="seg"><p class="lbl">Detail budget</p>
@@ -234,9 +240,11 @@
       <button id="flynow" type="button">Take off now — keep loading</button>
       <button id="retry" type="button" class="linky" style="display:none">Retry failed requests</button>
       <button id="showrep" type="button" class="linky">What happened? — copy a report</button>
-      <p class="fine" id="loadnote">Terrain first, then nine map requests, two at a time: the detailed 2.5 km core,
-        a mid ring out to 6 km that keeps every building, and an outer ring of landmarks to 10 km. Each falls back
-        through the Overpass mirrors in turn and gives up after 40–50 seconds rather than hanging.</p>
+      <p class="fine" id="loadnote">Terrain first, then ten map requests, two at a time: a full-detail core,
+        a mid ring that keeps every building, an outer ring of landmarks to 10 km, and one sweep of the whole
+        square for anything worth flying to. How big the first two are depends on how built-up it turns out to
+        be. Each request races the public Overpass servers and takes the first real answer — a server that
+        replies with an empty database does not count as an answer.</p>
     </div>
   </div>
 </div>
@@ -320,6 +328,8 @@ function reportText(){
            (n.els != null ? "  " + n.els + " elements" : "") +
            (n.remark ? "\n              remark: " + n.remark : ""));
   });
+  var vd = dataVerdict();
+  if(vd) L.push("verdict  " + vd);
   if(errLog.length){ L.push("errors"); errLog.forEach(function(e){ L.push("   " + e); }); }
   return L.join("\n");
 }
@@ -474,6 +484,17 @@ $("useco").onclick = function(){
   setGo(true);
 };
 
+/* An escape hatch that does not depend on me guessing which public mirrors a
+   given network allows: name one yourself and it is tried before all of them. */
+function customOverpass(){
+  var el = $("ovurl"), v = el ? (el.value || "").trim() : "";
+  return /^https:\/\/[^\s]+$/.test(v) ? v : null;
+}
+try{
+  var savedOv = localStorage.getItem("tf.overpass");
+  if(savedOv) $("ovurl").value = savedOv;
+}catch(e){}
+
 /* ---- connection test: names exactly which services this viewer allows ---- */
 function probeFetch(name, url, opts){
   return fetch(url, opts || {})
@@ -490,36 +511,69 @@ function probeImage(name, url){
     im.src = url;
   });
 }
+/* Reachable is not the same as working. A mirror that answers in 200 ms with
+   an empty database passes any test that only checks for a response, and that
+   is exactly the failure that emptied a world — so every mirror gets a real
+   query over a piece of central London that certainly contains buildings, and
+   is judged on whether it can count them. */
+var TEST_Q = '[out:json][timeout:20];way["building"](51.5065,-0.1290,51.5080,-0.1270);out count;';
+function probeMirror(url){
+  var t0 = Date.now();
+  return fetch(url, {method:"POST", body:"data=" + encodeURIComponent(TEST_Q),
+                     headers:{"Content-Type":"application/x-www-form-urlencoded"}})
+    .then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+    .then(function(txt){
+      var j = JSON.parse(txt), ms = Date.now()-t0, n = 0, els = j.elements || [];
+      if(els[0] && els[0].tags)
+        for(var k in els[0].tags){ var v = parseInt(els[0].tags[k], 10); if(!isNaN(v) && v > n) n = v; }
+      if(j.remark && badRemark(j.remark))
+        return {host:hostOf(url), state:"bad", info:j.remark.slice(0, 60)};
+      if(n > 0) return {host:hostOf(url), state:"ok", info:n + " buildings in " + ms + "ms"};
+      return {host:hostOf(url), state:"empty", info:"answered in " + ms + "ms with an empty database"};
+    })
+    .catch(function(e){
+      return {host:hostOf(url), state:"dead",
+              info:((e && e.message) || "blocked") + " after " + (Date.now()-t0) + "ms"};
+    });
+}
 function runProbe(){
   var out = $("probeout");
   out.classList.add("on");
-  out.textContent = "Testing four services…";
+  out.textContent = "Testing every service, and every map server, with a real query…";
+  var extra = customOverpass();
+  var mirrors = (extra ? [extra] : []).concat(OVERPASS);
   Promise.all([
     probeFetch("Postcodes.io &nbsp;(postcode lookup)", "https://api.postcodes.io/postcodes/SW1A1AA"),
     probeFetch("Nominatim &nbsp;&nbsp;&nbsp;&nbsp;(place search)",
       "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q=durham"),
-    probeFetch("Overpass &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(map geometry)", "https://overpass-api.de/api/interpreter",
-      {method:"POST",
-       body:"data=" + encodeURIComponent("[out:json][timeout:10];node(51.500,-0.100,51.501,-0.099);out count;"),
-       headers:{"Content-Type":"application/x-www-form-urlencoded"}}),
     probeImage("Esri imagery &nbsp;(aerial tiles)",
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/10/335/511")
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/10/335/511"),
+    Promise.all(mirrors.map(probeMirror))
   ]).then(function(res){
-    var html = "";
-    res.forEach(function(r){
-      html += '<div><span class="' + (r.ok ? "pp" : "pf") + '">' + (r.ok ? "PASS" : "FAIL") +
-              '</span> &nbsp;' + r.name + ' &nbsp;<span style="color:#8a7c60">' + r.info + '</span></div>';
-    });
-    var geo = res[0].ok || res[1].ok, data = res[2].ok;
-    var verdict;
-    if(geo && data){
-      verdict = "All reachable — search should work. If it just failed, try again; the public servers rate-limit.";
-    } else if(!geo && data){
-      verdict = "Map data is reachable but the geocoders are not. Use the coordinate box above and the sim will run normally.";
-    } else {
-      verdict = "This viewer is blocking outbound requests, so no map data can be fetched here. " +
-                "Download this file and open it in a browser tab — there are no such restrictions there and it will run fully.";
+    var html = "", i, m = res[3], live = 0, empty = 0;
+    for(i=0;i<3;i++)
+      html += '<div><span class="' + (res[i].ok ? "pp" : "pf") + '">' + (res[i].ok ? "PASS" : "FAIL") +
+              '</span> &nbsp;' + res[i].name + ' &nbsp;<span style="color:#8a7c60">' + res[i].info + '</span></div>';
+    html += '<div style="margin-top:7px">Map servers (Overpass)</div>';
+    for(i=0;i<m.length;i++){
+      var r = m[i], cl = r.state === "ok" ? "pp" : "pf";
+      var word = r.state === "ok" ? "PASS" : (r.state === "dead" ? "FAIL" : "EMPTY");
+      if(r.state === "ok") live++; else if(r.state !== "dead") empty++;
+      html += '<div><span class="' + cl + '">' + word + '</span> &nbsp;' + r.host +
+              ' &nbsp;<span style="color:#8a7c60">' + r.info + '</span></div>';
     }
+    var geo = res[0].ok || res[1].ok, verdict;
+    if(live && geo)
+      verdict = live + " of " + m.length + " map servers are working. The sim races them and takes the " +
+                "first real answer, so it only needs one.";
+    else if(live)
+      verdict = "Map data works but the geocoders do not. Use the coordinate box above and the sim runs normally.";
+    else if(empty)
+      verdict = "Every map server this network can reach is answering with an empty database — a fault at " +
+                "their end. Wait a few minutes and test again, or paste a working Overpass server below.";
+    else
+      verdict = "No map server can be reached from here. If this is an in-app browser, open the file in a " +
+                "normal browser tab; if it is a work or school network, it is blocking them.";
     html += '<div class="verdict">' + verdict + '</div>';
     out.innerHTML = html;
   });
@@ -1481,9 +1535,16 @@ var HALF_A = 1250;                 /* full-detail core:  2.5 km square */
 var HALF_M = 3000;                 /* mid ring:          every building */
 var HALF_B = 5000;                 /* outer ring:        landmarks only */
 var GRID = 5, CELL = 2000;         /* nav-display graticule only      */
+/* Public Overpass instances. Three was not enough: on a network where two of
+   them are unreachable, the third gets to decide what the world contains — and
+   if its database is empty, so is the world. More mirrors is the only real
+   defence, and CONNECTION TEST will tell you which ones this network allows. */
 var OVERPASS = [
   "https://overpass.kumi.systems/api/interpreter",   /* usually the least queued */
   "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://overpass.osm.jp/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass.osm.ch/api/interpreter"
 ];
 /* Caps are per cell now, not one shared pot: the core used to be able to
@@ -1668,7 +1729,9 @@ function densityProbe(){
     for(i=0;i<els.length;i++){
       if(els[i].type === "count" && els[i].tags){
         n = parseInt(els[i].tags.ways || els[i].tags.total, 10);
-        if(!isNaN(n)) return n/4;
+        /* A zero is not a measurement of an empty place, it is a broken
+           mirror. Treat it as no answer and let the plan fall back. */
+        if(!isNaN(n) && n > 0) return n/4;
       }
     }
     return null;
@@ -1738,6 +1801,21 @@ function hostOf(u){ return u.split("/")[2] || u; }
    instantly with nothing, and because a fast empty answer wins a race against
    slow real ones, it won every time. An empty answer is now only believed
    when every mirror agrees on it. */
+/* An "out count" answer is a single element that can itself say zero, so a
+   mirror with an empty database does not look empty by element count. That is
+   what cost this flight: the density probe read "0 buildings in 4 km2 of
+   Surrey" as fact, sized the rings for open moor, and every ring query then
+   went to the same broken mirror. Nowhere in Britain has no buildings. */
+function answerIsEmpty(j){
+  var els = (j && j.elements) || [];
+  if(!els.length) return true;
+  if(els.length === 1 && els[0].type === "count"){
+    var t = els[0].tags || {}, n = 0, k, v;
+    for(k in t){ v = parseInt(t[k], 10); if(!isNaN(v) && v > n) n = v; }
+    return n === 0;
+  }
+  return false;
+}
 function badRemark(r){
   return !!r && /error|timed?\s*out|out of memory|dispatcher|not available|refused/i.test(r);
 }
@@ -1745,15 +1823,37 @@ function demote(url){                              /* misbehaving mirror goes la
   var i = OVERPASS.indexOf(url);
   if(i >= 0 && i < OVERPASS.length - 1) OVERPASS.push(OVERPASS.splice(i, 1)[0]);
 }
+/* Ten cells times six mirrors times fifteen seconds of hanging is most of an
+   hour spent asking servers that have already said no. Three strikes and a
+   mirror is skipped for the rest of the load — unless it is the last one
+   standing, in which case there is nothing to be gained by refusing to ask. */
+var mirrorFails = {};
+function strike(url){ mirrorFails[url] = (mirrorFails[url] || 0) + 1; }
+function benched(url){ return (mirrorFails[url] || 0) >= 3; }
+function anyFresh(){
+  for(var i=0;i<OVERPASS.length;i++) if(!benched(OVERPASS[i])) return true;
+  return false;
+}
 
 var MIRROR_STAGGER = 2500;
 function overpassRace(q, timeoutMs, tag){
   return new Promise(function(resolve, reject){
+    /* Once every mirror has struck out there is nothing left to race. Grinding
+       through ten cells and three retries of servers that have already failed
+       three times each is ten minutes of watching a progress bar to reach a
+       conclusion we could state now. */
+    if(!anyFresh()){ reject(new Error("every map server has already failed repeatedly")); return; }
     var ctrls = [], timers = [], settled = false, started = 0, fails = 0, lastErr = null;
     var emptyAnswer = null;                        /* kept in case they all say empty */
+    var live = [];                                 /* mirrors still in flight */
     function cleanup(){
       for(var i=0;i<ctrls.length;i++){ try{ ctrls[i].abort(); }catch(e){} }
       for(var t=0;t<timers.length;t++) clearTimeout(timers[t]);
+      /* A mirror aborted mid-flight used to vanish from the report, so a host
+         that simply never answers looked like a host that was never tried. */
+      for(i=0;i<live.length;i++)
+        if(!live[i].done) logNet({tag:tag, host:live[i].host, status:"no answer (aborted)",
+                                  ms:Date.now()-live[i].t0});
     }
     var timer = setTimeout(function(){
       if(settled) return;
@@ -1762,11 +1862,29 @@ function overpassRace(q, timeoutMs, tag){
     }, timeoutMs);
     timers.push(timer);
 
+    /* One place that decides the race is over, because there are three ways to
+       cross a mirror off — it answered with nothing, it failed, or it is
+       benched — and a skipped mirror that was not counted meant `fails` could
+       never reach the end of the list. The race then had no way to finish
+       except its own 70-second timeout, three times per cell, which is what
+       left the loading card sitting on "Building the grid". */
+    function exhausted(){
+      if(settled || fails < OVERPASS.length) return;
+      settled = true; clearTimeout(timer); cleanup();
+      if(emptyAnswer) resolve(emptyAnswer);        /* the area really may be empty */
+      else reject(lastErr || new Error("all map servers failed"));
+    }
     function tryMirror(i){
       if(settled || i >= OVERPASS.length) return;
       if(i < started) return;                    /* already running */
       started = i + 1;
+      if(benched(OVERPASS[i]) && anyFresh()){
+        lastErr = lastErr || new Error(hostOf(OVERPASS[i]) + " skipped after repeated failures");
+        fails++; tryMirror(i + 1); exhausted(); return;
+      }
       var url = OVERPASS[i], ctrl = null, t0 = Date.now();
+      var rec = {host:hostOf(url), t0:t0, done:false};
+      live.push(rec);
       try{ ctrl = new AbortController(); ctrls.push(ctrl); }catch(e){}
       /* the next mirror joins in on its own if this one is merely slow */
       timers.push(setTimeout(function(){ tryMirror(i+1); }, MIRROR_STAGGER));
@@ -1775,6 +1893,7 @@ function overpassRace(q, timeoutMs, tag){
                   body:"data=" + encodeURIComponent(q),
                   headers:{"Content-Type":"application/x-www-form-urlencoded"}})
         .then(function(r){
+          rec.done = true;
           if(!r.ok){
             logNet({tag:tag, host:hostOf(url), status:r.status, ms:Date.now()-t0});
             throw new Error(hostOf(url) + " HTTP " + r.status);
@@ -1784,36 +1903,32 @@ function overpassRace(q, timeoutMs, tag){
         .then(function(txt){
           if(settled) return;
           var j = JSON.parse(txt);
-          var els = (j.elements || []).length, rem = j.remark || "";
+          var els = answerIsEmpty(j) ? 0 : (j.elements || []).length, rem = j.remark || "";
           logNet({tag:tag, host:hostOf(url), status:200, ms:Date.now()-t0,
                   kb:Math.round(txt.length/1024), els:els, remark:rem.slice(0,90)});
-          if(badRemark(rem) || els === 0){
+          if(badRemark(rem) || answerIsEmpty(j)){
             /* not an answer we can trust — keep it only as a last resort */
             if(!emptyAnswer) emptyAnswer = j;
-            if(badRemark(rem)) demote(url);
+            /* No remark does not make it honest: a mirror that says Surrey has
+               no buildings has earned its place at the back of the queue. */
+            demote(url); strike(url);
             lastErr = new Error(hostOf(url) + (rem ? ": " + rem.slice(0,70) : " returned nothing"));
             fails++;
             tryMirror(started);
-            if(fails >= OVERPASS.length){
-              settled = true; clearTimeout(timer); cleanup();
-              /* every mirror said empty, so the area really is empty */
-              resolve(emptyAnswer);
-            }
+            exhausted();
             return;
           }
           settled = true; clearTimeout(timer); cleanup(); resolve(j);
         })
         .catch(function(e){
+          rec.done = true;
           if(settled) return;
           if(e && e.name !== "AbortError" && !/HTTP/.test(e.message||""))
             logNet({tag:tag, host:hostOf(url), status:(e.message||"failed").slice(0,40), ms:Date.now()-t0});
           lastErr = e; fails++;
+          if(!(e && e.name === "AbortError")) strike(url);
           tryMirror(started);                    /* don't wait out the stagger on a failure */
-          if(fails >= OVERPASS.length){
-            settled = true; cleanup();
-            if(emptyAnswer) resolve(emptyAnswer);
-            else reject(lastErr || new Error("all mirrors failed"));
-          }
+          exhausted();
         });
     }
     tryMirror(0);
@@ -3161,11 +3276,11 @@ function tally(){
 }
 function fail(where, err){
   var m = (err && err.message) || "unreachable";
-  var extra = DENSITY != null
+  var extra = dataVerdict() || (DENSITY != null
     ? "This area has about " + Math.round(DENSITY).toLocaleString() + " buildings per km², so the " +
       "requests are large. Retry, or drop the detail budget to LOW to ask for less."
     : "The public Overpass servers refused or timed out. Retry, or if every attempt fails the " +
-      "viewer is blocking outbound requests and this needs a normal browser tab.";
+      "viewer is blocking outbound requests and this needs a normal browser tab.");
   $("loadnote").innerHTML = '<b style="color:#b0243f">' + where + " failed: " + m + "</b><br>" + extra;
   $("retry").style.display = "block";
 }
@@ -3175,6 +3290,12 @@ $("go").onclick = function(){
   LAT0 = chosen.lat; LON0 = chosen.lon;
   M0 = merc(LON0, LAT0); K = Math.cos(LAT0*Math.PI/180);
   Q = QUALITY[opt.quality]; treeBudget = Q.trees;
+  var ov = customOverpass();
+  if(ov){
+    if(OVERPASS.indexOf(ov) >= 0) OVERPASS.splice(OVERPASS.indexOf(ov), 1);
+    OVERPASS.unshift(ov);
+    try{ localStorage.setItem("tf.overpass", ov); }catch(e2){}
+  }
   AI.on = !!(AI.p && $("aiuse").checked);
   AI.applied = AI.dressed = 0;
   $("setup").style.display = "none"; $("load").classList.add("on");
@@ -3215,6 +3336,13 @@ $("showrep").onclick = showReport;
 $("retry").onclick = function(){
   $("retry").style.display = "none";
   $("loadnote").textContent = "Retrying…";
+  mirrorFails = {};                             /* everyone gets another go */
+  var ov = customOverpass();                    /* including one named since the last try */
+  if(ov && OVERPASS.indexOf(ov) !== 0){
+    if(OVERPASS.indexOf(ov) > 0) OVERPASS.splice(OVERPASS.indexOf(ov), 1);
+    OVERPASS.unshift(ov);
+  }
+  ringsQueued = false;
   if(coverage.a === 0 || coverage.a === 3) phaseA();
   if(coverage.L === 0 || coverage.L === 3) queueCell("L", 0);
   for(var i=0;i<4;i++){
@@ -3253,14 +3381,23 @@ function startLoad(){
       try{ initImagery(); }catch(err){ report("Imagery", err); }
     });
     phaseA();
-    setTimeout(function(){
-      queueCell("L", 0);                          /* landmarks early: they are cheap */
-      for(var i=0;i<4;i++) queueCell("m", i);     /* then the nearest ring */
-      for(var j=0;j<4;j++) queueCell("b", j);
-    }, 1200);
+    /* With no probe the rings fall back to a cautious 900 m, which is right for
+       a city centre and much too small for a village. When the probe is the
+       thing that failed, wait for the core and size the rings from what it
+       actually contained — that is a measurement, not a guess. */
+    if(d == null) ringsAfterCore = true;
+    else setTimeout(queueRings, 1200);
   });
 }
 
+var ringsAfterCore = false, ringsQueued = false;
+function queueRings(){
+  if(ringsQueued) return;
+  ringsQueued = true;
+  queueCell("L", 0);                            /* landmarks early: they are cheap */
+  for(var i=0;i<4;i++) queueCell("m", i);       /* then the nearest ring */
+  for(var j=0;j<4;j++) queueCell("b", j);
+}
 var RING_M = ringRects(HALF_A, HALF_M);      /* rebuilt in startLoad once the */
 var RING_B = ringRects(HALF_M, HALF_B);      /* quality setting is known      */
 
@@ -3281,6 +3418,16 @@ function phaseA(step){
       try{ buildCell(data, {inner:true, skipHalf:0, cap:Q.core, minArea:14, tallest:0}); }
       catch(err){ report("Core tile", err); }
       coverage.a = 2;
+      if(ringsAfterCore){
+        ringsAfterCore = false;
+        var km2 = Math.pow(2*half/1000, 2);
+        if(statBuildings > 0 && km2 > 0){
+          applyProfile(statBuildings/km2);       /* measured, where the probe was refused */
+          $("here").textContent += " · " + Math.round(statBuildings/km2).toLocaleString() +
+                                   " buildings/km² (from the core, not the probe)";
+        }
+        queueRings();
+      }
       status("core loaded in " + ((Date.now()-t0)/1000).toFixed(1) + "s");
       $("flynow").classList.add("on");
       tally(); takeOffWhenReady(); maybeFinish();
@@ -3288,6 +3435,7 @@ function phaseA(step){
     .catch(function(err){
       if(step < 2){ return phaseA(step + 1); }
       coverage.a = 3; tally();
+      if(ringsAfterCore){ ringsAfterCore = false; queueRings(); }
       fail("Core area", err);
     });
 }
@@ -3340,9 +3488,13 @@ function ringCell(kind, i, step){
     .catch(function(err){
       if(step < 2) return ringCell(kind, i, step + 1);
       cov[i] = 3; cellDone(); tally();
-      if(coverage.a === 2) status("a " + (mid ? "mid" : "outer") + " section is unavailable — the rest is flying");
+      if(coverage.a === 2 && anyLoaded())
+        status("a " + (mid ? "mid" : "outer") + " section is unavailable — the rest is flying");
       else if(coverage.a === 3) fail(mid ? "Mid ring" : "Outer ring", err);
       /* core still in flight: leave the note alone, it has the better story */
+      /* Without this the loading card sat on "Building the grid" for ever when
+         every cell failed: the only route to a verdict was the success path. */
+      maybeFinish();
     });
 }
 /* Don't make anyone watch a loading card while a slow cell grinds through the
@@ -3400,19 +3552,46 @@ function streamTick(){
     });
 }
 
-function anyLoaded(){
-  if(coverage.a === 2 || coverage.L === 2) return true;
-  for(var i=0;i<4;i++) if(coverage.m[i] === 2 || coverage.b[i] === 2) return true;
-  return false;
+/* A cell that came back empty is not a loaded cell. Reporting "World ready"
+   over nothing at all is how an unusable mirror got to look like a working
+   sim with an unlucky postcode. */
+function anyLoaded(){ return statBuildings > 0 || statRoadM > 0; }
+/* Read the request log and say what actually went wrong, in the one sentence
+   that tells you what to do about it. */
+function dataVerdict(){
+  var empty = {}, dead = {}, good = 0, k, n, i;
+  for(i=0;i<netLog.length;i++){
+    n = netLog[i];
+    if(n.status === 200 && n.els > 0) good++;
+    else if(n.status === 200) empty[n.host] = (empty[n.host]||0) + 1;
+    else dead[n.host] = (dead[n.host]||0) + 1;
+  }
+  var e = Object.keys(empty), d = Object.keys(dead);
+  if(good) return null;
+  if(e.length && !d.length)
+    return "Every map server this network can reach answered, but with nothing in it — " +
+           e.join(", ") + " returned an empty database, which is a fault at their end, not here. " +
+           "Retry in a few minutes, or name a different Overpass server on the setup screen.";
+  if(e.length && d.length)
+    return "Only " + e.join(", ") + " is reachable from this network, and it is answering with an " +
+           "empty database. " + d.join(", ") + " could not be reached at all. Run CONNECTION TEST to " +
+           "see which servers this network allows, then name a working one on the setup screen.";
+  if(d.length)
+    return "No map server could be reached (" + d.join(", ") + "). If this is a work or school " +
+           "network it is probably blocking them; run CONNECTION TEST to confirm.";
+  return "No map data came back and nothing was logged, which usually means the request never left " +
+         "the browser. Run CONNECTION TEST.";
 }
 function maybeFinish(){
   var pending = (coverage.a === 1 ? 1 : 0) + cq.length + cqActive;
   if(pending === 0){
-    $("loadhd").textContent = anyLoaded() ? "World ready" : "Nothing loaded";
-    status(anyLoaded() ? "complete" : "every request failed");
+    var ok = anyLoaded();
+    $("loadhd").textContent = ok ? "World ready" : "No map data";
+    status(ok ? "complete" : "every server returned an empty world");
     /* the core is the nicest cell, not a required one — fly on whatever landed */
-    if(!running && anyLoaded()) launch();
+    if(!running && ok) launch();
     else if(running) flash("World complete", tierLine());
+    else fail("Map data", new Error("nothing to draw"));
   }
 }
 $("flynow").onclick = function(){ if(!running && plane) launch(); };
