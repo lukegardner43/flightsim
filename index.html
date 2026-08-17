@@ -284,11 +284,11 @@ function reportText(){
   L.push("terrain  " + (HF.ready ? "ok, ground " + Math.round(HF.elev0) + "m, relief " +
                                    Math.round(HF.max-HF.min) + "m" : "none"));
   L.push("cells    core=" + coverage.a + " mid=" + coverage.m.join("") + " outer=" + coverage.b.join("") +
-         "   (0 pending 1 loading 2 done 3 failed)");
+         " landmarks=" + coverage.L + "   (0 pending 1 loading 2 done 3 failed)");
   L.push("drawn    " + statBuildings + " buildings = " + statModelled + " modelled + " +
          statMeasured + " measured + " + statEstimated + " estimated;  " +
          Math.round(statRoadM/1000) + " km road;  " + statSkipped + " skipped;  " +
-         statStreamed + " squares streamed in");
+         statStreamed + " squares streamed in;  " + statLandmarks + " landmarks named");
   var ip = IMG_LAYERS.map(function(x){
     var n = 0; for(var k in x.tiles) n++;
     var live = 0; for(k in x.tiles) if(x.tiles[k].mesh) live++;
@@ -612,8 +612,35 @@ var TYPE_H = {
   school:9.5, university:18, college:14, hospital:22, civic:14, government:20,
   train_station:14, stadium:22, sports_hall:11, parking:12, service:3.4,
   construction:14, tower:40, farm:6, farm_auxiliary:5.5, barn:7.5, stable:4.5,
-  pub:8, semi:7.2, static_caravan:2.8
+  pub:8, semi:7.2, static_caravan:2.8,
+  /* landmark classes, reached through HIST_TYPE / MM_TYPE below */
+  castle:18, manor:12, mansion:14, palace:20, abbey:22, hist_tower:17, museum:16,
+  windmill:12, watermill:9, lighthouse:26, ruins:5, monument:9, grandstand:14,
+  water_tower:22, mast:34, chimney:32, silo:16
 };
+/* An OSM landmark often carries no building tag at all — historic=castle,
+   man_made=windmill — and everything downstream (height, roof, colour, whether
+   it counts as notable) keys off the building tag. So the tag is synthesised
+   once, at ingest, and the rest of the pipeline never has to know. */
+var HIST_TYPE = {
+  castle:"castle", fort:"castle", manor:"manor", mansion:"mansion", house:"manor",
+  palace:"palace", church:"church", priory:"church", chapel:"chapel",
+  abbey:"abbey", monastery:"abbey", tower:"hist_tower", city_gate:"hist_tower",
+  gatehouse:"manor", windmill:"windmill", watermill:"watermill",
+  lighthouse:"lighthouse", ruins:"ruins", building:"civic", farm:"farm",
+  stable:"stable", memorial:"monument", monument:"monument", aqueduct:"monument"
+};
+var MM_TYPE = {
+  lighthouse:"lighthouse", windmill:"windmill", watermill:"watermill",
+  water_tower:"water_tower", tower:"mast", communications_tower:"mast",
+  chimney:"chimney", kiln:"chimney", obelisk:"monument",
+  silo:"silo", storage_tank:"silo", gasometer:"silo"
+};
+function classify(t){
+  if(t.building && t.building !== "yes") return null;      /* already specific */
+  return HIST_TYPE[t.historic] || MM_TYPE[t.man_made] ||
+         (t.tourism === "museum" ? "museum" : null);
+}
 function parseLen(v){
   if(!v) return NaN;
   v = String(v).trim();
@@ -999,18 +1026,26 @@ var OVERPASS = [
    eat the whole budget and leave the surrounding rings empty. */
 /* midHalf sizes the every-building ring. It is the one number that decides how
    much JSON a dense city sends back, so it shrinks with the quality setting. */
+/* coreHalf and midHalf are ceilings, not sizes: the density probe decides how
+   big the rings actually are. They only bite where a place is sparse enough
+   that the budget would otherwise buy more square kilometres than the world
+   contains — which is most of Britain, and is why a village used to get the
+   same 2.5 km core as a city that needed it. */
 var QUALITY = {
-  low:  {core: 5000,  mid: 2200,  outer: 1200, trees: 1200,  midHalf: 2200, cars: 0,   trains: 0},
-  med:  {core: 12000, mid: 5000,  outer: 2500, trees: 6000,  midHalf: 3000, cars: 220, trains: 14},
-  high: {core: 26000, mid: 11000, outer: 5000, trees: 16000, midHalf: 3600, cars: 420, trains: 26}
+  low:  {core: 6000,  mid: 2600,  outer: 1600, landmark: 500,  trees: 1600,
+         coreHalf: 1300, midHalf: 2400, cars: 0,   trains: 0},
+  med:  {core: 14000, mid: 5600,  outer: 3200, landmark: 1200, trees: 7000,
+         coreHalf: 1800, midHalf: 3800, cars: 220, trains: 14},
+  high: {core: 30000, mid: 12000, outer: 6000, landmark: 2400, trees: 18000,
+         coreHalf: 2300, midHalf: 4600, cars: 420, trains: 26}
 };
 var Q, treeBudget = 0, statBuildings = 0, statRoadM = 0;
 var statModelled = 0, statMeasured = 0, statEstimated = 0;   /* the three tiers */
 var statSkipped = 0;                                         /* elements OSM gave us that we couldn't use */
-var statStreamed = 0, statTrees = 0, drawnIds = {};          /* one OSM id is drawn exactly once */
+var statStreamed = 0, statTrees = 0, statLandmarks = 0, drawnIds = {};
 var world = new THREE.Group();
 /* 0 pending, 1 loading, 2 done, 3 failed */
-var coverage = {a:0, m:[0,0,0,0], b:[0,0,0,0]};
+var coverage = {a:0, m:[0,0,0,0], b:[0,0,0,0], L:0};
 
 function bboxM(west, south, east, north){
   var mLat = 110540, mLon = 111320*Math.cos(LAT0*Math.PI/180);
@@ -1024,14 +1059,28 @@ var NOTABLE = "^(apartments|commercial|office|retail|supermarket|industrial|ware
   "government|train_station|stadium|sports_hall|hangar|tower|parking)$";
 
 var TMO = 60;                                       /* server-side seconds */
+/* What counts as a road depends on what else is coming back with it. In open
+   country the lanes, farm tracks and bridleways ARE the landscape and leaving
+   them out is why the surrounding area looked empty; in a dense city centre
+   the same tags are the download that turns a request into a timeout. */
+var RD_MAIN  = "motorway|trunk|primary|secondary|tertiary|" +
+               "motorway_link|trunk_link|primary_link|secondary_link|tertiary_link";
+var RD_LOCAL = "residential|unclassified|living_street|road";
+var RD_MINOR = "service|pedestrian|footway|cycleway|path|track|bridleway|steps";
+function roadRe(tier){
+  if(tier === "core")
+    return "^(" + RD_MAIN + "|" + RD_LOCAL + (DENSE ? "" : "|" + RD_MINOR) + ")$";
+  if(tier === "mid")
+    return "^(" + RD_MAIN + "|" + RD_LOCAL +
+           (DENSE ? "" : "|service|track|cycleway|bridleway") + ")$";
+  if(DENSE) return "^(motorway|trunk|primary)$";
+  /* Out here the ring is landmarks only, so the street layout of the villages
+     in it is affordable wherever the place is not built up. */
+  return "^(" + RD_MAIN + (DENSITY == null || DENSITY < 900 ? "|" + RD_LOCAL : "") + ")$";
+}
 function queryFull(bb){
   var b = bbs(bb);
-  /* In a dense city centre the footways, service roads and street trees are a
-     bigger download than the buildings themselves, and they are what turns a
-     central London request into a timeout. Drop them when it is busy. */
-  var roads = DENSE
-    ? "^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|motorway_link|trunk_link|primary_link)$"
-    : "^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|pedestrian|footway|motorway_link|trunk_link|primary_link)$";
+  var roads = roadRe("core");
   return "[out:json][timeout:"+TMO+"];(" +
     'way["building"]('+b+');' +
     'relation["building"]["type"="multipolygon"]('+b+');' +
@@ -1056,7 +1105,7 @@ function queryMid(bb){
     'relation["building"]["type"="multipolygon"]('+b+');' +
     'way["building:part"]('+b+');' +
     'relation["building:part"]('+b+');' +
-    'way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|motorway_link|trunk_link|primary_link)$"]('+b+');' +
+    'way["highway"~"'+roadRe("mid")+'"]('+b+');' +
     'way["railway"~"^(rail|light_rail|narrow_gauge)$"]('+b+');' +
     'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
     'way["waterway"~"^(river|canal)$"]('+b+');' +
@@ -1075,7 +1124,7 @@ function queryNotable(bb){
     return "[out:json][timeout:"+TMO+"];(" +
       'way["building"~"'+LANDMARK+'"]('+b+');' +
       'way["building"]["building:levels"~"^([6-9]|[1-9][0-9]+)$"]('+b+');' +
-      'way["highway"~"^(motorway|trunk|primary)$"]('+b+');' +
+      'way["highway"~"'+roadRe("outer")+'"]('+b+');' +
       'way["railway"="rail"]["usage"~"^(main|branch)$"]('+b+');' +
       'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
       'way["waterway"="river"]('+b+');' +
@@ -1087,7 +1136,7 @@ function queryNotable(bb){
     'way["building"]["building:levels"]('+b+');' +
     'way["building:part"]('+b+');' +                  /* landmarks are the point of this ring */
     'relation["building:part"]('+b+');' +
-    'way["highway"~"^(motorway|trunk|primary|secondary|motorway_link|trunk_link)$"]('+b+');' +
+    'way["highway"~"'+roadRe("outer")+'"]('+b+');' +
     'way["railway"="rail"]('+b+');' +
     'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
     'way["waterway"~"^(river|canal)$"]('+b+');' +
@@ -1095,6 +1144,54 @@ function queryNotable(bb){
     'way["landuse"~"^(forest|farmland|meadow)$"]('+b+');' +
     'way["leisure"~"^(park|golf_course|nature_reserve)$"]('+b+');' +
     ");out geom;";
+}
+
+/* ---- landmarks, over the whole 10 km square, outside the ring plan ----
+   The rings decide what to keep by BUILDING TAG, and by building tag almost
+   every notable house in Britain is invisible: Polesden Lacey is building=yes.
+   What makes it a landmark is historic=house, National Trust, and a listing —
+   and half the candidates (windmills, follies, water towers, castle ruins)
+   carry no building tag at all. This one extra request goes out over the
+   entire square, ignores the rings, and asks for the things worth flying to. */
+var LM_HISTORIC = "^(castle|manor|house|palace|church|chapel|monastery|abbey|priory|" +
+  "fort|city_gate|gatehouse|tower|windmill|watermill|lighthouse|ruins|building|" +
+  "farm|stable|memorial|monument|aqueduct|mansion)$";
+var LM_MANMADE = "^(lighthouse|windmill|watermill|water_tower|tower|chimney|obelisk|" +
+  "communications_tower|silo|storage_tank|gasometer|kiln)$";
+var LM_BUILDING = "^(castle|cathedral|church|chapel|monastery|mosque|temple|synagogue|" +
+  "palace|manor|windmill|watermill|lighthouse|tower|stadium|grandstand|train_station|" +
+  "museum|hospital|university|college|civic|government|hangar)$";
+function queryLandmarks(bb){
+  var b = bbs(bb);
+  return "[out:json][timeout:"+TMO+"];(" +
+    'way["historic"~"'+LM_HISTORIC+'"]('+b+');' +
+    'relation["historic"~"'+LM_HISTORIC+'"]["type"="multipolygon"]('+b+');' +
+    'way["building"]["historic"]('+b+');' +
+    'way["building"]["heritage"]('+b+');' +
+    'way["building"]["listed_status"]('+b+');' +
+    'way["building"]["tourism"~"^(attraction|museum|gallery|viewpoint)$"]('+b+');' +
+    'way["building"]["operator"~"National Trust|English Heritage|Historic",i]('+b+');' +
+    'way["building"~"'+LM_BUILDING+'"]('+b+');' +
+    'relation["building"~"'+LM_BUILDING+'"]["type"="multipolygon"]('+b+');' +
+    'way["man_made"~"'+LM_MANMADE+'"]('+b+');' +
+    (DENSE ? "" : 'way["building"]["wikidata"]('+b+');' +
+                  'way["building:part"]('+b+');relation["building:part"]('+b+');') +
+    ");out geom;";
+}
+/* A closed way can be a structure without ever saying building=. */
+function isStructure(t){
+  if(t.building) return true;
+  if(t.historic && new RegExp(LM_HISTORIC).test(t.historic)) return true;
+  if(t.man_made && new RegExp(LM_MANMADE).test(t.man_made)) return true;
+  return false;
+}
+/* Is this worth naming on the horizon? */
+function isLandmark(t){
+  if(t.historic || t.heritage || t.listed_status || t.wikidata) return true;
+  if(t.man_made && new RegExp(LM_MANMADE).test(t.man_made)) return true;
+  if(t.building && new RegExp(LM_BUILDING).test(t.building)) return true;
+  if(t.tourism === "attraction" || t.tourism === "museum") return true;
+  return /National Trust|English Heritage/i.test(t.operator || "");
 }
 
 /* ---- how built-up is it here? one cheap count decides the whole plan ---- */
@@ -1120,7 +1217,7 @@ function applyProfile(d){
   DENSITY = d;
   if(d != null && d > 20){
     DENSE = d > 1800;
-    HALF_A = Math.max(650, Math.min(1250, Math.round(500*Math.sqrt(Q.core/d))));
+    HALF_A = Math.max(650, Math.min(Q.coreHalf, Math.round(500*Math.sqrt(Q.core/d))));
     var coreKm = 2*HALF_A/1000;
     HALF_M = Math.max(HALF_A + 400,
              Math.min(Q.midHalf, Math.round(500*Math.sqrt(4*Q.mid/d + coreKm*coreKm))));
@@ -1532,8 +1629,12 @@ function buildCell(data, cell){
   for(i=0;i<els.length;i++){
     var e = els[i], t = e.tags || {};
     if(e.type === "node"){ if(t.natural === "tree") tr.push(e); continue; }
+    /* Give a landmark the building tag OSM never gave it, before anything
+       downstream asks what shape or height it should be. */
+    var cls = classify(t);
+    if(cls) t.building = cls;                   /* idempotent: classify bows out after */
     if(t["building:part"]) pt.push(e);          /* a modelled volume wins over its outline */
-    else if(t.building) bl.push(e);
+    else if(isStructure(t)) bl.push(e);
     else if(t.railway){ if(t.tunnel !== "yes") ra.push(e); }
     else if(t.highway) rd.push(e);
     else if(t.waterway && t.waterway !== "riverbank"){ if(t.tunnel !== "yes") wa.push(e); }
@@ -1617,6 +1718,10 @@ function volumeOf(t, area, dist, seed){
   }
   return v;
 }
+/* Buildings that get a pitched roof however big their footprint is, and the
+   handful that end in a point. */
+var PITCHED = /^(manor|mansion|palace|abbey|castle|church|chapel|cathedral|barn|stable|farm|farm_auxiliary|watermill|ruins|school|civic|museum|grandstand|train_station|hotel|pub|house|terrace|bungalow)$/;
+var TOWERY  = /^(windmill|lighthouse|hist_tower|mast|chimney|silo|water_tower)$/;
 var ROOF_ALIAS = {
   "half-hipped":"hipped", gambrel:"hipped", mansard:"hipped", round:"dome",
   onion:"onion", spire:"cone", cone:"cone", pyramidal:"pyramidal", dome:"dome",
@@ -1629,8 +1734,12 @@ function roofPlan(t, pts, box, area, house, roofH){
   var boxy = box && box.area > 0 && area/box.area > 0.72;   /* is it really a rectangle? */
   if(!s){
     /* untagged: a long narrow footprint is a terrace or semi and wants a
-       ridge, a squat one wants a hip, anything big and flat-roofed stays flat */
-    if(!house) s = "flat";
+       ridge, a squat one wants a hip, anything big and flat-roofed stays flat.
+       A country house, a barn or an abbey is none of those and is not flat
+       either — footprint alone was giving Polesden Lacey the roof of a
+       supermarket. */
+    if(TOWERY.test(t.building || "")) s = "cone";
+    else if(!house && !PITCHED.test(t.building || "")) s = "flat";
     else if(boxy && box.hu/Math.max(0.6, box.hv) > 1.25) s = "gabled";
     else if(boxy) s = "hipped";
     else s = "pyramidal";
@@ -1765,6 +1874,10 @@ function addBuildings(list, parts, group, cell){
     else if(v.tier === "measured") statMeasured++;
     else statEstimated++;
     statBuildings++;
+    /* Labelled from the tags, not from which request happened to fetch it, so
+       a landmark the core ring already drew still gets named. */
+    if(!b.part && b.tags.name && b.area > 40 && isLandmark(b.tags))
+      addLabel(b.tags.name, b.c.x, b.c.z, pad + h, labelScore(b.tags, b.area));
   }
   if(walls.count()) group.add(walls.mesh(matBuild));
   if(roofs.count()) group.add(roofs.mesh(matRoof));
@@ -1880,6 +1993,80 @@ function oneArea(e, b, v, cell){
     }
   }
 }
+/* A landmark is only "included" if you can find it from the air. One small
+   billboard per named one — capped, and hidden past a few kilometres so the
+   horizon doesn't fill with text. */
+var labelGroup = null, labels = [], LABEL_MAX = 64, LABEL_FAR = 4200;
+function labelTexture(text){
+  var fs = 30, pad = 11, font = "600 " + fs + "px ui-monospace, Menlo, Consolas, monospace";
+  var c = document.createElement("canvas");
+  var x = c.getContext("2d");
+  x.font = font;
+  c.width = Math.ceil(x.measureText(text).width) + pad*2;
+  c.height = fs + pad*2;
+  x = c.getContext("2d");                       /* resizing the canvas resets it */
+  x.font = font;
+  x.fillStyle = "rgba(11,17,27,0.74)";
+  x.fillRect(0, 0, c.width, c.height);
+  x.fillStyle = "#C22A6B";
+  x.fillRect(0, c.height - 3, c.width, 3);
+  x.fillStyle = "#F2EAD6";
+  x.textBaseline = "middle";
+  x.fillText(text, pad, c.height/2 + 1);
+  var t = new THREE.CanvasTexture(c);
+  t.minFilter = t.magFilter = THREE.LinearFilter;
+  return {tex:t, aspect:c.width/c.height};
+}
+/* Which landmarks keep their name when there are more than will fit: a listed
+   National Trust house outranks a big anonymous church, and both outrank a
+   warehouse that happens to carry a wikidata tag. */
+function labelScore(t, area){
+  var s = area;
+  if(t.historic || t.heritage || t.listed_status) s += 4000;
+  if(/National Trust|English Heritage/i.test(t.operator || "")) s += 6000;
+  if(t.man_made) s += 2500;
+  if(t.wikidata) s += 1500;
+  return s;
+}
+function dropLabel(s){
+  labelGroup.remove(s);
+  if(s.material.map) s.material.map.dispose();
+  s.material.dispose();
+  labels.splice(labels.indexOf(s), 1);
+}
+function addLabel(name, x, z, top, score){
+  if(!scene) return;
+  if(labels.length >= LABEL_MAX){
+    var worst = null, i;
+    for(i=0;i<labels.length;i++)
+      if(!worst || labels[i].userData.score < worst.userData.score) worst = labels[i];
+    if(!worst || worst.userData.score >= score) return;
+    dropLabel(worst);
+  }
+  var L, s;
+  try{ L = labelTexture(String(name).slice(0, 30)); }catch(err){ return; }
+  s = new THREE.Sprite(new THREE.SpriteMaterial({map:L.tex, transparent:true,
+        depthTest:true, sizeAttenuation:false, fog:false}));
+  var h = 0.045;                                /* held at a fixed screen size */
+  s.scale.set(h*L.aspect, h, 1);
+  s.center.set(0.5, 0);                         /* hangs above the roof */
+  s.position.set(x, top + 14, z);
+  s.renderOrder = 6;
+  s.userData.name = name; s.userData.score = score;
+  if(!labelGroup){ labelGroup = new THREE.Group(); scene.add(labelGroup); }
+  labelGroup.add(s);
+  labels.push(s);
+  statLandmarks = labels.length;
+}
+function updateLabels(){
+  if(!labels.length || !plane) return;
+  var px = plane.position.x, pz = plane.position.z;
+  for(var i=0;i<labels.length;i++){
+    var s = labels[i], dx = s.position.x - px, dz = s.position.z - pz;
+    s.visible = dx*dx + dz*dz < LABEL_FAR*LABEL_FAR;
+  }
+}
+
 /* Two crude species, built once and instanced: a broadleaf blob and a conifer
    cone. Cheap enough to plant a forest with. */
 var treeGeoCache = null;
@@ -2356,7 +2543,7 @@ function buildAircraft(){
    Phase B  (4 parallel) : the rest of the 10 km, landmarks + A-roads.
    You can take off the moment phase A lands.
    ============================================================ */
-var CELLS = 9;                      /* 1 core + 4 mid + 4 outer */
+var CELLS = 10;                     /* 1 core + 4 mid + 4 outer + 1 landmark sweep */
 var terrainReady = null;
 function status(txt){ $("cellState").textContent = txt; }
 /* Which tier of the model cascade this place actually landed on. */
@@ -2376,6 +2563,7 @@ function tally(){
   var done = (coverage.a === 2 ? 1 : 0), i;
   for(i=0;i<4;i++) if(coverage.m[i] === 2) done++;
   for(i=0;i<4;i++) if(coverage.b[i] === 2) done++;
+  if(coverage.L === 2) done++;
   $("cellsDone").textContent = done;
   $("barfill").style.width = (done/CELLS*100) + "%";
   drawGridSvg();
@@ -2434,6 +2622,7 @@ $("retry").onclick = function(){
   $("retry").style.display = "none";
   $("loadnote").textContent = "Retrying…";
   if(coverage.a === 0 || coverage.a === 3) phaseA();
+  if(coverage.L === 0 || coverage.L === 3) queueCell("L", 0);
   for(var i=0;i<4;i++){
     if(coverage.m[i] === 0 || coverage.m[i] === 3) queueCell("m", i);
     if(coverage.b[i] === 0 || coverage.b[i] === 3) queueCell("b", i);
@@ -2471,7 +2660,8 @@ function startLoad(){
     });
     phaseA();
     setTimeout(function(){
-      for(var i=0;i<4;i++) queueCell("m", i);     /* nearest ring first */
+      queueCell("L", 0);                          /* landmarks early: they are cheap */
+      for(var i=0;i<4;i++) queueCell("m", i);     /* then the nearest ring */
       for(var j=0;j<4;j++) queueCell("b", j);
     }, 1200);
   });
@@ -2510,7 +2700,29 @@ function phaseA(step){
 
 /* One cell of a ring. The mid ring keeps every building down to 45 m²; the
    outer ring keeps landmarks, which is all that reads from 5 km up anyway. */
+/* The landmark sweep: one request over the whole square, outside the rings,
+   asking only for the things worth flying to. Small enough to run alongside
+   them and the reason a National Trust house five kilometres out now exists. */
+function landmarkCell(step){
+  step = step || 0;
+  coverage.L = 1; drawGridSvg();
+  var half = Math.round(HALF_B*(step === 0 ? 1 : 0.55));
+  var bb = bboxM(-half, -half, half, half);
+  overpassTry(queryLandmarks(bb), 70000, step === 0 ? 1 : 0, 4000, "lm" + step)
+    .then(function(data){ return whenGround(function(){
+      try{
+        buildCell(data, {inner:false, skipHalf:0, cap:Q.landmark, minArea:8, tallest:0});
+      }catch(err){ report("Landmarks", err); }
+      coverage.L = 2; tally(); cellDone(); maybeFinish();
+    }); })
+    .catch(function(err){
+      if(step < 1) return landmarkCell(step + 1);
+      coverage.L = 3; tally(); cellDone(); maybeFinish();
+      report("Landmarks", err);
+    });
+}
 function ringCell(kind, i, step){
+  if(kind === "L") return landmarkCell(step);
   step = step || 0;
   var mid = kind === "m", cov = mid ? coverage.m : coverage.b;
   var r = (mid ? RING_M : RING_B)[i];
@@ -2595,7 +2807,7 @@ function streamTick(){
 }
 
 function anyLoaded(){
-  if(coverage.a === 2) return true;
+  if(coverage.a === 2 || coverage.L === 2) return true;
   for(var i=0;i<4;i++) if(coverage.m[i] === 2 || coverage.b[i] === 2) return true;
   return false;
 }
@@ -2887,7 +3099,7 @@ function loop(){
   try{
     var dt = Math.min(clock.getDelta(), 0.05);
     physics(dt); updateCam(dt); followCam(); updateHud(dt);
-    updateTraffic(dt); streamTick();
+    updateTraffic(dt); updateLabels(); streamTick();
     renderer.render(scene, camera);
   }catch(err){
     frameFailed = true; running = false;
@@ -2921,6 +3133,10 @@ window.__sim = {
   plane: function(){ return plane; },
   plan: function(){ return {density: DENSITY, dense: DENSE, halfA: HALF_A, halfM: HALF_M,
                             quality: opt.quality}; },
+  landmarks: function(){
+    return labels.map(function(s){ return {name:s.userData.name,
+      x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });
+  },
   imagery: function(){
     return {layers: IMG_LAYERS.map(function(L){
               var want = 0, live = 0;
