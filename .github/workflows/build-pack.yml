@@ -112,6 +112,7 @@ jobs:
       # --- OS data -> GeoJSON, in WGS84, clipped to the area we need ---
       # GDAL runs here on GitHub's machine, not on yours.
       - name: Convert and clip
+        id: conv
         env:
           LAT: ${{ steps.loc.outputs.lat }}
           LON: ${{ steps.loc.outputs.lon }}
@@ -127,24 +128,34 @@ jobs:
             console.log([lat - r/mLat, lon - r/mLon, lat + r/mLat, lon + r/mLon].join(" "));
           ')
           echo "clip to $S,$W .. $N,$E"
-          rm -f buildings.geojson
+          rm -f out-*.geojson
+          # Every source becomes its OWN GeoJSON. A GeoJSON file holds exactly
+          # one layer, so appending a second source to it asks the driver to
+          # create a layer named after that source and it refuses. The pack
+          # builder takes a list of files, so there is nothing to append.
+          OUT=()
           GPKG=$(find osdata -iname '*.gpkg' | head -1)
           if [ -n "$GPKG" ]; then
-            # One container, many named layers: ask it which one holds buildings.
             echo "source: $GPKG"
             ogrinfo -so "$GPKG" | sed -n '1,60p'
-            LAYER=$(ogrinfo -so "$GPKG" \
-                    | sed -n 's/^[0-9]*: *\([A-Za-z0-9_]*[Bb]uilding[A-Za-z0-9_]*\).*/\1/p' | head -1)
-            if [ -z "$LAYER" ]; then
+            mapfile -t LAYERS < <(ogrinfo -so "$GPKG" \
+              | sed -n 's/^[0-9]*: *\([A-Za-z0-9_]*[Bb]uilding[A-Za-z0-9_]*\).*/\1/p')
+            if [ "${#LAYERS[@]}" -eq 0 ]; then
               echo "::error::no building layer in $GPKG — layers listed above"; exit 1
             fi
-            echo "layer: $LAYER"
-            ogr2ogr -f GeoJSON buildings.geojson "$GPKG" "$LAYER" \
-                    -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
+            i=0
+            for L in "${LAYERS[@]}"; do
+              i=$((i+1))
+              echo "layer: $L"
+              ogr2ogr -f GeoJSON "out-$i.geojson" "$GPKG" "$L" \
+                      -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
+              OUT+=("out-$i.geojson")
+            done
           else
             # A shapefile bundle puts every layer in its own FILE, so the
-            # buildings are a filename, not a layer name — taking the first
-            # .shp found lands on motorway junctions.
+            # buildings are filenames, not layer names — and there is more than
+            # one of them: OS keeps schools, hospitals and civic buildings in a
+            # separate "ImportantBuilding" layer that is worth having.
             mapfile -t SHPS < <(find osdata -iname '*building*.shp' | sort)
             if [ "${#SHPS[@]}" -eq 0 ]; then
               echo "::error::no building shapefile in the download. What arrived:"
@@ -153,26 +164,29 @@ jobs:
             fi
             echo "building files:"
             printf '  %s\n' "${SHPS[@]}"
+            i=0
             for f in "${SHPS[@]}"; do
-              if [ -f buildings.geojson ]; then
-                ogr2ogr -f GeoJSON -append buildings.geojson "$f" \
-                        -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
-              else
-                ogr2ogr -f GeoJSON buildings.geojson "$f" \
-                        -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
-              fi
+              i=$((i+1))
+              ogr2ogr -f GeoJSON "out-$i.geojson" "$f" \
+                      -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
+              OUT+=("out-$i.geojson")
             done
           fi
-          if [ ! -s buildings.geojson ]; then
-            echo "::error::the clip produced nothing — is the postcode really inside grid square $SQ?"
-            exit 1
-          fi
-          ls -lh buildings.geojson
+          LIST=$(IFS=,; printf '%s' "${OUT[*]}")
+          echo "files=$LIST" >> "$GITHUB_OUTPUT"
+          ls -lh out-*.geojson
           node -e '
-            const n = (JSON.parse(require("fs").readFileSync("buildings.geojson", "utf8")).features || []).length;
-            console.log(n + " footprints inside the clip");
-            if (!n) { console.error("::error::the clip is empty"); process.exit(1); }
-          '
+            const fs = require("fs");
+            let total = 0;
+            for (const f of process.argv.slice(1)) {
+              const n = (JSON.parse(fs.readFileSync(f, "utf8")).features || []).length;
+              console.log("  " + f + ": " + n + " footprints");
+              total += n;
+            }
+            console.log(total + " footprints inside the clip");
+            if (!total) { console.error("::error::the clip is empty — is the postcode really inside " +
+                                        process.env.SQ + "?"); process.exit(1); }
+          ' "${OUT[@]}"
 
       - name: Build the pack
         env:
@@ -181,9 +195,10 @@ jobs:
           LAT: ${{ steps.loc.outputs.lat }}
           LON: ${{ steps.loc.outputs.lon }}
           RADIUS: ${{ inputs.radius }}
+          FILES: ${{ steps.conv.outputs.files }}
         run: |
           set -euo pipefail
-          node packs/make-pack.js --in buildings.geojson \
+          node packs/make-pack.js --in "$FILES" \
             --id "$ID" --name "$NAME" --centre "$LAT,$LON" --radius "$RADIUS"
           ls -lh packs/
 

@@ -60,10 +60,10 @@ found before it uses it.
   downloading.
 
 OS ships this data as either a GeoPackage (one file, many named layers) or a
-shapefile bundle (one file *per* layer). The workflow reads both — the first
-run tripped on this, because in a shapefile bundle the buildings are a
-filename rather than a layer name, and picking the first `.shp` in the folder
-lands on motorway junctions.
+shapefile bundle (one file *per* layer). The workflow reads both, and takes
+**every** building layer it finds — OS keeps ordinary buildings and
+"important" ones (schools, hospitals, civic buildings) in separate layers, and
+you want both.
 
 ## Details, if you want them
 
