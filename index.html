@@ -3394,7 +3394,7 @@ $("go").onclick = function(){
   M0 = merc(LON0, LAT0); K = Math.cos(LAT0*Math.PI/180);
   Q = QUALITY[opt.quality]; treeBudget = Q.trees;
   var pk = packFor(LAT0, LON0);
-  if(pk) loadPack(pk);
+  if(pk){ loadPack(pk); armPackTimer(); }
   var ov = customOverpass();
   if(ov){
     if(OVERPASS.indexOf(ov) >= 0) OVERPASS.splice(OVERPASS.indexOf(ov), 1);
@@ -3536,7 +3536,7 @@ function phaseA(step){
       }
       status("core loaded in " + ((Date.now()-t0)/1000).toFixed(1) + "s");
       $("flynow").classList.add("on");
-      tally(); takeOffWhenReady(); maybeFinish();
+      tally(); takeOffWhenReady(); tryPack(); maybeFinish();
     }); })
     .catch(function(err){
       if(step < 2){ return phaseA(step + 1); }
@@ -3589,11 +3589,12 @@ function ringCell(kind, i, step){
       }catch(err){ report((mid ? "Mid" : "Outer") + " section " + i, err); }
       cov[i] = 2; cellDone(); tally();
       $("flynow").classList.add("on");
-      takeOffWhenReady(); maybeFinish();
+      takeOffWhenReady(); tryPack(); maybeFinish();
     }); })
     .catch(function(err){
       if(step < 2) return ringCell(kind, i, step + 1);
       cov[i] = 3; cellDone(); tally();
+      tryPack();
       if(coverage.a === 2 && anyLoaded())
         status("a " + (mid ? "mid" : "outer") + " section is unavailable — the rest is flying");
       else if(coverage.a === 3) fail(mid ? "Mid ring" : "Outer ring", err);
@@ -3669,6 +3670,30 @@ function anyLoaded(){ return statBuildings > 0 || statRoadM > 0; }
    which request happened to land first. */
 var packMerged = false;
 var PACK_CHUNK = 1200;
+/* The pack is local, complete and instant. Waiting for every last Overpass
+   cell before using it meant one rate-limited outer strip — landmarks only,
+   nowhere near the houses — could hold twenty thousand surveyed buildings
+   out of the world for the whole flight. It is due as soon as the rings that
+   actually cover the same ground have settled, and unconditionally after a
+   while whatever the servers are doing. */
+function packDue(){
+  if(packMerged || PACK.state !== "loaded") return false;
+  if(coverage.a === 0 || coverage.a === 1) return false;      /* core still coming */
+  for(var i=0;i<4;i++) if(coverage.m[i] === 0 || coverage.m[i] === 1) return false;
+  return true;
+}
+function tryPack(after){
+  if(packMerged || PACK.state !== "loaded") return;
+  if(!after && !packDue()) return;
+  whenGround(mergePack);
+}
+var packTimer = null;
+function armPackTimer(){
+  if(packTimer) return;
+  /* the outer ring is landmarks at 220 m² and up, so merging before it lands
+     risks almost no double-drawing — far less than the cost of not merging */
+  packTimer = setTimeout(function(){ tryPack(true); }, 30000);
+}
 function mergePack(){
   if(packMerged || !PACK.data) return Promise.resolve();
   packMerged = true;
@@ -3769,6 +3794,7 @@ function maybeFinish(){
       whenGround(mergePack).then(maybeFinish);
       return;
     }
+    if(packTimer){ clearTimeout(packTimer); packTimer = null; }
     var ok = anyLoaded();
     $("loadhd").textContent = ok ? "World ready" : "No map data";
     status(ok ? "complete" : "every server returned an empty world");
