@@ -302,6 +302,10 @@ function reportText(){
     ? "profile " + AI.p.id + " (" + AI.p.place + ") - dressed " + AI.dressed +
       " of " + AI.applied + " footprints OSM left undescribed"
     : (AI.p ? "profile " + AI.p.id + " available, not used" : "no profile for this place")));
+  L.push("pack     " + (PACK.p
+    ? PACK.p.id + " (" + PACK.p.name + ") " + PACK.state +
+      (packMerged ? " - drew " + PACK.drawn + ", skipped " + PACK.dup + " already in OSM" : "")
+    : "none for this place"));
   L.push("terrain  " + (HF.ready ? "ok, ground " + Math.round(HF.elev0) + "m, relief " +
                                    Math.round(HF.max-HF.min) + "m" : "none"));
   L.push("cells    core=" + coverage.a + " mid=" + coverage.m.join("") + " outer=" + coverage.b.join("") +
@@ -701,6 +705,44 @@ function hash(a,b){ var s = Math.sin(a*12.9898 + b*78.233)*43758.5453; return s 
    The profiles live in ai/*.json and are copied in here by ai/embed.js,
    because a page opened from disk cannot fetch its own neighbours.
    ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   LOCAL BUILDING PACKS  (OS OpenMap Local)
+
+   OpenStreetMap's coverage of *which buildings exist* varies village by
+   village. Ordnance Survey's OpenMap Local is a surveyed footprint layer for
+   the whole of Great Britain (OGL licence), so where OSM is thin a pack made
+   from it fills the gaps. The rule is strict: OSM wins wherever it has a
+   building; a pack footprint is drawn only where OSM has nothing overlapping.
+   Packs carry no heights and no types — a filled footprint goes through the
+   same estimator as any untagged OSM building (and the AI profile, if one is
+   switched on, dresses it like everything else).
+
+   Packs are built by packs/make-pack.js and live in packs/<id>.js next to
+   this file. They load through a <script> tag because a page opened from
+   disk may not fetch() its neighbours but may still load scripts. Only the
+   small manifest below is embedded. */
+/* PACKS-START */
+var PACKS = [];
+/* PACKS-END */
+var PACK = {p:null, data:null, drawn:0, dup:0, state:"none"};
+function packFor(lat, lon){
+  for(var i=0;i<PACKS.length;i++){
+    var b = PACKS[i].bbox;              /* [s, w, n, e] */
+    if(lat >= b[0] && lat <= b[2] && lon >= b[1] && lon <= b[3]) return PACKS[i];
+  }
+  return null;
+}
+window.TF_PACK = function(d){ PACK.data = d; PACK.state = "loaded"; };
+function loadPack(p){
+  PACK.p = p; PACK.state = "loading";
+  var el = document.createElement("script");
+  el.src = "packs/" + p.file;
+  el.onerror = function(){ PACK.state = "failed"; };
+  document.head.appendChild(el);
+  /* a missing file on a slow host must not wedge the load */
+  setTimeout(function(){ if(PACK.state === "loading") PACK.state = "failed"; }, 20000);
+}
+
 /* AI-PROFILES-START */
 var AI_PROFILES = [
  {
@@ -1568,6 +1610,26 @@ var Q, treeBudget = 0, statBuildings = 0, statRoadM = 0;
 var statModelled = 0, statMeasured = 0, statEstimated = 0;   /* the three tiers */
 var statSkipped = 0;                                         /* elements OSM gave us that we couldn't use */
 var statStreamed = 0, statTrees = 0, statLandmarks = 0, drawnIds = {};
+/* Bounding boxes of every OSM building drawn, in a coarse grid, so a pack
+   footprint can ask cheaply whether OSM already has this building. */
+var FOOT = {cell:48, map:{}};
+function footAdd(bb){
+  var i0 = Math.floor(bb[0]/FOOT.cell), i1 = Math.floor(bb[2]/FOOT.cell);
+  var j0 = Math.floor(bb[1]/FOOT.cell), j1 = Math.floor(bb[3]/FOOT.cell);
+  for(var i=i0;i<=i1;i++) for(var j=j0;j<=j1;j++){
+    var k = i + "," + j;
+    (FOOT.map[k] = FOOT.map[k] || []).push(bb);
+  }
+}
+function footCovered(x, z){
+  var list = FOOT.map[Math.floor(x/FOOT.cell) + "," + Math.floor(z/FOOT.cell)];
+  if(!list) return false;
+  for(var i=0;i<list.length;i++){
+    var b = list[i];
+    if(x >= b[0]-1.5 && x <= b[2]+1.5 && z >= b[1]-1.5 && z <= b[3]+1.5) return true;
+  }
+  return false;
+}
 var world = new THREE.Group();
 /* 0 pending, 1 loading, 2 done, 3 failed */
 var coverage = {a:0, m:[0,0,0,0], b:[0,0,0,0], L:0};
@@ -2474,6 +2536,7 @@ function addBuildings(list, parts, group, cell){
       var oid = (e.type === "relation" ? "r" : "w") + e.id + (k ? "_" + k : "");
       if(drawnIds[oid]) continue;
       drawnIds[oid] = 1;
+      if(!isPart) footAdd(bboxOf(pts));
       into.push({pts:pts, holes:(k===0 ? inners : null), tags:t, area:area, dist:dist, c:c,
                  part:isPart, bb:isPart ? null : bboxOf(pts),
                  score:area/(1 + dist*0.0018)});
@@ -3290,6 +3353,8 @@ $("go").onclick = function(){
   LAT0 = chosen.lat; LON0 = chosen.lon;
   M0 = merc(LON0, LAT0); K = Math.cos(LAT0*Math.PI/180);
   Q = QUALITY[opt.quality]; treeBudget = Q.trees;
+  var pk = packFor(LAT0, LON0);
+  if(pk) loadPack(pk);
   var ov = customOverpass();
   if(ov){
     if(OVERPASS.indexOf(ov) >= 0) OVERPASS.splice(OVERPASS.indexOf(ov), 1);
@@ -3300,7 +3365,8 @@ $("go").onclick = function(){
   AI.applied = AI.dressed = 0;
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (osgb(LAT0, LON0) || "outside the OS grid") +
-                         (AI.on ? " · AI interpretation: " + AI.p.place : "");
+                         (AI.on ? " · AI interpretation: " + AI.p.place : "") +
+                         (PACK.p ? " · OS pack: " + PACK.p.name : "");
   drawGridSvg();
   try{ initScene(); }
   catch(err){ report("Scene setup failed", err); status("failed — see diagnostics"); return; }
@@ -3556,6 +3622,50 @@ function streamTick(){
    over nothing at all is how an unusable mirror got to look like a working
    sim with an unlucky postcode. */
 function anyLoaded(){ return statBuildings > 0 || statRoadM > 0; }
+
+/* Turn the pack's compact rings back into elements and draw the ones OSM has
+   nothing for. Runs once, after every planned cell has settled, because only
+   then is "OSM has nothing here" a statement about the map rather than about
+   which request happened to land first. */
+var packMerged = false;
+function mergePack(){
+  if(packMerged || !PACK.data) return;
+  packMerged = true;
+  var d = PACK.data, els = [], i, j;
+  var q = d.q || 1e6;
+  for(i=0;i<d.buildings.length;i++){
+    var r = d.buildings[i], lat = r[0]/q, lon = r[1]/q;
+    var geom = [{lat:lat, lon:lon}];
+    for(j=2;j<r.length;j+=2){
+      lat += r[j]/q; lon += r[j+1]/q;
+      geom.push({lat:lat, lon:lon});
+    }
+    var c = toWorld(geom[0].lon, geom[0].lat);
+    if(Math.abs(c.x) > LIMIT || Math.abs(c.z) > LIMIT) continue;
+    /* centre of the ring, cheaply */
+    var pts = ringToPts(geom);
+    if(pts.length < 3) continue;
+    var cc = centroid(pts);
+    if(footCovered(cc.x, cc.z)){ PACK.dup++; continue; }
+    els.push({type:"way", id:"pk" + i, tags:{building:"yes", "source":"OS OpenMap Local"},
+              geometry:geom});
+  }
+  if(els.length){
+    try{
+      var before = statBuildings;
+      buildCell({elements:els}, {inner:false, skipHalf:0, cap:els.length,
+                                 minArea:16, tallest:0});
+      PACK.drawn = statBuildings - before;
+    }catch(err){ report("Building pack", err); }
+  }
+  /* Streaming exists to fetch what the plan did not. The pack has just filled
+     the whole square with surveyed footprints, and a streamed OSM square could
+     only draw the same buildings again on top of them. */
+  if(PACK.drawn > 0) STREAM.fails = 99;
+  tally();
+  flash("Local building pack", PACK.drawn.toLocaleString() + " footprints added from " +
+        (PACK.p ? PACK.p.name : "pack"));
+}
 /* Read the request log and say what actually went wrong, in the one sentence
    that tells you what to do about it. */
 function dataVerdict(){
@@ -3585,6 +3695,17 @@ function dataVerdict(){
 function maybeFinish(){
   var pending = (coverage.a === 1 ? 1 : 0) + cq.length + cqActive;
   if(pending === 0){
+    if(PACK.state === "loading"){                 /* give the pack file a moment */
+      setTimeout(maybeFinish, 400);
+      return;
+    }
+    /* The merge is asynchronous (it waits for the terrain), and the verdict
+       below must not be reached before it has run: a total Overpass outage
+       with a good pack is a flyable world, not "No map data". */
+    if(PACK.state === "loaded" && !packMerged){
+      whenGround(mergePack).then(maybeFinish);
+      return;
+    }
     var ok = anyLoaded();
     $("loadhd").textContent = ok ? "World ready" : "No map data";
     status(ok ? "complete" : "every server returned an empty world");
@@ -3910,6 +4031,8 @@ window.__sim = {
     return labels.map(function(s){ return {name:s.userData.name,
       x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });
   },
+  pack: function(){ return {state:PACK.state, id:PACK.p ? PACK.p.id : null,
+                            drawn:PACK.drawn, dup:PACK.dup, merged:packMerged}; },
   ai: function(){ return {on:AI.on, id:AI.p ? AI.p.id : null,
                           applied:AI.applied, dressed:AI.dressed,
                           profiles:AI_PROFILES.map(function(p){ return p.id; })}; },
