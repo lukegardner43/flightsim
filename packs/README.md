@@ -1,76 +1,94 @@
-# Local building packs (OS OpenMap Local)
+# Filling OpenStreetMap's gaps with Ordnance Survey
 
-## Why
+## What this does
 
-OpenStreetMap's coverage of *which buildings exist* varies village by village —
-some places have every garden shed mapped, others are missing whole streets.
-Ordnance Survey's **OpenMap Local** is a surveyed building-footprint layer for
-all of Great Britain, free under the Open Government Licence. A pack made from
-it fills OSM's gaps for one area.
+OpenStreetMap's coverage of *which buildings exist* varies place to place. Some
+villages have every shed mapped; others are missing whole streets. **OS OpenMap
+Local** is Ordnance Survey's surveyed building-footprint layer for the whole of
+Great Britain, free to use. A "pack" is that data for one area, stored in this
+repository, used to fill in the buildings OSM doesn't have.
 
-The merge rule is strict, and worth stating plainly:
+## How to build one
 
-- **OSM wins.** A pack footprint is drawn only where OSM has no overlapping
-  building. Nothing OSM knows about is replaced or moved.
-- **Packs carry footprints only.** OpenMap Local has no heights, no types and
-  no materials, so a filled footprint goes through the same estimator as any
-  untagged OSM building — and the AI interpretation, if switched on, dresses
-  it like everything else.
-- **The report says what happened**: `pack kt23 (Great Bookham) loaded - drew
-  312, skipped 1,171 already in OSM`.
+Everything happens on github.com. You don't need to install anything.
 
-## Making a pack
+1. Go to the **Actions** tab of this repository.
+2. Click **Build a building pack** in the left-hand list.
+3. Click the **Run workflow** button on the right.
+4. Type a postcode — `KT23 3HP` — and click the green **Run workflow**.
 
-1. **Download OpenMap Local** for your 100 km grid square (e.g. `TQ` for
-   Surrey/London) from the OS Data Hub: <https://osdatahub.os.uk/downloads/open/OpenMapLocal>
-   — choose the **GeoPackage** format. No account or API key is needed.
+Wait a few minutes. The job downloads the Ordnance Survey data, converts it,
+clips it to a 10 km square around that postcode, and commits the pack to this
+repository by itself.
 
-2. **Export the `building` layer as GeoJSON** in WGS84. With GDAL installed:
+Then fly that postcode in the sim. The loading card will say
+`OS pack: KT23 3HP`, and the report will tell you exactly what it added:
 
-   ```
-   ogr2ogr -f GeoJSON buildings.geojson OMLOCAL_GB.gpkg building -t_srs EPSG:4326
-   ```
+```
+pack  kt233hp (KT23 3HP) loaded - drew 312, skipped 1,171 already in OSM
+```
 
-   (In QGIS: load the GeoPackage, right-click the *building* layer → Export →
-   Save Features As → GeoJSON, CRS EPSG:4326.)
+That's the honest measure of whether OSM was missing anything: **drew** is what
+OS had and OSM didn't; **skipped** is what OSM already had, left alone.
 
-   If you skip `-t_srs`, that's fine — the script detects British National
-   Grid coordinates and converts them itself (accurate to a few metres).
+## The rules it follows
 
-3. **Build the pack**, centred on the place you fly from:
+- **OpenStreetMap always wins.** A pack footprint is drawn only where OSM has
+  no building overlapping it. Nothing OSM knows about is replaced or moved.
+- **Packs are footprints only.** OS publishes no heights, no building types and
+  no materials, so a filled-in building goes through exactly the same height
+  estimator as an untagged OSM one — and if you tick the AI interpretation on
+  the setup screen, that dresses pack buildings too. The two work together: OS
+  says *where*, the AI says *what it probably looks like*.
+- **A pack also works with no internet map servers at all.** If Overpass is
+  down or blocked, the pack alone still gives you a world to fly over.
 
-   ```
-   node packs/make-pack.js --in buildings.geojson --id kt23 \
-        --name "Great Bookham" --centre 51.2790,-0.3760 --radius 5200
-   ```
+## If the workflow fails
 
-   This writes `packs/kt23.js` and registers it in `index.html`'s manifest.
-   The default radius (5,200 m) covers the sim's whole 10 km square.
+Open the failed run and read the step that went red — each one prints what it
+found before it uses it.
 
-4. Commit both files. Anyone flying inside the pack's square gets it
-   automatically; the loading card shows `OS pack: Great Bookham`.
+- **"postcode not found"** — check the postcode, or that it's in Great Britain.
+  Northern Ireland is not covered by OpenMap Local.
+- **"nothing downloadable for XX"** — the step prints every format and area
+  Ordnance Survey is offering. Send me that list and I'll adjust the selector.
+- **The job times out or the file is huge** — some grid squares are large. Try
+  a smaller `radius` (the third input), or tell me and I'll add per-tile
+  downloading.
 
-## How it loads
+## Details, if you want them
 
-The sim is a single file that also works opened straight from disk, where
-pages may not `fetch()` their neighbours — but they may load scripts. So a
-pack is a `.js` file calling `TF_PACK({...})`, injected with a `<script>` tag
-when your home point falls inside its bounding box. Missing or slow pack files
-time out after 20 s and the sim continues without them.
+**Why a `.js` file and not JSON?** The sim is a single page that also works
+opened straight from a folder, where a page may load scripts but may not read
+files. So a pack is a script that calls `TF_PACK({...})`, injected when your
+home point falls inside its square. A missing or slow pack times out after 20
+seconds and the sim carries on without it.
 
-Pack footprints are merged **after** all planned map requests settle, because
-"OSM has nothing here" is only meaningful once OSM has finished answering.
-Once a pack has filled the square, ahead-of-the-aircraft streaming is switched
-off — it exists to fetch what the plan didn't, and the pack already has.
+**When the merge happens.** After every map request has finished, because "OSM
+has nothing here" only means something once OSM has finished answering. Once a
+pack has filled the square, the sim stops streaming extra OSM squares ahead of
+the aircraft — that exists to fetch what the plan didn't, and now the plan has
+it.
 
-## Size
+**Size.** Footprints are stored as differences between corners at about 10 cm
+resolution. A village 10 km square is roughly 300–800 KB; a market town 1–2 MB.
 
-Footprints are delta-encoded at ~0.1 m resolution. A rural 10 km square is
-roughly 300–800 KB; a market town 1–2 MB. Packs load once, locally, and cost
-Overpass nothing.
+**Building one on your own machine instead** (only if you want to — the
+workflow above is the supported route): export the `building` layer of an
+OpenMap Local GeoPackage to GeoJSON, then
+
+```
+node packs/make-pack.js --in buildings.geojson --id kt23 \
+     --name "Great Bookham" --postcode "KT23 3HP"
+```
+
+If the export is still in British National Grid coordinates, the script detects
+that and converts them itself.
 
 ## Licence
 
-Packs derived from OS OpenMap Local must carry the attribution embedded in
-each pack file: *Contains OS data © Crown copyright and database right
-[year]. Open Government Licence v3.* Keep it if you redistribute.
+Packs are derived from OS OpenMap Local and carry this attribution inside each
+pack file — keep it if you share them:
+
+> Contains OS data © Crown copyright and database right. Open Government
+> Licence v3.

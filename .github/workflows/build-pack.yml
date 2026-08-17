@@ -1,0 +1,149 @@
+name: Build a building pack
+
+# Fills OpenStreetMap's gaps with Ordnance Survey's surveyed building
+# footprints, for one area, entirely on GitHub. Nothing to install.
+#
+#   Actions tab  ->  "Build a building pack"  ->  Run workflow
+#   ->  type a postcode  ->  Run workflow
+#
+# It downloads OS OpenMap Local (free, Open Government Licence), converts it,
+# clips it to a 10 km square around the postcode, and commits the pack. When it
+# finishes, fly that postcode: the pack is picked up automatically.
+
+on:
+  workflow_dispatch:
+    inputs:
+      postcode:
+        description: 'Postcode to centre the pack on, e.g. KT23 3HP'
+        required: true
+      name:
+        description: 'Name to show in the sim (blank = use the postcode area)'
+        required: false
+        default: ''
+      radius:
+        description: 'Half-width in metres. 5200 covers the sim''s whole 10 km square.'
+        required: false
+        default: '5200'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # --- where are we, and which OS grid square is that? ---
+      - name: Locate the postcode
+        id: loc
+        run: |
+          set -euo pipefail
+          node packs/grid-square.js "${{ inputs.postcode }}" > loc.txt
+          SQ=$(sed -n 1p loc.txt)
+          LAT=$(sed -n 2p loc.txt)
+          LON=$(sed -n 3p loc.txt)
+          ID=$(echo "${{ inputs.postcode }}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9')
+          NAME="${{ inputs.name }}"
+          if [ -z "$NAME" ]; then NAME="${{ inputs.postcode }}"; fi
+          echo "square=$SQ"  >> "$GITHUB_OUTPUT"
+          echo "lat=$LAT"    >> "$GITHUB_OUTPUT"
+          echo "lon=$LON"    >> "$GITHUB_OUTPUT"
+          echo "id=$ID"      >> "$GITHUB_OUTPUT"
+          echo "name=$NAME"  >> "$GITHUB_OUTPUT"
+          echo "::notice::${{ inputs.postcode }} is at $LAT,$LON in OS grid square $SQ"
+
+      # --- fetch that grid square of OS OpenMap Local ---
+      # Open data: no account, no API key. The downloads API lists what is
+      # available per 100 km square; we pick the GeoPackage for ours.
+      - name: Download OS OpenMap Local
+        id: dl
+        run: |
+          set -euo pipefail
+          SQ="${{ steps.loc.outputs.square }}"
+          API="https://api.os.uk/downloads/v1/products/OpenMapLocal/downloads"
+          curl -sSL --retry 3 --retry-delay 5 "$API" -o list.json
+          echo "formats and areas offered:"
+          node -e "
+            const l = require('./list.json');
+            const seen = new Set();
+            for (const d of l) seen.add(d.format + '  area=' + (d.area||'GB'));
+            console.log([...seen].join('\n'));
+          "
+          URL=$(node -e "
+            const l = require('./list.json'), sq = process.argv[1].toUpperCase();
+            const gpkg = d => /geopackage/i.test(d.format || '');
+            let hit = l.find(d => gpkg(d) && (d.area||'').toUpperCase() === sq);
+            if (!hit) hit = l.find(d => gpkg(d) && !d.area);          // whole-GB fallback
+            if (!hit) hit = l.find(d => (d.area||'').toUpperCase() === sq);
+            if (!hit) { console.error('nothing downloadable for ' + sq); process.exit(1); }
+            console.error('chose: ' + (hit.fileName||'?') + '  ' + hit.format +
+                          '  ' + Math.round((hit.size||0)/1048576) + ' MB');
+            console.log(hit.url);
+          " "$SQ")
+          echo "downloading $URL"
+          curl -sSL --retry 3 --retry-delay 10 "$URL" -o data.zip
+          ls -lh data.zip
+          unzip -q -o data.zip -d osdata
+          find osdata -iname '*.gpkg' -o -iname '*.shp' | head -20
+
+      # --- GeoPackage -> GeoJSON, in WGS84, clipped to the area we need ---
+      # GDAL runs here on GitHub's machine, not yours.
+      - name: Convert and clip
+        id: conv
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gdal-bin
+          LAT="${{ steps.loc.outputs.lat }}"
+          LON="${{ steps.loc.outputs.lon }}"
+          R="${{ inputs.radius }}"
+          read S W N E < <(node -e "
+            const lat=+process.argv[1], lon=+process.argv[2], r=+process.argv[3];
+            const mLat=110540, mLon=111320*Math.cos(lat*Math.PI/180);
+            console.log([lat-r/mLat, lon-r/mLon, lat+r/mLat, lon+r/mLon].join(' '));
+          " "$LAT" "$LON" "$R")
+          echo "clip to $S,$W .. $N,$E"
+          SRC=$(find osdata -iname '*.gpkg' | head -1)
+          if [ -z "$SRC" ]; then SRC=$(find osdata -iname '*.shp' | head -1); fi
+          echo "source: $SRC"
+          ogrinfo -so "$SRC" | head -40
+          LAYER=$(ogrinfo -so "$SRC" | grep -oiE '[0-9]+: *[A-Za-z_]*building[A-Za-z_]*' \
+                  | head -1 | sed 's/.*: *//')
+          if [ -z "$LAYER" ]; then LAYER=Building; fi
+          echo "layer: $LAYER"
+          ogr2ogr -f GeoJSON buildings.geojson "$SRC" "$LAYER" \
+                  -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
+          ls -lh buildings.geojson
+
+      - name: Build the pack
+        run: |
+          set -euo pipefail
+          node packs/make-pack.js \
+            --in buildings.geojson \
+            --id "${{ steps.loc.outputs.id }}" \
+            --name "${{ steps.loc.outputs.name }}" \
+            --centre "${{ steps.loc.outputs.lat }},${{ steps.loc.outputs.lon }}" \
+            --radius "${{ inputs.radius }}"
+          ls -lh packs/
+
+      - name: Commit it
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packs/ index.html
+          if git diff --cached --quiet; then
+            echo "::warning::nothing changed — the pack is already up to date"
+            exit 0
+          fi
+          git commit -m "Building pack for ${{ inputs.postcode }} from OS OpenMap Local
+
+          Contains OS data (c) Crown copyright and database right. Open
+          Government Licence v3. Built by .github/workflows/build-pack.yml."
+          git push
+          echo "::notice::Pack committed. Fly ${{ inputs.postcode }} and the report will show how much of it was used."

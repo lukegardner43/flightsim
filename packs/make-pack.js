@@ -3,19 +3,22 @@
    surveyed building-footprint layer for Great Britain (OGL v3 — attribution
    required, see README.md in this directory).
 
-   The input is GeoJSON. OS distributes OpenMap Local as GeoPackage; one
-   ogr2ogr command (or a QGIS export) turns its `building` layer into GeoJSON —
-   the README walks through it. This script clips that to a square around a
-   centre point, drops what the sim would not draw anyway, converts British
-   National Grid coordinates to WGS84 if needed, delta-encodes the rings, and
-   writes packs/<id>.js plus the manifest entry inside index.html.
+   You should not need to run this by hand. The supported route is the
+   Actions tab of this repository -> "Build a building pack" -> type a
+   postcode; the workflow does the downloading and converting on GitHub's
+   machine and commits the result. See README.md in this directory.
+
+   This script takes GeoJSON, clips it to a square around a centre point,
+   converts British National Grid coordinates to WGS84 if the export did not,
+   delta-encodes the rings, and writes packs/<id>.js plus the manifest entry
+   inside index.html.
 
    Usage:
      node packs/make-pack.js --in buildings.geojson --id kt23 \
-          --name "Great Bookham" --centre 51.2790,-0.3760 [--radius 5200]
+          --name "Great Bookham" --postcode "KT23 3HP" [--radius 5200]
 
-   Then open the sim and fly anywhere inside the pack's square: it is picked
-   up automatically and the report says how much of it was used.
+   --centre lat,lon works instead of --postcode. --in takes a comma-separated
+   list if the data arrived in several files.
 */
 'use strict';
 const fs = require('fs');
@@ -31,12 +34,29 @@ function arg(name, dflt) {
   return process.argv[i + 1];
 }
 
-const IN = arg('in');
+const IN = arg('in').split(',').map(f => f.trim()).filter(Boolean);
 const ID = arg('id').toLowerCase().replace(/[^a-z0-9-]/g, '');
 const NAME = arg('name');
-const CENTRE = arg('centre').split(',').map(Number);
 const RADIUS = +arg('radius', '5200');
-if (CENTRE.length !== 2 || CENTRE.some(isNaN)) { console.error('--centre must be lat,lon'); process.exit(1); }
+
+/* --centre lat,lon, or --postcode which is resolved through postcodes.io
+   (that is what the GitHub Actions workflow uses, so nobody has to know
+   their own latitude). */
+async function centre() {
+  const c = arg('centre', '');
+  if (c) {
+    const v = c.split(',').map(Number);
+    if (v.length !== 2 || v.some(isNaN)) { console.error('--centre must be lat,lon'); process.exit(1); }
+    return v;
+  }
+  const pc = arg('postcode', '');
+  if (!pc) { console.error('give either --centre lat,lon or --postcode'); process.exit(1); }
+  const r = await fetch('https://api.postcodes.io/postcodes/' + encodeURIComponent(pc));
+  const j = await r.json();
+  if (!j.result || j.result.latitude == null) { console.error('postcode not found: ' + pc); process.exit(1); }
+  console.log('postcode ' + j.result.postcode + ' -> ' + j.result.latitude + ',' + j.result.longitude);
+  return [j.result.latitude, j.result.longitude];
+}
 
 /* ---- OSGB36 / British National Grid -> WGS84 ----
    Inverse Transverse Mercator on the Airy ellipsoid, then a 7-parameter
@@ -102,9 +122,14 @@ function bngToWgs84(E, N) {
 }
 
 /* ---- read, clip, encode ---- */
-const gj = JSON.parse(fs.readFileSync(IN, 'utf8'));
-const feats = gj.features || [];
-if (!feats.length) { console.error('no features in ' + IN); process.exit(1); }
+async function main() {
+const [clat, clon] = await centre();
+let feats = [];
+for (const f of IN) {
+  const gj = JSON.parse(fs.readFileSync(f, 'utf8'));
+  feats = feats.concat(gj.features || []);
+}
+if (!feats.length) { console.error('no features in ' + IN.join(',')); process.exit(1); }
 
 /* BNG eastings are 6-figure metres; longitudes are small. */
 function firstCoord(g) {
@@ -117,7 +142,6 @@ const isBNG = Math.abs(sample[0]) > 180 || Math.abs(sample[1]) > 90;
 console.log('input:  ' + feats.length + ' features, coordinates look like ' +
   (isBNG ? 'British National Grid (will convert)' : 'WGS84'));
 
-const [clat, clon] = CENTRE;
 const mLat = 110540, mLon = 111320 * Math.cos(clat * Math.PI / 180);
 const S = clat - RADIUS / mLat, Nn = clat + RADIUS / mLat;
 const W = clon - RADIUS / mLon, E = clon + RADIUS / mLon;
@@ -189,3 +213,5 @@ manifest.push({ id: ID, name: NAME, file: ID + '.js', bbox: [S, W, Nn, E], n: ri
 const block = OPEN + '\nvar PACKS = ' + JSON.stringify(manifest) + ';\n' + CLOSE;
 fs.writeFileSync(HTML, html.slice(0, a) + block + html.slice(b + CLOSE.length));
 console.log('manifest: ' + manifest.map(p => p.id + ' (' + p.n + ')').join(', '));
+}
+main().catch(e => { console.error(e.message || e); process.exit(1); });
