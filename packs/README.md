@@ -50,11 +50,20 @@ found before it uses it.
 
 - **"postcode not found"** — check the postcode, or that it's in Great Britain.
   Northern Ireland is not covered by OpenMap Local.
-- **"nothing downloadable for XX"** — the step prints every format and area
-  Ordnance Survey is offering. Send me that list and I'll adjust the selector.
+- **"nothing downloadable for XX"** or **"no building shapefile in the
+  download"** — Ordnance Survey changed what it publishes. Both steps print
+  exactly what they found before giving up: the download step lists every
+  format and area on offer, and the convert step lists the files that actually
+  arrived. Paste that into the chat and it's a one-line fix.
 - **The job times out or the file is huge** — some grid squares are large. Try
   a smaller `radius` (the third input), or tell me and I'll add per-tile
   downloading.
+
+OS ships this data as either a GeoPackage (one file, many named layers) or a
+shapefile bundle (one file *per* layer). The workflow reads both — the first
+run tripped on this, because in a shapefile bundle the buildings are a
+filename rather than a layer name, and picking the first `.shp` in the folder
+lands on motorway junctions.
 
 ## Details, if you want them
 

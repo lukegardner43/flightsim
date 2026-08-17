@@ -9,6 +9,10 @@ name: Build a building pack
 # It downloads OS OpenMap Local (free, Open Government Licence), converts it,
 # clips it to a 10 km square around the postcode, and commits the pack. When it
 # finishes, fly that postcode: the pack is picked up automatically.
+#
+# Every input reaches the shell through the environment rather than being
+# pasted into the script, so a postcode containing shell characters is a
+# postcode, not a command.
 
 on:
   workflow_dispatch:
@@ -17,7 +21,7 @@ on:
         description: 'Postcode to centre the pack on, e.g. KT23 3HP'
         required: true
       name:
-        description: 'Name to show in the sim (blank = use the postcode area)'
+        description: 'Name to show in the sim (blank = use the postcode)'
         required: false
         default: ''
       radius:
@@ -31,6 +35,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -41,109 +48,158 @@ jobs:
       # --- where are we, and which OS grid square is that? ---
       - name: Locate the postcode
         id: loc
+        env:
+          POSTCODE: ${{ inputs.postcode }}
+          PACK_NAME: ${{ inputs.name }}
         run: |
           set -euo pipefail
-          node packs/grid-square.js "${{ inputs.postcode }}" > loc.txt
+          node packs/grid-square.js "$POSTCODE" > loc.txt
           SQ=$(sed -n 1p loc.txt)
           LAT=$(sed -n 2p loc.txt)
           LON=$(sed -n 3p loc.txt)
-          ID=$(echo "${{ inputs.postcode }}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9')
-          NAME="${{ inputs.name }}"
-          if [ -z "$NAME" ]; then NAME="${{ inputs.postcode }}"; fi
-          echo "square=$SQ"  >> "$GITHUB_OUTPUT"
-          echo "lat=$LAT"    >> "$GITHUB_OUTPUT"
-          echo "lon=$LON"    >> "$GITHUB_OUTPUT"
-          echo "id=$ID"      >> "$GITHUB_OUTPUT"
-          echo "name=$NAME"  >> "$GITHUB_OUTPUT"
-          echo "::notice::${{ inputs.postcode }} is at $LAT,$LON in OS grid square $SQ"
+          ID=$(printf '%s' "$POSTCODE" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9')
+          NAME="$PACK_NAME"
+          if [ -z "$NAME" ]; then NAME="$POSTCODE"; fi
+          {
+            echo "square=$SQ"
+            echo "lat=$LAT"
+            echo "lon=$LON"
+            echo "id=$ID"
+            echo "name=$NAME"
+          } >> "$GITHUB_OUTPUT"
+          echo "::notice::$POSTCODE is at $LAT,$LON in OS grid square $SQ"
 
       # --- fetch that grid square of OS OpenMap Local ---
       # Open data: no account, no API key. The downloads API lists what is
-      # available per 100 km square; we pick the GeoPackage for ours.
+      # available per 100 km square; we take whichever format we can read.
       - name: Download OS OpenMap Local
-        id: dl
+        env:
+          SQ: ${{ steps.loc.outputs.square }}
         run: |
           set -euo pipefail
-          SQ="${{ steps.loc.outputs.square }}"
           API="https://api.os.uk/downloads/v1/products/OpenMapLocal/downloads"
           curl -sSL --retry 3 --retry-delay 5 "$API" -o list.json
-          echo "formats and areas offered:"
-          node -e "
-            const l = require('./list.json');
-            const seen = new Set();
-            for (const d of l) seen.add(d.format + '  area=' + (d.area||'GB'));
-            console.log([...seen].join('\n'));
-          "
-          URL=$(node -e "
-            const l = require('./list.json'), sq = process.argv[1].toUpperCase();
-            const gpkg = d => /geopackage/i.test(d.format || '');
-            let hit = l.find(d => gpkg(d) && (d.area||'').toUpperCase() === sq);
-            if (!hit) hit = l.find(d => gpkg(d) && !d.area);          // whole-GB fallback
-            if (!hit) hit = l.find(d => (d.area||'').toUpperCase() === sq);
-            if (!hit) { console.error('nothing downloadable for ' + sq); process.exit(1); }
-            console.error('chose: ' + (hit.fileName||'?') + '  ' + hit.format +
-                          '  ' + Math.round((hit.size||0)/1048576) + ' MB');
+          echo "everything Ordnance Survey offers for OpenMap Local:"
+          node -e '
+            const l = require("./list.json");
+            for (const d of l) console.log("  " + (d.format || "?") + "   area=" + (d.area || "(whole GB)") +
+              "   " + Math.round((d.size || 0) / 1048576) + " MB");
+          '
+          URL=$(node -e '
+            const l = require("./list.json"), sq = (process.env.SQ || "").toUpperCase();
+            const here = d => (d.area || "").toUpperCase() === sq;
+            const fmt = re => d => re.test(d.format || "");
+            const gpkg = fmt(/geopackage|gpkg/i), shp = fmt(/shape/i);
+            /* Both are readable: a GeoPackage names its layers, a shapefile
+               bundle puts each layer in its own file. */
+            const hit = l.find(d => here(d) && gpkg(d))
+                     || l.find(d => here(d) && shp(d))
+                     || l.find(d => gpkg(d) && !d.area)
+                     || l.find(here);
+            if (!hit) {
+              console.error("nothing downloadable for grid square " + sq + " — see the list above");
+              process.exit(1);
+            }
+            console.error("chose: " + (hit.fileName || "?") + "  [" + hit.format + "]  " +
+                          Math.round((hit.size || 0) / 1048576) + " MB");
             console.log(hit.url);
-          " "$SQ")
+          ')
           echo "downloading $URL"
           curl -sSL --retry 3 --retry-delay 10 "$URL" -o data.zip
           ls -lh data.zip
           unzip -q -o data.zip -d osdata
-          find osdata -iname '*.gpkg' -o -iname '*.shp' | head -20
 
-      # --- GeoPackage -> GeoJSON, in WGS84, clipped to the area we need ---
-      # GDAL runs here on GitHub's machine, not yours.
+      # --- OS data -> GeoJSON, in WGS84, clipped to the area we need ---
+      # GDAL runs here on GitHub's machine, not on yours.
       - name: Convert and clip
-        id: conv
+        env:
+          LAT: ${{ steps.loc.outputs.lat }}
+          LON: ${{ steps.loc.outputs.lon }}
+          RADIUS: ${{ inputs.radius }}
+          SQ: ${{ steps.loc.outputs.square }}
         run: |
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq gdal-bin
-          LAT="${{ steps.loc.outputs.lat }}"
-          LON="${{ steps.loc.outputs.lon }}"
-          R="${{ inputs.radius }}"
-          read S W N E < <(node -e "
-            const lat=+process.argv[1], lon=+process.argv[2], r=+process.argv[3];
-            const mLat=110540, mLon=111320*Math.cos(lat*Math.PI/180);
-            console.log([lat-r/mLat, lon-r/mLon, lat+r/mLat, lon+r/mLon].join(' '));
-          " "$LAT" "$LON" "$R")
+          read -r S W N E < <(node -e '
+            const lat = +process.env.LAT, lon = +process.env.LON, r = +process.env.RADIUS;
+            const mLat = 110540, mLon = 111320 * Math.cos(lat * Math.PI / 180);
+            console.log([lat - r/mLat, lon - r/mLon, lat + r/mLat, lon + r/mLon].join(" "));
+          ')
           echo "clip to $S,$W .. $N,$E"
-          SRC=$(find osdata -iname '*.gpkg' | head -1)
-          if [ -z "$SRC" ]; then SRC=$(find osdata -iname '*.shp' | head -1); fi
-          echo "source: $SRC"
-          ogrinfo -so "$SRC" | head -40
-          LAYER=$(ogrinfo -so "$SRC" | grep -oiE '[0-9]+: *[A-Za-z_]*building[A-Za-z_]*' \
-                  | head -1 | sed 's/.*: *//')
-          if [ -z "$LAYER" ]; then LAYER=Building; fi
-          echo "layer: $LAYER"
-          ogr2ogr -f GeoJSON buildings.geojson "$SRC" "$LAYER" \
-                  -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
+          rm -f buildings.geojson
+          GPKG=$(find osdata -iname '*.gpkg' | head -1)
+          if [ -n "$GPKG" ]; then
+            # One container, many named layers: ask it which one holds buildings.
+            echo "source: $GPKG"
+            ogrinfo -so "$GPKG" | sed -n '1,60p'
+            LAYER=$(ogrinfo -so "$GPKG" \
+                    | sed -n 's/^[0-9]*: *\([A-Za-z0-9_]*[Bb]uilding[A-Za-z0-9_]*\).*/\1/p' | head -1)
+            if [ -z "$LAYER" ]; then
+              echo "::error::no building layer in $GPKG — layers listed above"; exit 1
+            fi
+            echo "layer: $LAYER"
+            ogr2ogr -f GeoJSON buildings.geojson "$GPKG" "$LAYER" \
+                    -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
+          else
+            # A shapefile bundle puts every layer in its own FILE, so the
+            # buildings are a filename, not a layer name — taking the first
+            # .shp found lands on motorway junctions.
+            mapfile -t SHPS < <(find osdata -iname '*building*.shp' | sort)
+            if [ "${#SHPS[@]}" -eq 0 ]; then
+              echo "::error::no building shapefile in the download. What arrived:"
+              find osdata -iname '*.shp' -printf '  %f\n' | sort
+              exit 1
+            fi
+            echo "building files:"
+            printf '  %s\n' "${SHPS[@]}"
+            for f in "${SHPS[@]}"; do
+              if [ -f buildings.geojson ]; then
+                ogr2ogr -f GeoJSON -append buildings.geojson "$f" \
+                        -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
+              else
+                ogr2ogr -f GeoJSON buildings.geojson "$f" \
+                        -t_srs EPSG:4326 -clipdst "$W" "$S" "$E" "$N"
+              fi
+            done
+          fi
+          if [ ! -s buildings.geojson ]; then
+            echo "::error::the clip produced nothing — is the postcode really inside grid square $SQ?"
+            exit 1
+          fi
           ls -lh buildings.geojson
+          node -e '
+            const n = (JSON.parse(require("fs").readFileSync("buildings.geojson", "utf8")).features || []).length;
+            console.log(n + " footprints inside the clip");
+            if (!n) { console.error("::error::the clip is empty"); process.exit(1); }
+          '
 
       - name: Build the pack
+        env:
+          ID: ${{ steps.loc.outputs.id }}
+          NAME: ${{ steps.loc.outputs.name }}
+          LAT: ${{ steps.loc.outputs.lat }}
+          LON: ${{ steps.loc.outputs.lon }}
+          RADIUS: ${{ inputs.radius }}
         run: |
           set -euo pipefail
-          node packs/make-pack.js \
-            --in buildings.geojson \
-            --id "${{ steps.loc.outputs.id }}" \
-            --name "${{ steps.loc.outputs.name }}" \
-            --centre "${{ steps.loc.outputs.lat }},${{ steps.loc.outputs.lon }}" \
-            --radius "${{ inputs.radius }}"
+          node packs/make-pack.js --in buildings.geojson \
+            --id "$ID" --name "$NAME" --centre "$LAT,$LON" --radius "$RADIUS"
           ls -lh packs/
 
       - name: Commit it
+        env:
+          POSTCODE: ${{ inputs.postcode }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add packs/ index.html
           if git diff --cached --quiet; then
-            echo "::warning::nothing changed — the pack is already up to date"
+            echo "::warning::nothing changed — that pack is already up to date"
             exit 0
           fi
-          git commit -m "Building pack for ${{ inputs.postcode }} from OS OpenMap Local
-
-          Contains OS data (c) Crown copyright and database right. Open
-          Government Licence v3. Built by .github/workflows/build-pack.yml."
+          git commit -m "Building pack for $POSTCODE from OS OpenMap Local" \
+                     -m "Contains OS data (c) Crown copyright and database right. Open Government Licence v3. Built by .github/workflows/build-pack.yml."
           git push
-          echo "::notice::Pack committed. Fly ${{ inputs.postcode }} and the report will show how much of it was used."
+          echo "::notice::Pack committed. Fly $POSTCODE — the report's pack line says how much of it was used."
