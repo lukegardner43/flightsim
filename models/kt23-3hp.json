@@ -17,45 +17,212 @@
         -0.3707
       ],
       "radius": 600,
-      "confidence": "medium",
-      "note": "Edwardian remodelling of a Regency house for Mrs Greville, National Trust. Two main storeys, pale rendered walls, hipped roof, built around a courtyard. The courtyard is why the main mass is modelled at two storeys with a taller entrance block rather than as one slab.",
+      "confidence": "the courtyard plan and two storeys are high; the turret is the least certain thing here and is one line to delete",
+      "replaceOutline": true,
+      "note": "A Regency villa of Thomas Cubitt's, remodelled for Mrs Ronald Greville in 1906 by Mewes and Davis \u2014 the Ritz architects \u2014 and given to the National Trust with her collection. The thing to get right is that it is built AROUND A COURTYARD: four two-storey ranges enclosing a paved court, not a solid block. Modelling it as one mass is the single biggest thing you can get wrong about this house. Pale rendered walls, hipped slate roofs, and the grouped chimney stacks of its date. The south range faces the famous view down the valley and carries a taller centre bay. Every range is sized as a fraction of whatever quadrangle OpenStreetMap actually holds, so the courtyard stays open at the real proportions.",
       "parts": [
         {
-          "on": "footprint",
-          "height": 11.5,
+          "at": [
+            0,
+            -0.75
+          ],
+          "wF": 1.0,
+          "dF": 0.25,
+          "height": 10.5,
           "roof": "hipped",
-          "roofHeight": 4.5,
+          "roofHeight": 4.0,
+          "type": "manor",
           "material": "plaster",
           "roofMaterial": "slate",
-          "type": "manor"
+          "note": "north range \u2014 the entrance side, off the courtyard"
         },
         {
           "at": [
             0,
-            -0.95
+            0.75
           ],
-          "w": 14,
-          "d": 4,
-          "height": 13.5,
-          "roof": "gabled",
-          "roofHeight": 3,
+          "wF": 1.0,
+          "dF": 0.25,
+          "height": 10.5,
+          "roof": "hipped",
+          "roofHeight": 4.0,
+          "type": "manor",
           "material": "plaster",
           "roofMaterial": "slate",
-          "type": "manor"
+          "note": "south range \u2014 the garden front, facing the view"
         },
         {
           "at": [
-            -0.55,
-            0.9
+            -0.82,
+            0
           ],
-          "w": 5,
-          "d": 3,
-          "height": 15,
+          "wF": 0.18,
+          "dF": 1.0,
+          "height": 10.5,
+          "roof": "hipped",
+          "roofHeight": 4.0,
+          "type": "manor",
+          "material": "plaster",
+          "roofMaterial": "slate",
+          "note": "west range"
+        },
+        {
+          "at": [
+            0.82,
+            0
+          ],
+          "wF": 0.18,
+          "dF": 1.0,
+          "height": 10.5,
+          "roof": "hipped",
+          "roofHeight": 4.0,
+          "type": "manor",
+          "material": "plaster",
+          "roofMaterial": "slate",
+          "note": "east range"
+        },
+        {
+          "at": [
+            0,
+            0.72
+          ],
+          "wF": 0.24,
+          "dF": 0.31,
+          "height": 12.5,
+          "roof": "hipped",
+          "roofHeight": 3.4,
+          "type": "manor",
+          "material": "plaster",
+          "roofMaterial": "slate",
+          "note": "the centre bay of the garden front, standing slightly forward and taller"
+        },
+        {
+          "at": [
+            0,
+            -0.75
+          ],
+          "w": 4.2,
+          "d": 4.2,
+          "minHeight": 13.0,
+          "height": 21.0,
           "roof": "pyramidal",
-          "roofHeight": 2,
+          "roofHeight": 2.6,
+          "type": "manor",
           "material": "plaster",
           "roofMaterial": "lead",
-          "type": "manor"
+          "note": "clock turret over the entrance range \u2014 the least certain element in this file"
+        },
+        {
+          "at": [
+            -0.46,
+            -0.75
+          ],
+          "w": 3.0,
+          "d": 2.2,
+          "minHeight": 10.5,
+          "height": 18.1,
+          "roof": "flat",
+          "type": "manor",
+          "material": "brick",
+          "note": "north range stack"
+        },
+        {
+          "at": [
+            0.46,
+            -0.75
+          ],
+          "w": 3.0,
+          "d": 2.2,
+          "minHeight": 10.5,
+          "height": 18.1,
+          "roof": "flat",
+          "type": "manor",
+          "material": "brick",
+          "note": "north range stack"
+        },
+        {
+          "at": [
+            -0.46,
+            0.75
+          ],
+          "w": 3.0,
+          "d": 2.2,
+          "minHeight": 10.5,
+          "height": 18.1,
+          "roof": "flat",
+          "type": "manor",
+          "material": "brick",
+          "note": "south range stack"
+        },
+        {
+          "at": [
+            0.46,
+            0.75
+          ],
+          "w": 3.0,
+          "d": 2.2,
+          "minHeight": 10.5,
+          "height": 18.1,
+          "roof": "flat",
+          "type": "manor",
+          "material": "brick",
+          "note": "south range stack"
+        },
+        {
+          "at": [
+            -0.82,
+            -0.42
+          ],
+          "w": 3.0,
+          "d": 2.2,
+          "minHeight": 10.5,
+          "height": 18.1,
+          "roof": "flat",
+          "type": "manor",
+          "material": "brick",
+          "note": "west range stack"
+        },
+        {
+          "at": [
+            -0.82,
+            0.42
+          ],
+          "w": 3.0,
+          "d": 2.2,
+          "minHeight": 10.5,
+          "height": 18.1,
+          "roof": "flat",
+          "type": "manor",
+          "material": "brick",
+          "note": "west range stack"
+        },
+        {
+          "at": [
+            0.82,
+            -0.42
+          ],
+          "w": 3.0,
+          "d": 2.2,
+          "minHeight": 10.5,
+          "height": 18.1,
+          "roof": "flat",
+          "type": "manor",
+          "material": "brick",
+          "note": "east range stack"
+        },
+        {
+          "at": [
+            0.82,
+            0.42
+          ],
+          "w": 3.0,
+          "d": 2.2,
+          "minHeight": 10.5,
+          "height": 18.1,
+          "roof": "flat",
+          "type": "manor",
+          "material": "brick",
+          "note": "east range stack"
         }
       ]
     },
@@ -375,6 +542,7 @@
     "These are massing models, not architecture. A church gets a nave, a tower and a spire of about the right height; it does not get its aisles, porch, transepts or windows.",
     "Nothing here is measured. Heights are judged from the building type and from how these places read in the landscape, not from drawings.",
     "A model only applies if OpenStreetMap has the building mapped AND named close to the way this file spells it. Where OSM has no footprint, nothing is drawn \u2014 deliberately, so a wrong guess can never put a building in an empty field.",
-    "Coordinates are approximate. They exist only to stop 'St Mary's Church' matching the wrong St Mary's; the radius is generous for that reason."
+    "Coordinates are approximate. They exist only to stop 'St Mary's Church' matching the wrong St Mary's; the radius is generous for that reason.",
+    "Polesden Lacey is modelled range by range because it is a courtyard house; the others are massing in two or three volumes. All of them are still proportion and silhouette, not architecture."
   ]
 }

@@ -20,9 +20,18 @@ for (const f of files) {
     for (const k of ['id', 'name', 'match', 'parts'])
       if (m[k] === undefined) throw new Error(f + ': model "' + (m.name || '?') + '" is missing ' + k);
     if (!m.parts.length) throw new Error(f + ': model "' + m.name + '" has no parts');
-    if (!m.parts.some(p => p.on === 'footprint'))
-      throw new Error(f + ': model "' + m.name + '" has no on:"footprint" part, so the plain ' +
-                      'outline would survive underneath the added volumes');
+    /* Something has to account for the mapped outline, or the plain box
+       survives underneath everything you added. Either a part IS the
+       footprint, or the model states that its parts cover the plan between
+       them — which is how a courtyard house works, since its middle is a
+       courtyard and must not be filled in. */
+    if (!m.parts.some(p => p.on === 'footprint') && !m.replaceOutline)
+      throw new Error(f + ': model "' + m.name + '" has no on:"footprint" part and does not ' +
+                      'set replaceOutline, so the plain outline would survive under the parts');
+    for (const p of m.parts) {
+      if (p.wF != null && (p.wF <= 0 || p.wF > 2)) throw new Error(f + ': ' + m.name + ': silly wF');
+      if (p.dF != null && (p.dF <= 0 || p.dF > 2)) throw new Error(f + ': ' + m.name + ': silly dF');
+    }
   }
   const js = path.basename(f, '.json') + '.js';
   fs.writeFileSync(path.join(__dirname, js), 'TF_MODELS(' + JSON.stringify(d) + ');\n');

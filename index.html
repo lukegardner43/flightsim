@@ -799,7 +799,13 @@ function modelParts(e, m){
       var rot = (p.rot || 0)*Math.PI/180;
       var ax = Math.cos(rot)*box.ux - Math.sin(rot)*box.uz;
       var az = Math.cos(rot)*box.uz + Math.sin(rot)*box.ux;
-      var hw = (p.w || 6)/2, hd = (p.d || 6)/2;
+      /* wF/dF are fractions of the real footprint's own width and depth, so a
+         range of a courtyard house fits whatever quadrangle OSM actually
+         holds instead of a size guessed in metres. (They assume rot 0; with a
+         rotation, give w/d in metres instead.) */
+      var pw = p.wF != null ? p.wF*2*box.hu : (p.w || 6);
+      var pd = p.dF != null ? p.dF*2*box.hv : (p.d || 6);
+      var hw = pw/2, hd = pd/2;
       var cs = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]], k;
       geom = [];
       for(k=0;k<4;k++){
