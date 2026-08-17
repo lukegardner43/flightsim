@@ -1,0 +1,335 @@
+{
+  "id": "kt23-3hp",
+  "postcode": "KT23 3HP",
+  "matches": [
+    "KT23"
+  ],
+  "place": "Great Bookham, Mole Valley, Surrey",
+  "produced_by": "Claude Opus 5",
+  "produced_on": "2026-08-17",
+  "method": "Written from the model's training knowledge of the area. No live lookup, no aerial imagery, no OSM query, no site visit.",
+  "confidence": {
+    "area_character": "medium \u2014 KT23 is a well-known Surrey commuter village and its general building stock is the kind of thing a language model does hold",
+    "proportions": "low to medium \u2014 the weights below are a considered estimate, not a survey. The first draft made every roof clay terracotta; interwar and post-war Surrey is mostly brown and grey concrete tile, which is the sort of thing this file exists to be corrected on.",
+    "street_level": "low \u2014 nothing here is specific to the HP sector, and should not be read as such",
+    "landmarks": "medium-high for the named ones; they are notable enough to be recalled rather than inferred"
+  },
+  "character": "Great and Little Bookham: a Surrey commuter village between Leatherhead and Effingham, on the Mole Valley line. Predominantly interwar and post-war low-density suburban housing \u2014 detached and semi-detached, two storeys, generous plots with mature trees, laid out on cul-de-sacs and crescents off a few through-roads. A short older core around the church with some genuinely old fabric. Red and brown brick dominates, with render, pebbledash and tile-hanging common on 1930s stock. Roofs are overwhelmingly pitched, plain concrete or clay tile, a good share hipped rather than gabled. Very little that is tall: almost nothing above three storeys. Bookham Common to the north-west and Polesden Lacey's estate to the south are both National Trust, and the surrounding land is farmland, woodland and paddock rather than open moor.",
+  "shedArea": 900,
+  "stock": {
+    "house": 0.82,
+    "block": 0.04,
+    "shed": 0.14
+  },
+  "type": {
+    "house": [
+      [
+        "detached",
+        0.44
+      ],
+      [
+        "semidetached_house",
+        0.32
+      ],
+      [
+        "bungalow",
+        0.11
+      ],
+      [
+        "terrace",
+        0.08
+      ],
+      [
+        "house",
+        0.05
+      ]
+    ],
+    "block": [
+      [
+        "apartments",
+        0.7
+      ],
+      [
+        "retail",
+        0.2
+      ],
+      [
+        "commercial",
+        0.1
+      ]
+    ],
+    "shed": [
+      [
+        "garage",
+        0.34
+      ],
+      [
+        "barn",
+        0.24
+      ],
+      [
+        "shed",
+        0.2
+      ],
+      [
+        "warehouse",
+        0.12
+      ],
+      [
+        "industrial",
+        0.1
+      ]
+    ],
+    "shed_large": [
+      [
+        "warehouse",
+        0.42
+      ],
+      [
+        "industrial",
+        0.28
+      ],
+      [
+        "barn",
+        0.18
+      ],
+      [
+        "factory",
+        0.12
+      ]
+    ]
+  },
+  "storeys": {
+    "house": [
+      [
+        2,
+        0.76
+      ],
+      [
+        1,
+        0.17
+      ],
+      [
+        3,
+        0.07
+      ]
+    ],
+    "block": [
+      [
+        3,
+        0.55
+      ],
+      [
+        4,
+        0.35
+      ],
+      [
+        2,
+        0.1
+      ]
+    ],
+    "shed": [
+      [
+        1,
+        1.0
+      ]
+    ]
+  },
+  "wall": {
+    "house": [
+      [
+        "red_brick",
+        0.4
+      ],
+      [
+        "brick",
+        0.17
+      ],
+      [
+        "render",
+        0.15
+      ],
+      [
+        "plaster",
+        0.09
+      ],
+      [
+        "timber_framing",
+        0.07
+      ],
+      [
+        "stone",
+        0.05
+      ],
+      [
+        "concrete",
+        0.04
+      ],
+      [
+        "wood",
+        0.03
+      ]
+    ],
+    "block": [
+      [
+        "brick",
+        0.5
+      ],
+      [
+        "render",
+        0.3
+      ],
+      [
+        "concrete",
+        0.2
+      ]
+    ],
+    "shed": [
+      [
+        "metal",
+        0.55
+      ],
+      [
+        "concrete",
+        0.2
+      ],
+      [
+        "brick",
+        0.15
+      ],
+      [
+        "wood",
+        0.1
+      ]
+    ]
+  },
+  "roofShape": {
+    "house": [
+      [
+        "hipped",
+        0.46
+      ],
+      [
+        "gabled",
+        0.44
+      ],
+      [
+        "pyramidal",
+        0.07
+      ],
+      [
+        "flat",
+        0.03
+      ]
+    ],
+    "block": [
+      [
+        "hipped",
+        0.45
+      ],
+      [
+        "flat",
+        0.4
+      ],
+      [
+        "gabled",
+        0.15
+      ]
+    ],
+    "shed": [
+      [
+        "gabled",
+        0.8
+      ],
+      [
+        "flat",
+        0.2
+      ]
+    ]
+  },
+  "roofMat": {
+    "house": [
+      [
+        "tile",
+        0.52
+      ],
+      [
+        "slate",
+        0.34
+      ],
+      [
+        "clay",
+        0.14
+      ]
+    ],
+    "block": [
+      [
+        "tile",
+        0.45
+      ],
+      [
+        "gravel",
+        0.3
+      ],
+      [
+        "slate",
+        0.25
+      ]
+    ],
+    "shed": [
+      [
+        "metal",
+        0.75
+      ],
+      [
+        "asbestos",
+        0.25
+      ]
+    ]
+  },
+  "expect": {
+    "densityPerKm2": 380,
+    "treeCover": "high \u2014 mature garden trees throughout, ancient woodland on the commons",
+    "tallest_m": 14,
+    "note": "If the density probe reports far outside 200-700 buildings/km2, this profile is being applied somewhere it was not written for."
+  },
+  "landmarks": [
+    {
+      "name": "Polesden Lacey",
+      "what": "Edwardian country house and garden, National Trust",
+      "where": "~2.5 km south of Great Bookham, above Ranmore",
+      "osm_hint": "building=yes with historic=house; not tagged as a castle or palace"
+    },
+    {
+      "name": "St Nicolas Church, Great Bookham",
+      "what": "parish church, Norman origins, shingled spire",
+      "where": "the old village core, Church Road"
+    },
+    {
+      "name": "Bookham Common",
+      "what": "National Trust common, oak woodland and ponds",
+      "where": "north-west of the village, either side of the railway"
+    },
+    {
+      "name": "Bookham station",
+      "what": "Mole Valley line halt",
+      "where": "north of the village centre"
+    },
+    {
+      "name": "The Old Barn Hall",
+      "what": "converted barn, village hall",
+      "where": "Church Road, Great Bookham"
+    },
+    {
+      "name": "Effingham Junction",
+      "what": "railway junction and depot",
+      "where": "west, on the KT24 boundary"
+    }
+  ],
+  "known_gaps": [
+    "No coordinates are given for anything. This profile cannot place a building; it can only say what a building already known to exist is probably like.",
+    "The HP sector is not distinguished from the rest of KT23. Treat every number here as 'typical of Bookham', not 'true of this street'.",
+    "Proportions are a judgement, not a count. The honest test is whether they beat the sim's existing UK-wide defaults, not whether they are right.",
+    "Building type is chosen from footprint size alone, because that is the only evidence OSM gives. A 200 m2 footprint that is really a village hall will be dressed as a house."
+  ]
+}

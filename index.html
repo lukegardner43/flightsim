@@ -201,6 +201,15 @@
         </div>
       </div>
 
+      <div id="aibox" style="display:none;margin:2px 0 12px">
+        <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer">
+          <input type="checkbox" id="aiuse" style="margin-top:3px;flex:none">
+          <span>
+            <b style="display:block">Use the AI interpretation of <span id="ainame"></span></b>
+            <span class="note" style="margin:2px 0 0" id="ainote"></span>
+          </span>
+        </label>
+      </div>
       <button id="go" disabled>Find a place first</button>
       <p class="fine">Map data © OpenStreetMap contributors (ODbL) via Overpass. Postcode geocoding by
         Postcodes.io; place search by Nominatim. Aerial imagery © Esri and its sources. Terrain heights from
@@ -281,6 +290,10 @@ function reportText(){
   L.push("quality  " + opt.quality + "   density " + (DENSITY == null ? "unknown" : Math.round(DENSITY) + "/km2") +
          "   dense " + DENSE);
   L.push("rings    core " + HALF_A + "m  mid " + HALF_M + "m  outer " + HALF_B + "m");
+  L.push("ai       " + (AI.on
+    ? "profile " + AI.p.id + " (" + AI.p.place + ") - dressed " + AI.dressed +
+      " of " + AI.applied + " footprints OSM left undescribed"
+    : (AI.p ? "profile " + AI.p.id + " available, not used" : "no profile for this place")));
   L.push("terrain  " + (HF.ready ? "ok, ground " + Math.round(HF.elev0) + "m, relief " +
                                    Math.round(HF.max-HF.min) + "m" : "none"));
   L.push("cells    core=" + coverage.a + " mid=" + coverage.m.join("") + " outer=" + coverage.b.join("") +
@@ -516,6 +529,21 @@ function setGo(ok){
   var g = $("go");
   g.disabled = !ok;
   g.textContent = ok ? "Start engine — " + chosen.name : "Find a place first";
+  offerAI(ok ? chosen.name : "");
+}
+/* The option only appears where a profile has actually been written. Offering
+   it everywhere would imply the model knows every postcode, which it does not. */
+function offerAI(name){
+  var p = aiFind(name), box = $("aibox");
+  AI.p = p;
+  if(!p){ box.style.display = "none"; $("aiuse").checked = false; return; }
+  box.style.display = "block";
+  $("ainame").textContent = p.place;
+  $("ainote").textContent = "OSM rarely says what a building is made of, how many " +
+    "storeys it has or what shape its roof is. This fills those gaps with a description of " +
+    p.place + " written by " + (p.produced_by || "a language model") +
+    " from memory — no imagery, no survey. Footprints and positions still come entirely " +
+    "from OSM: nothing is invented or moved. See ai/" + p.id + ".json.";
 }
 
 /* quality + light */
@@ -602,6 +630,416 @@ function hash(a,b){ var s = Math.sin(a*12.9898 + b*78.233)*43758.5453; return s 
 /* ============================================================
    3.  HEIGHT ESTIMATION  (UK-tuned)
    ============================================================ */
+/* ------------------------------------------------------------------
+   AN AI INTERPRETATION OF A PLACE
+
+   OSM tells you a footprint exists. For most British buildings it will not
+   tell you what the building is, how many storeys it has, what it is built
+   of, or what shape its roof is — so the sim guesses, from a UK-wide average
+   baked into estimateHeight(). A profile replaces that national average with
+   one written for a particular place.
+
+   It invents no geometry and moves nothing: every footprint still comes from
+   OSM, and a profile is ignored wherever OSM has actually said something. All
+   it supplies is the judgement OSM is missing, and the buildings it touches
+   stay in the "estimated" tier so the report never claims they were measured.
+
+   The profiles live in ai/*.json and are copied in here by ai/embed.js,
+   because a page opened from disk cannot fetch its own neighbours.
+   ------------------------------------------------------------------ */
+/* AI-PROFILES-START */
+var AI_PROFILES = [
+ {
+  "id": "kt23-3hp",
+  "postcode": "KT23 3HP",
+  "matches": [
+   "KT23"
+  ],
+  "place": "Great Bookham, Mole Valley, Surrey",
+  "produced_by": "Claude Opus 5",
+  "produced_on": "2026-08-17",
+  "method": "Written from the model's training knowledge of the area. No live lookup, no aerial imagery, no OSM query, no site visit.",
+  "confidence": {
+   "area_character": "medium — KT23 is a well-known Surrey commuter village and its general building stock is the kind of thing a language model does hold",
+   "proportions": "low to medium — the weights below are a considered estimate, not a survey. The first draft made every roof clay terracotta; interwar and post-war Surrey is mostly brown and grey concrete tile, which is the sort of thing this file exists to be corrected on.",
+   "street_level": "low — nothing here is specific to the HP sector, and should not be read as such",
+   "landmarks": "medium-high for the named ones; they are notable enough to be recalled rather than inferred"
+  },
+  "character": "Great and Little Bookham: a Surrey commuter village between Leatherhead and Effingham, on the Mole Valley line. Predominantly interwar and post-war low-density suburban housing — detached and semi-detached, two storeys, generous plots with mature trees, laid out on cul-de-sacs and crescents off a few through-roads. A short older core around the church with some genuinely old fabric. Red and brown brick dominates, with render, pebbledash and tile-hanging common on 1930s stock. Roofs are overwhelmingly pitched, plain concrete or clay tile, a good share hipped rather than gabled. Very little that is tall: almost nothing above three storeys. Bookham Common to the north-west and Polesden Lacey's estate to the south are both National Trust, and the surrounding land is farmland, woodland and paddock rather than open moor.",
+  "shedArea": 900,
+  "stock": {
+   "house": 0.82,
+   "block": 0.04,
+   "shed": 0.14
+  },
+  "type": {
+   "house": [
+    [
+     "detached",
+     0.44
+    ],
+    [
+     "semidetached_house",
+     0.32
+    ],
+    [
+     "bungalow",
+     0.11
+    ],
+    [
+     "terrace",
+     0.08
+    ],
+    [
+     "house",
+     0.05
+    ]
+   ],
+   "block": [
+    [
+     "apartments",
+     0.7
+    ],
+    [
+     "retail",
+     0.2
+    ],
+    [
+     "commercial",
+     0.1
+    ]
+   ],
+   "shed": [
+    [
+     "garage",
+     0.34
+    ],
+    [
+     "barn",
+     0.24
+    ],
+    [
+     "shed",
+     0.2
+    ],
+    [
+     "warehouse",
+     0.12
+    ],
+    [
+     "industrial",
+     0.1
+    ]
+   ],
+   "shed_large": [
+    [
+     "warehouse",
+     0.42
+    ],
+    [
+     "industrial",
+     0.28
+    ],
+    [
+     "barn",
+     0.18
+    ],
+    [
+     "factory",
+     0.12
+    ]
+   ]
+  },
+  "storeys": {
+   "house": [
+    [
+     2,
+     0.76
+    ],
+    [
+     1,
+     0.17
+    ],
+    [
+     3,
+     0.07
+    ]
+   ],
+   "block": [
+    [
+     3,
+     0.55
+    ],
+    [
+     4,
+     0.35
+    ],
+    [
+     2,
+     0.1
+    ]
+   ],
+   "shed": [
+    [
+     1,
+     1
+    ]
+   ]
+  },
+  "wall": {
+   "house": [
+    [
+     "red_brick",
+     0.4
+    ],
+    [
+     "brick",
+     0.17
+    ],
+    [
+     "render",
+     0.15
+    ],
+    [
+     "plaster",
+     0.09
+    ],
+    [
+     "timber_framing",
+     0.07
+    ],
+    [
+     "stone",
+     0.05
+    ],
+    [
+     "concrete",
+     0.04
+    ],
+    [
+     "wood",
+     0.03
+    ]
+   ],
+   "block": [
+    [
+     "brick",
+     0.5
+    ],
+    [
+     "render",
+     0.3
+    ],
+    [
+     "concrete",
+     0.2
+    ]
+   ],
+   "shed": [
+    [
+     "metal",
+     0.55
+    ],
+    [
+     "concrete",
+     0.2
+    ],
+    [
+     "brick",
+     0.15
+    ],
+    [
+     "wood",
+     0.1
+    ]
+   ]
+  },
+  "roofShape": {
+   "house": [
+    [
+     "hipped",
+     0.46
+    ],
+    [
+     "gabled",
+     0.44
+    ],
+    [
+     "pyramidal",
+     0.07
+    ],
+    [
+     "flat",
+     0.03
+    ]
+   ],
+   "block": [
+    [
+     "hipped",
+     0.45
+    ],
+    [
+     "flat",
+     0.4
+    ],
+    [
+     "gabled",
+     0.15
+    ]
+   ],
+   "shed": [
+    [
+     "gabled",
+     0.8
+    ],
+    [
+     "flat",
+     0.2
+    ]
+   ]
+  },
+  "roofMat": {
+   "house": [
+    [
+     "tile",
+     0.52
+    ],
+    [
+     "slate",
+     0.34
+    ],
+    [
+     "clay",
+     0.14
+    ]
+   ],
+   "block": [
+    [
+     "tile",
+     0.45
+    ],
+    [
+     "gravel",
+     0.3
+    ],
+    [
+     "slate",
+     0.25
+    ]
+   ],
+   "shed": [
+    [
+     "metal",
+     0.75
+    ],
+    [
+     "asbestos",
+     0.25
+    ]
+   ]
+  },
+  "expect": {
+   "densityPerKm2": 380,
+   "treeCover": "high — mature garden trees throughout, ancient woodland on the commons",
+   "tallest_m": 14,
+   "note": "If the density probe reports far outside 200-700 buildings/km2, this profile is being applied somewhere it was not written for."
+  },
+  "landmarks": [
+   {
+    "name": "Polesden Lacey",
+    "what": "Edwardian country house and garden, National Trust",
+    "where": "~2.5 km south of Great Bookham, above Ranmore",
+    "osm_hint": "building=yes with historic=house; not tagged as a castle or palace"
+   },
+   {
+    "name": "St Nicolas Church, Great Bookham",
+    "what": "parish church, Norman origins, shingled spire",
+    "where": "the old village core, Church Road"
+   },
+   {
+    "name": "Bookham Common",
+    "what": "National Trust common, oak woodland and ponds",
+    "where": "north-west of the village, either side of the railway"
+   },
+   {
+    "name": "Bookham station",
+    "what": "Mole Valley line halt",
+    "where": "north of the village centre"
+   },
+   {
+    "name": "The Old Barn Hall",
+    "what": "converted barn, village hall",
+    "where": "Church Road, Great Bookham"
+   },
+   {
+    "name": "Effingham Junction",
+    "what": "railway junction and depot",
+    "where": "west, on the KT24 boundary"
+   }
+  ],
+  "known_gaps": [
+   "No coordinates are given for anything. This profile cannot place a building; it can only say what a building already known to exist is probably like.",
+   "The HP sector is not distinguished from the rest of KT23. Treat every number here as 'typical of Bookham', not 'true of this street'.",
+   "Proportions are a judgement, not a count. The honest test is whether they beat the sim's existing UK-wide defaults, not whether they are right.",
+   "Building type is chosen from footprint size alone, because that is the only evidence OSM gives. A 200 m2 footprint that is really a village hall will be dressed as a house."
+  ]
+ }
+];
+/* AI-PROFILES-END */
+var AI = {on:false, p:null, applied:0, dressed:0};
+function aiFind(text){
+  var s = String(text || "").toUpperCase().replace(/\s+/g, "");
+  for(var i=0;i<AI_PROFILES.length;i++){
+    var m = AI_PROFILES[i].matches || [];
+    for(var j=0;j<m.length;j++)
+      if(s.indexOf(String(m[j]).toUpperCase().replace(/\s+/g, "")) === 0) return AI_PROFILES[i];
+  }
+  return null;
+}
+/* Weighted choice, seeded by the building, so a house does not change its mind
+   about what it is made of between one frame and the next. */
+function wpick(list, seed, salt){
+  if(!list || !list.length) return null;
+  var total = 0, i;
+  for(i=0;i<list.length;i++) total += list[i][1];
+  var r = hash(seed, salt)*total;
+  for(i=0;i<list.length;i++){ r -= list[i][1]; if(r <= 0) return list[i][0]; }
+  return list[list.length-1][0];
+}
+function aiDress(t, seed, area){
+  var p = AI.p;
+  if(!p) return false;
+  var b = t.building || "", cls, touched = false;
+  if(b && b !== "yes"){
+    cls = SHED_RE.test(b) ? "shed" : (HOUSE_RE.test(b) ? "house" : "block");
+  }else{
+    /* Footprint size is the only evidence OSM has given us. Turning it into a
+       building type is exactly the judgement the profile exists to supply. */
+    cls = area > (p.shedArea || 900) ? "shed"
+        : (area > 300 && hash(seed, 91) < (p.stock.block || 0) * 4) ? "block" : "house";
+    /* a 5,000 m2 footprint is not a garage: big sheds get their own list */
+    var list = (cls === "shed" && area > 2000 && p.type.shed_large) ? p.type.shed_large : p.type[cls];
+    var ty = wpick(list, seed, 92);
+    if(ty){ t.building = ty; touched = true; }
+  }
+  if(!t["building:levels"] && !t.height && !t["building:height"] && p.storeys[cls]){
+    /* ai: prefix, not building:levels — an inference must not be counted as a
+       measurement in the report */
+    t["ai:levels"] = String(wpick(p.storeys[cls], seed, 93)); touched = true;
+  }
+  if(!t["building:material"] && !t["building:colour"] && p.wall[cls]){
+    t["ai:wallmat"] = wpick(p.wall[cls], seed, 94); touched = true;
+  }
+  if(!t["roof:shape"] && p.roofShape[cls]){
+    t["roof:shape"] = wpick(p.roofShape[cls], seed, 95); touched = true;
+  }
+  if(!t["roof:material"] && !t["roof:colour"] && p.roofMat[cls]){
+    t["ai:roofmat"] = wpick(p.roofMat[cls], seed, 96); touched = true;
+  }
+  if(touched) AI.dressed++;
+  AI.applied++;
+  return touched;
+}
 var TYPE_H = {
   house:7.2, detached:7.4, semidetached_house:7.2, terrace:8.4, bungalow:4.4, terraced_house:8.4,
   residential:12, apartments:16, dormitory:18, hotel:22,
@@ -884,11 +1322,37 @@ var COL = {
   pitch:new THREE.Color(0x54804a),
   trunk:new THREE.Color(0x453626), leaf:new THREE.Color(0x3d5f32)
 };
-function wallColour(h, seed, house){
+/* Three kinds of thing get built, and they are not made of the same stuff.
+   Rendering a warehouse with an office curtain wall and a parapet turns it
+   into a block of flats, which is what every big shed in the world was. */
+var SHED_RE  = /^(industrial|warehouse|factory|manufacture|works|depot|distribution|storage|shed|hangar|barn|farm_auxiliary|greenhouse|silo|garage|garages|carport|service|construction)$/;
+var HOUSE_RE = /^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|cabin|hut|static_caravan|manor|mansion|farm|residential)$/;
+function buildClass(t, area, h, house){
+  var b = t.building || "";
+  if(SHED_RE.test(b)) return "shed";
+  if(t.landuse === "industrial" || t.industrial || t.craft) return "shed";
+  if(HOUSE_RE.test(b)) return "house";
+  /* Untagged, enormous, and low: a distribution shed, not a tower of flats.
+     Nothing three storeys high covers a third of a hectare and has people
+     living in it. */
+  if((b === "yes" || b === "") && area > 1100 && h < 16) return "shed";
+  if(house) return "house";
+  return "block";
+}
+var HOUSE_WALL = [0x9d5f4a, 0xa86f55, 0x8d6047, 0xb08a6a,          /* brick */
+                  0xdad3c3, 0xe3ded1, 0xcbc5b6,                     /* render */
+                  0xbdb6a6, 0xaaa497];                              /* pebbledash */
+var SHED_WALL  = [0x8e9aa0, 0x9aa6a4, 0x7d8a90, 0xa9b1ae, 0x6f7d78,
+                  0xb5b9b3, 0x7f8c84];
+function pick(list, seed, salt){
+  return new THREE.Color(list[Math.floor(hash(seed, salt)*list.length) % list.length]);
+}
+function wallColour(h, seed, cls){
   var c;
-  if(house) c = COL.brick.clone().lerp(COL.wallLo, hash(seed,61)*0.65);
+  if(cls === "house")     c = pick(HOUSE_WALL, seed, 61);
+  else if(cls === "shed") c = pick(SHED_WALL, seed, 63);
   else c = COL.wallLo.clone().lerp(COL.wallHi, Math.min(1, h/70));
-  c.offsetHSL((hash(seed,31)-0.5)*0.03, 0, (hash(seed,21)-0.5)*0.13);
+  c.offsetHSL((hash(seed,31)-0.5)*0.03, 0, (hash(seed,21)-0.5)*0.10);
   return c;
 }
 
@@ -1402,6 +1866,33 @@ function boxPoint(box, su, sv, y){
   return {x: box.cx + su*box.hu*box.ux - sv*box.hv*box.uz, y: y,
           z: box.cz + su*box.hu*box.uz + sv*box.hv*box.ux};
 }
+/* One stack at a gable end. Two dozen triangles, and it is the difference
+   between a house and a shoebox with a lid. */
+function chimney(b, box, top, roofH, seed, col){
+  var side = hash(seed, 71) > 0.5 ? 1 : -1;
+  /* through the slope, not perched on the very end of the eaves */
+  var u = side*box.hu*0.62;
+  var cx = box.cx + u*box.ux, cz = box.cz + u*box.uz;
+  /* sized off the house: a stack on a semi is about a metre across, and the
+     fixed 1.2 m one looked like a power station on anything small */
+  var w = Math.max(0.26, Math.min(0.5, box.hv*0.085));
+  var hgt = roofH*0.72 + 0.7 + hash(seed, 73)*0.5;
+  var c = col.clone().offsetHSL(0, 0, -0.09);
+  var q = [[-w,-w],[w,-w],[w,w],[-w,w]], pts = [], i;
+  for(i=0;i<4;i++)
+    pts.push({x: cx + q[i][0]*box.ux - q[i][1]*box.uz,
+              z: cz + q[i][0]*box.uz + q[i][1]*box.ux});
+  for(i=0;i<4;i++){
+    var a = pts[i], d = pts[(i+1)%4];
+    b.addTri({x:a.x,y:top,z:a.z}, {x:d.x,y:top,z:d.z}, {x:d.x,y:top+hgt,z:d.z}, c);
+    b.addTri({x:a.x,y:top,z:a.z}, {x:d.x,y:top+hgt,z:d.z}, {x:a.x,y:top+hgt,z:a.z}, c);
+  }
+  var ref = {x:cx, y:top-1, z:cz}, cap = c.clone().offsetHSL(0, 0, -0.06);
+  b.addTriOut({x:pts[0].x,y:top+hgt,z:pts[0].z}, {x:pts[1].x,y:top+hgt,z:pts[1].z},
+              {x:pts[2].x,y:top+hgt,z:pts[2].z}, cap, ref);
+  b.addTriOut({x:pts[0].x,y:top+hgt,z:pts[0].z}, {x:pts[2].x,y:top+hgt,z:pts[2].z},
+              {x:pts[3].x,y:top+hgt,z:pts[3].z}, cap, ref);
+}
 function roofRidged(b, box, y, h, hipped, col){
   var ru = hipped && box.hu > 0 ? Math.max(0, 1 - box.hv/box.hu) : 1;
   var c00 = boxPoint(box,-1,-1,y), c10 = boxPoint(box,1,-1,y),
@@ -1477,11 +1968,61 @@ function facadeTexture(){
     x.fillStyle = "rgba(255,255,255,.30)"; x.fillRect(wx, wy, ww, 2);
     x.fillStyle = "rgba(0,0,0,.18)"; x.fillRect(wx + ww/2 - 1, wy, 2, wh);
   }
+  return wallTex(c, 4, 3.2);
+}
+function wallTex(c, mx, my){
   var t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(1/4, 1/3.2);                    /* UVs come out of ExtrudeGeometry in metres */
+  t.repeat.set(1/mx, 1/my);                    /* UVs come out of ExtrudeGeometry in metres */
   t.anisotropy = 4;
   return t;
+}
+/* A house is not a small office block, and dressing one in a curtain wall is
+   most of why they looked wrong: brick courses and a pair of domestic windows
+   per bay read as a house from any height you actually fly at. One tile is
+   about one bay of a British semi. */
+function houseTexture(){
+  var c = document.createElement("canvas");
+  c.width = 64; c.height = 64;
+  var x = c.getContext("2d"), r;
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 64, 64);
+  for(r=0;r<64;r+=4){                          /* brick courses */
+    x.fillStyle = "rgba(0,0,0,.07)";  x.fillRect(0, r, 64, 1);
+    x.fillStyle = "rgba(255,255,255,.09)"; x.fillRect(0, r+1, 64, 1);
+  }
+  function win(wx, wy, ww, wh){
+    x.fillStyle = "rgba(242,238,230,.96)";     /* white frame and cill */
+    x.fillRect(wx-2, wy-2, ww+4, wh+4);
+    var g = x.createLinearGradient(0, wy, 0, wy+wh);
+    g.addColorStop(0, "rgba(44,54,66,.90)");
+    g.addColorStop(1, "rgba(92,106,120,.70)");
+    x.fillStyle = g; x.fillRect(wx, wy, ww, wh);
+    x.fillStyle = "rgba(242,238,230,.85)";
+    x.fillRect(wx + ww/2 - 1, wy, 2, wh);      /* mullion */
+    x.fillRect(wx, wy + Math.round(wh*0.34), ww, 1.5);
+  }
+  win(9, 11, 16, 17);
+  win(40, 11, 16, 17);
+  x.fillStyle = "rgba(0,0,0,.06)"; x.fillRect(0, 34, 64, 2);
+  win(9, 42, 16, 15);
+  win(40, 42, 16, 15);
+  return wallTex(c, 4, 3.2);
+}
+/* Profiled steel: vertical ribs, a high clerestory strip, and no glazing
+   anywhere a person would stand. */
+function shedTexture(){
+  var c = document.createElement("canvas");
+  c.width = 64; c.height = 64;
+  var x = c.getContext("2d"), i;
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 64, 64);
+  for(i=0;i<64;i+=4){                          /* the ribs */
+    x.fillStyle = "rgba(0,0,0,.07)";       x.fillRect(i, 0, 1, 64);
+    x.fillStyle = "rgba(255,255,255,.10)"; x.fillRect(i+2, 0, 1, 64);
+  }
+  x.fillStyle = "rgba(150,168,178,.55)"; x.fillRect(0, 4, 64, 7);   /* clerestory */
+  x.fillStyle = "rgba(0,0,0,.10)";       x.fillRect(0, 11, 64, 1);
+  x.fillStyle = "rgba(0,0,0,.07)";       x.fillRect(0, 52, 64, 3);  /* base rail */
+  return wallTex(c, 6, 4.2);                   /* sheds are built to a bigger grid */
 }
 
 var ROOF_MAT = {
@@ -1619,7 +2160,7 @@ function updateTraffic(dt){
 }
 
 /* ---- mesh construction for one fetched chunk ---- */
-var matBuild, matRoof, matFlat, matTree, matVeg;
+var matBuild, matHouse, matShed, matRoof, matFlat, matTree, matVeg;
 function inSkip(x, z, cell){
   return cell.skipHalf > 0 && Math.abs(x) < cell.skipHalf && Math.abs(z) < cell.skipHalf;
 }
@@ -1699,10 +2240,13 @@ function volumeOf(t, area, dist, seed){
   var v = {tier:"estimated"};
   var explicit = parseLen(t.height || t["building:height"]);
   var lv = parseFloat(t["building:levels"]);
+  var ai = parseFloat(t["ai:levels"]);
   if(!isNaN(explicit) && explicit > 1 && explicit < 900){ v.h = explicit; v.tier = "measured"; }
   else if(!isNaN(lv) && lv > 0 && lv < 200){
     var fh = (t.building === "office" || t.building === "commercial") ? 3.8 : LEVEL_H;
     v.h = lv*fh + 1.4; v.tier = "measured";
+  }else if(!isNaN(ai) && ai > 0 && ai < 200){
+    v.h = ai*LEVEL_H + 1.4; v.tier = "estimated";   /* inferred, not measured */
   }else{
     v.h = estimateHeight(t, area, dist, seed);
   }
@@ -1728,10 +2272,15 @@ var ROOF_ALIAS = {
   gabled:"gabled", hipped:"hipped", skillion:"skillion", "pitched":"gabled",
   "double_saltbox":"gabled", saltbox:"gabled", flat:"flat"
 };
-function roofPlan(t, pts, box, area, house, roofH){
+function roofPlan(t, pts, box, area, house, roofH, cls, seed){
   var s = ROOF_ALIAS[String(t["roof:shape"] || "").trim().toLowerCase()];
   var tagged = !!s;
   var boxy = box && box.area > 0 && area/box.area > 0.72;   /* is it really a rectangle? */
+  if(!s && cls === "shed"){
+    /* A shed has a shallow pitch and no parapet. That is the whole silhouette
+       difference between a distribution centre and a block of flats. */
+    s = boxy ? "gabled" : "flat";
+  }
   if(!s){
     /* untagged: a long narrow footprint is a terrace or semi and wants a
        ridge, a squat one wants a hip, anything big and flat-roofed stays flat.
@@ -1746,9 +2295,14 @@ function roofPlan(t, pts, box, area, house, roofH){
   }
   if((s === "gabled" || s === "hipped" || s === "skillion") && !boxy) s = "pyramidal";
   if(isNaN(roofH)){
+    /* 30-42 degrees, which is what a British roof is; the old flat 0.95 of the
+       half-depth was steeper than anything outside a Swiss chalet */
+    var pitch = 0.60 + hash(seed || 1, 83)*0.26;
     if(s === "flat") roofH = 0;
+    else if(cls === "shed" && (s === "gabled" || s === "hipped"))
+      roofH = Math.min(3.2, (box ? box.hv : Math.sqrt(area)/2)*0.2);
     else if(s === "skillion") roofH = Math.min(3.5, box ? box.hv*0.6 : 2);
-    else if(s === "gabled" || s === "hipped") roofH = Math.min(6, (box ? box.hv : Math.sqrt(area)/2)*0.95);
+    else if(s === "gabled" || s === "hipped") roofH = Math.min(5.5, (box ? box.hv : Math.sqrt(area)/2)*pitch);
     else if(s === "cone") roofH = Math.min(30, Math.sqrt(area)*1.6);
     else if(s === "dome" || s === "onion") roofH = box ? box.hv*1.1 : Math.sqrt(area)*0.5;
     else roofH = Math.min(12, Math.sqrt(area)*0.55);        /* pyramidal */
@@ -1756,15 +2310,30 @@ function roofPlan(t, pts, box, area, house, roofH){
   }
   return {shape:s, h:Math.max(0, roofH)};
 }
-function roofColour(t, seed, shape){
+/* Clay pantile, concrete tile, Welsh slate — a British street is not one
+   colour of roof, and one colour of roof is what a street of them looked like. */
+var HOUSE_ROOF = [0x7b4c35, 0x6d4632, 0x63483b, 0x54504b, 0x474749, 0x5c574f, 0x6a5a4b];
+var SHED_ROOF  = [0x868e90, 0x79817f, 0x8f9694, 0x6f7877];
+function roofColour(t, seed, shape, cls){
   var c = osmColour(t["roof:colour"]) || matColour(ROOF_MAT, t["roof:material"]);
-  if(c) return c;
-  c = (shape === "flat" ? COL.roofFlat : COL.roofHouse).clone();
-  return c.offsetHSL(0, (hash(seed,41)-0.5)*0.1, (hash(seed,51)-0.5)*0.09);
+  if(c) return c;                              /* OSM said so: use it exactly */
+  /* A guessed material is a guess about the street, not about this roof, so it
+     keeps the variation a real street has. Without this a profile that says
+     "60% tile" paints every single roof the identical terracotta. */
+  c = matColour(ROOF_MAT, t["ai:roofmat"]);
+  /* skewed dark: a roof is weathered, and the bright end of an even spread
+     gave a village the odd bone-white roof that does not exist anywhere */
+  if(c) return c.offsetHSL((hash(seed,47)-0.5)*0.05,
+                           (hash(seed,41)-0.5)*0.26, (hash(seed,51)-0.64)*0.22);
+  if(cls === "house")     c = pick(HOUSE_ROOF, seed, 44);
+  else if(cls === "shed") c = pick(SHED_ROOF, seed, 46);
+  else c = (shape === "flat" ? COL.roofFlat : COL.roofHouse).clone();
+  return c.offsetHSL(0, (hash(seed,41)-0.5)*0.07, (hash(seed,51)-0.5)*0.07);
 }
 
 function addBuildings(list, parts, group, cell){
-  var walls = new Batch(true), roofs = new Batch();
+  var wallsH = new Batch(true), wallsB = new Batch(true), wallsS = new Batch(true);
+  var roofs = new Batch();
   var outlines = [], modelled = [], i, o, r;
 
   /* Per element, not per cell: a single unusable way must cost us that way
@@ -1822,6 +2391,7 @@ function addBuildings(list, parts, group, cell){
   }
   function raise(b){
     var seed = Math.round(b.pts[0].x*3.7 + b.pts[0].z*1.9);
+    if(AI.on && !b.part) aiDress(b.tags, seed, b.area);
     var v = volumeOf(b.tags, b.area, b.dist, seed);
     if(b.part) v.tier = "modelled";
     var h = Math.min(v.h, 400), minH = v.minH;
@@ -1829,13 +2399,14 @@ function addBuildings(list, parts, group, cell){
     tallest = Math.max(tallest, h);
 
     var house = isHouse(b.tags, b.area, h);
+    var cls = buildClass(b.tags, b.area, h, house);
     var box = b.pts.length < 60 ? orientedBox(b.pts, null) : null;
     if(b.tags["roof:direction"] !== undefined){
       var rd = parseFloat(b.tags["roof:direction"]);
       /* roof:direction is a compass bearing of the slope; the ridge runs across it */
       if(!isNaN(rd)) box = orientedBox(b.pts, (90 - rd)*Math.PI/180 + Math.PI/2);
     }
-    var plan = roofPlan(b.tags, b.pts, box, b.area, house, v.roofH);
+    var plan = roofPlan(b.tags, b.pts, box, b.area, house, v.roofH, cls, seed);
     var roofH = Math.min(plan.h, Math.max(0, h - minH - 1.2));
     var wallTop = h - roofH;
     if(wallTop < minH + 1.2) wallTop = minH + 1.2;
@@ -1850,18 +2421,33 @@ function addBuildings(list, parts, group, cell){
     try{ geo = new THREE.ExtrudeGeometry(shape, {depth:wallTop-minH, bevelEnabled:false, curveSegments:1}); }
     catch(err){ return; }
     geo.rotateX(-Math.PI/2);
-    var wc = osmColour(b.tags["building:colour"]) || matColour(WALL_MAT, b.tags["building:material"]) ||
-             wallColour(h, seed, house);
-    var rc = roofColour(b.tags, seed, plan.shape);
-    addExtrusion(geo, wc, rc, pad + minH, walls, roofs);
+    var wc = osmColour(b.tags["building:colour"]) || matColour(WALL_MAT, b.tags["building:material"]);
+    if(!wc){
+      wc = matColour(WALL_MAT, b.tags["ai:wallmat"]);
+      wc = wc ? wc.offsetHSL((hash(seed,53)-0.5)*0.05, (hash(seed,55)-0.5)*0.22,
+                             (hash(seed,57)-0.58)*0.19)
+              : wallColour(h, seed, cls);
+    }
+    var rc = roofColour(b.tags, seed, plan.shape, cls);
+    addExtrusion(geo, wc, rc, pad + minH,
+                 cls === "house" ? wallsH : (cls === "shed" ? wallsS : wallsB), roofs);
 
     var top = pad + wallTop;
     if(roofH > 0.4 && plan.shape !== "flat"){
-      if(plan.shape === "gabled" || plan.shape === "hipped") roofRidged(roofs, box, top, roofH, plan.shape === "hipped", rc);
-      else if(plan.shape === "skillion") roofSkillion(roofs, box, top, roofH, rc);
+      if(plan.shape === "gabled" || plan.shape === "hipped"){
+        /* Eaves. A British roof oversails its walls by about half a metre and
+           without that overhang a house is a box with a lid on it. */
+        var rbox = box;
+        if(box && cls === "house")
+          rbox = {cx:box.cx, cz:box.cz, ux:box.ux, uz:box.uz,
+                  hu:box.hu + 0.45, hv:box.hv + 0.45, area:box.area};
+        roofRidged(roofs, rbox, top, roofH, plan.shape === "hipped", rc);
+        if(cls === "house" && box && b.area > 42 && b.dist < 3200)
+          chimney(roofs, box, top, roofH, seed, wc);
+      }else if(plan.shape === "skillion") roofSkillion(roofs, box, top, roofH, rc);
       else if(plan.shape === "dome" || plan.shape === "onion") roofDome(roofs, b.pts, box, top, roofH, plan.shape === "onion", rc);
       else if(b.pts.length < 40) roofPyramid(roofs, b.pts, top, roofH, rc);   /* pyramidal, cone, spire */
-    }else if(plan.shape === "flat" && b.area > 260 && b.dist < 3500 && b.pts.length < 26){
+    }else if(plan.shape === "flat" && cls !== "shed" && b.area > 260 && b.dist < 3500 && b.pts.length < 26){
       /* A parapet is the difference between a roof and the top of a box. */
       var ph = 0.7 + Math.min(1.4, b.area/2600), pc = rc.clone().offsetHSL(0, 0, -0.06);
       for(var e2=0;e2<b.pts.length;e2++){
@@ -1879,7 +2465,9 @@ function addBuildings(list, parts, group, cell){
     if(!b.part && b.tags.name && b.area > 40 && isLandmark(b.tags))
       addLabel(b.tags.name, b.c.x, b.c.z, pad + h, labelScore(b.tags, b.area));
   }
-  if(walls.count()) group.add(walls.mesh(matBuild));
+  if(wallsH.count()) group.add(wallsH.mesh(matHouse));
+  if(wallsB.count()) group.add(wallsB.mesh(matBuild));
+  if(wallsS.count()) group.add(wallsS.mesh(matShed));
   if(roofs.count()) group.add(roofs.mesh(matRoof));
   cell.tallest = tallest;
 }
@@ -2477,6 +3065,9 @@ function initScene(){
   scene.add(new THREE.HemisphereLight(S.amb, 0x2f3a30, S.ai));
 
   matBuild = new THREE.MeshLambertMaterial({vertexColors:true, map:facadeTexture()});
+  matHouse = new THREE.MeshLambertMaterial({vertexColors:true, map:houseTexture()});
+  matShed  = new THREE.MeshLambertMaterial({vertexColors:true, map:shedTexture()});
+  matBuild.name = "block"; matHouse.name = "house"; matShed.name = "shed";
   matRoof  = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
   matTree  = new THREE.MeshLambertMaterial({vertexColors:true});
   /* Roads, water and parks lie on the same terrain as the imagery, so they
@@ -2584,8 +3175,11 @@ $("go").onclick = function(){
   LAT0 = chosen.lat; LON0 = chosen.lon;
   M0 = merc(LON0, LAT0); K = Math.cos(LAT0*Math.PI/180);
   Q = QUALITY[opt.quality]; treeBudget = Q.trees;
+  AI.on = !!(AI.p && $("aiuse").checked);
+  AI.applied = AI.dressed = 0;
   $("setup").style.display = "none"; $("load").classList.add("on");
-  $("here").textContent = chosen.name + " · " + (osgb(LAT0, LON0) || "outside the OS grid");
+  $("here").textContent = chosen.name + " · " + (osgb(LAT0, LON0) || "outside the OS grid") +
+                         (AI.on ? " · AI interpretation: " + AI.p.place : "");
   drawGridSvg();
   try{ initScene(); }
   catch(err){ report("Scene setup failed", err); status("failed — see diagnostics"); return; }
@@ -3137,6 +3731,9 @@ window.__sim = {
     return labels.map(function(s){ return {name:s.userData.name,
       x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });
   },
+  ai: function(){ return {on:AI.on, id:AI.p ? AI.p.id : null,
+                          applied:AI.applied, dressed:AI.dressed,
+                          profiles:AI_PROFILES.map(function(p){ return p.id; })}; },
   imagery: function(){
     return {layers: IMG_LAYERS.map(function(L){
               var want = 0, live = 0;
