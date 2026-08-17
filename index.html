@@ -1182,7 +1182,7 @@ function parseLen(v){
   var n = parseFloat(v.replace(/[^\d.\-]/g,""));
   return isNaN(n) ? NaN : n;
 }
-function estimateHeight(tags, area, dist, seed){
+function estimateHeight(tags, area, dist, seed, box){
   var h = parseLen(tags.height || tags["building:height"]);
   if(!isNaN(h) && h > 1 && h < 900) return h;
   var lv = parseFloat(tags["building:levels"]);
@@ -1195,9 +1195,26 @@ function estimateHeight(tags, area, dist, seed){
   if(tags.amenity && TYPE_H[tags.amenity] != null) return TYPE_H[tags.amenity];
   if(tags.shop) return 7.5 + hash(seed,3)*3;
   if(tags.office) return 20 + hash(seed,4)*14;
+  /* How DEEP it is beats how big it is. A terrace of eight houses has the
+     footprint area of a warehouse and the depth of a house, and Ordnance
+     Survey generalises exactly that way — it merges a whole row into one
+     block — so twenty thousand Surrey footprints came out as six-storey
+     slabs on the area curve alone. Nothing 9 m from front wall to back wall
+     is an office. In a city centre a thin block really can be six storeys,
+     so this defers to the density probe where the density says otherwise. */
+  if(box && box.hv > 0 && (DENSITY == null || DENSITY < 2500)){
+    var depth = 2*box.hv;
+    if(depth <= 12.5) return 6.8 + hash(seed,17)*1.9;          /* two storeys */
+    if(depth <= 17 && area < 700) return 8.2 + hash(seed,19)*2.4;
+  }
   /* untagged building=yes: read the urban form. British stock is low —
-     terraces and semis dominate, so the curve stays flat until footprints get big. */
-  var core = 1 - Math.min(1, dist/6000);
+     terraces and semis dominate, so the curve stays flat until footprints get big.
+     The "closer to the middle, the taller" boost was written for cities; in a
+     village the middle is the church and the Co-op, and it was turning 340 m²
+     village-hall footprints into six storeys. The density probe scales it: full
+     strength in a city centre, almost nothing in open country. */
+  var urban = DENSITY == null ? 0.45 : Math.max(0, Math.min(1, (DENSITY - 250)/2750));
+  var core = (1 - Math.min(1, dist/6000))*(0.10 + 0.90*urban);
   var base;
   if(area < 60)        base = 3.2 + core*1.2;          /* garages, outbuildings */
   else if(area < 130)  base = 6.4 + core*2.2;          /* semi / terrace */
@@ -1207,9 +1224,11 @@ function estimateHeight(tags, area, dist, seed){
   else                 base = 12 + core*30;            /* sheds, malls, stations */
   return base*(0.86 + hash(seed,11)*0.34);
 }
-function isHouse(tags, area, h){
+function isHouse(tags, area, h, depth){
   var t = tags.building || "";
   if(/^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|hut|cabin|shed|garage|garages|farm|farm_auxiliary|barn|stable|static_caravan)$/.test(t)) return true;
+  /* by area alone a merged terrace is indistinguishable from a warehouse */
+  if(depth && depth <= 12.5 && h < 11.5 && !tags.shop && !tags.office) return true;
   return area < 260 && h < 10.5 && !tags.shop && !tags.office && !tags.amenity;
 }
 
@@ -1423,11 +1442,15 @@ var COL = {
    into a block of flats, which is what every big shed in the world was. */
 var SHED_RE  = /^(industrial|warehouse|factory|manufacture|works|depot|distribution|storage|shed|hangar|barn|farm_auxiliary|greenhouse|silo|garage|garages|carport|service|construction)$/;
 var HOUSE_RE = /^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|cabin|hut|static_caravan|manor|mansion|farm|residential)$/;
-function buildClass(t, area, h, house){
+function buildClass(t, area, h, house, depth){
   var b = t.building || "";
   if(SHED_RE.test(b)) return "shed";
   if(t.landuse === "industrial" || t.industrial || t.craft) return "shed";
   if(HOUSE_RE.test(b)) return "house";
+  /* a 9 m deep block is a row of houses whatever its length — without this a
+     long enough terrace trips the "enormous and low" test below and gets
+     corrugated steel */
+  if(depth && depth <= 12.5 && h < 12) return "house";
   /* Untagged, enormous, and low: a distribution shed, not a tower of flats.
      Nothing three storeys high covers a third of a hectare and has people
      living in it. */
@@ -2413,7 +2436,7 @@ function pointInPoly(p, pts){
    Roof shape follows the same idea: tagged shape if there is one, else the
    shape the footprint's proportions imply. */
 var LEVEL_H = 2.95;
-function volumeOf(t, area, dist, seed){
+function volumeOf(t, area, dist, seed, box){
   var v = {tier:"estimated"};
   var explicit = parseLen(t.height || t["building:height"]);
   var lv = parseFloat(t["building:levels"]);
@@ -2425,7 +2448,7 @@ function volumeOf(t, area, dist, seed){
   }else if(!isNaN(ai) && ai > 0 && ai < 200){
     v.h = ai*LEVEL_H + 1.4; v.tier = "estimated";   /* inferred, not measured */
   }else{
-    v.h = estimateHeight(t, area, dist, seed);
+    v.h = estimateHeight(t, area, dist, seed, box);
   }
   v.minH = parseLen(t.min_height);
   if(isNaN(v.minH)){
@@ -2570,15 +2593,18 @@ function addBuildings(list, parts, group, cell){
   function raise(b){
     var seed = Math.round(b.pts[0].x*3.7 + b.pts[0].z*1.9);
     if(AI.on && !b.part) aiDress(b.tags, seed, b.area);
-    var v = volumeOf(b.tags, b.area, b.dist, seed);
+    /* the box comes first now: how deep a building is decides how tall to
+       guess it, so it cannot wait until after the guess */
+    var box = b.pts.length < 60 ? orientedBox(b.pts, null) : null;
+    var depth = box ? 2*box.hv : 0;
+    var v = volumeOf(b.tags, b.area, b.dist, seed, box);
     if(b.part) v.tier = "modelled";
     var h = Math.min(v.h, 400), minH = v.minH;
     if(!(h > minH)) h = minH + 3;
     tallest = Math.max(tallest, h);
 
-    var house = isHouse(b.tags, b.area, h);
-    var cls = buildClass(b.tags, b.area, h, house);
-    var box = b.pts.length < 60 ? orientedBox(b.pts, null) : null;
+    var house = isHouse(b.tags, b.area, h, depth);
+    var cls = buildClass(b.tags, b.area, h, house, depth);
     if(b.tags["roof:direction"] !== undefined){
       var rd = parseFloat(b.tags["roof:direction"]);
       /* roof:direction is a compass bearing of the slope; the ridge runs across it */
