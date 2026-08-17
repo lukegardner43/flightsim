@@ -303,8 +303,13 @@ function reportText(){
       " of " + AI.applied + " footprints OSM left undescribed"
     : (AI.p ? "profile " + AI.p.id + " available, not used" : "no profile for this place")));
   L.push("pack     " + (PACK.p
-    ? PACK.p.id + " (" + PACK.p.name + ") " + PACK.state +
-      (packMerged ? " - drew " + PACK.drawn + ", skipped " + PACK.dup + " already in OSM" : "")
+    ? PACK.p.id + " (" + PACK.p.name + ") " + PACK.state + ", " +
+      (PACK.data ? PACK.data.buildings.length + " footprints in the file" : "file not loaded") +
+      (packMerged ? " - wanted " + PACK.wanted + ", drew " + PACK.drawn +
+                    ", skipped " + PACK.dup + " already in OSM, " +
+                    PACK.chunks + " batches ok" +
+                    (PACK.chunkFail ? ", " + PACK.chunkFail + " FAILED" : "")
+                  : " - not merged yet")
     : "none for this place"));
   L.push("terrain  " + (HF.ready ? "ok, ground " + Math.round(HF.elev0) + "m, relief " +
                                    Math.round(HF.max-HF.min) + "m" : "none"));
@@ -724,7 +729,7 @@ function hash(a,b){ var s = Math.sin(a*12.9898 + b*78.233)*43758.5453; return s 
 /* PACKS-START */
 var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20972}];
 /* PACKS-END */
-var PACK = {p:null, data:null, drawn:0, dup:0, state:"none"};
+var PACK = {p:null, data:null, drawn:0, dup:0, wanted:0, chunks:0, chunkFail:0, state:"none"};
 function packFor(lat, lon){
   for(var i=0;i<PACKS.length;i++){
     var b = PACKS[i].bbox;              /* [s, w, n, e] */
@@ -3663,8 +3668,9 @@ function anyLoaded(){ return statBuildings > 0 || statRoadM > 0; }
    then is "OSM has nothing here" a statement about the map rather than about
    which request happened to land first. */
 var packMerged = false;
+var PACK_CHUNK = 1200;
 function mergePack(){
-  if(packMerged || !PACK.data) return;
+  if(packMerged || !PACK.data) return Promise.resolve();
   packMerged = true;
   var d = PACK.data, els = [], i, j;
   var q = d.q || 1e6;
@@ -3685,21 +3691,43 @@ function mergePack(){
     els.push({type:"way", id:"pk" + i, tags:{building:"yes", "source":"OS OpenMap Local"},
               geometry:geom});
   }
-  if(els.length){
-    try{
-      var before = statBuildings;
-      buildCell({elements:els}, {inner:false, skipHalf:0, cap:els.length,
-                                 minArea:16, tallest:0});
-      PACK.drawn = statBuildings - before;
-    }catch(err){ report("Building pack", err); }
-  }
-  /* Streaming exists to fetch what the plan did not. The pack has just filled
-     the whole square with surveyed footprints, and a streamed OSM square could
-     only draw the same buildings again on top of them. */
-  if(PACK.drawn > 0) STREAM.fails = 99;
-  tally();
-  flash("Local building pack", PACK.drawn.toLocaleString() + " footprints added from " +
-        (PACK.p ? PACK.p.name : "pack"));
+  PACK.wanted = els.length;
+  /* In chunks, and not all in the same tick. Twenty thousand footprints in one
+     batch is a thirty-megabyte buffer built in a single synchronous block:
+     enough to stall a phone for seconds, enough to fail outright on a tired
+     one — and because the whole merge sat in one try/catch, one failure threw
+     away every building in the pack rather than twelve hundred of them. */
+  return new Promise(function(done){
+    var at = 0;
+    function step(){
+      if(at >= els.length){
+        if(PACK.drawn > 0) STREAM.fails = 99;
+        tally();
+        flash("Local building pack", PACK.drawn.toLocaleString() + " footprints added from " +
+              (PACK.p ? PACK.p.name : "pack") +
+              (PACK.chunkFail ? " (" + PACK.chunkFail + " batches failed)" : ""));
+        done();
+        return;
+      }
+      var slice = els.slice(at, at + PACK_CHUNK);
+      at += PACK_CHUNK;
+      try{
+        var before = statBuildings;
+        buildCell({elements:slice}, {inner:false, skipHalf:0, cap:slice.length,
+                                     minArea:16, tallest:0});
+        PACK.drawn += statBuildings - before;
+        PACK.chunks++;
+      }catch(err){
+        PACK.chunkFail++;
+        if(PACK.chunkFail === 1) report("Building pack", err);   /* once is enough */
+      }
+      if(!running) status("adding surveyed buildings … " +
+                          Math.round(100*Math.min(at, els.length)/els.length) + "%");
+      tally();
+      setTimeout(step, 0);            /* let the phone draw a frame in between */
+    }
+    step();
+  });
 }
 /* Read the request log and say what actually went wrong, in the one sentence
    that tells you what to do about it. */
@@ -4067,7 +4095,10 @@ window.__sim = {
       x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });
   },
   pack: function(){ return {state:PACK.state, id:PACK.p ? PACK.p.id : null,
-                            drawn:PACK.drawn, dup:PACK.dup, merged:packMerged}; },
+                            inFile:PACK.data ? PACK.data.buildings.length : 0,
+                            wanted:PACK.wanted, drawn:PACK.drawn, dup:PACK.dup,
+                            chunks:PACK.chunks, chunkFail:PACK.chunkFail,
+                            merged:packMerged}; },
   ai: function(){ return {on:AI.on, id:AI.p ? AI.p.id : null,
                           applied:AI.applied, dressed:AI.dressed,
                           profiles:AI_PROFILES.map(function(p){ return p.id; })}; },
