@@ -311,6 +311,10 @@ function reportText(){
                     (PACK.chunkFail ? ", " + PACK.chunkFail + " FAILED" : "")
                   : " - not merged yet")
     : "none for this place"));
+  L.push("models   " + (MODELS.length
+    ? MODELS.length + " landmark models loaded, " + MODEL_HITS.length + " matched a mapped building" +
+      (MODEL_HITS.length ? ": " + MODEL_HITS.slice(0, 12).join(", ") : "")
+    : "none"));
   L.push("terrain  " + (HF.ready ? "ok, ground " + Math.round(HF.elev0) + "m, relief " +
                                    Math.round(HF.max-HF.min) + "m" : "none"));
   L.push("cells    core=" + coverage.a + " mid=" + coverage.m.join("") + " outer=" + coverage.b.join("") +
@@ -726,6 +730,101 @@ function hash(a,b){ var s = Math.sin(a*12.9898 + b*78.233)*43758.5453; return s 
    this file. They load through a <script> tag because a page opened from
    disk may not fetch() its neighbours but may still load scripts. Only the
    small manifest below is embedded. */
+/* ------------------------------------------------------------------
+   LANDMARK MODELS
+
+   A named landmark drawn from its footprint alone is a box with a roof on
+   it. These add the vertical structure the map does not carry — a church's
+   tower and spire, a country house's wings and pediment — as ordinary
+   building:parts, so they go through exactly the same renderer as the 3D
+   models OSM contributors build by hand, and count in the same "modelled"
+   tier.
+
+   The hard rule: a model ATTACHES to a building OpenStreetMap has actually
+   mapped, matched by name near a given point. It never places anything on
+   its own. If the footprint is missing, or the name does not match, nothing
+   is drawn — so a model can be wrong about what a building looks like, but
+   it can never invent a building that is not there.
+
+   Parts are positioned in fractions of the real footprint's own oriented
+   box, not in absolute metres, so a spire specified at the west end of the
+   nave lands at the west end of whatever nave OSM actually holds.
+
+   Written by a language model from knowledge, not survey. Each carries its
+   own confidence. See models/README.md.
+   ------------------------------------------------------------------ */
+/* MODELS-START */
+var MODELS = [], MODEL_FILES = ["kt23-3hp.js"];
+/* MODELS-END */
+var MODEL_HITS = [], modelSeen = {};
+window.TF_MODELS = function(d){
+  if(d && d.models) MODELS = MODELS.concat(d.models);
+};
+function modelFor(t, e){
+  if(!MODELS.length || !t.name || !e.geometry || !e.geometry[0]) return null;
+  var n = String(t.name).toLowerCase(), i, j;
+  for(i=0;i<MODELS.length;i++){
+    var m = MODELS[i], hit = false;
+    for(j=0;j<(m.match||[]).length;j++)
+      if(n.indexOf(String(m.match[j]).toLowerCase()) >= 0){ hit = true; break; }
+    if(!hit) continue;
+    if(m.near){                                  /* right name, right place */
+      var g = e.geometry[0];
+      var w = toWorld(g.lon, g.lat), c = toWorld(m.near[1], m.near[0]);
+      var r = m.radius || 500;
+      if((w.x-c.x)*(w.x-c.x) + (w.z-c.z)*(w.z-c.z) > r*r) continue;
+    }
+    return m;
+  }
+  return null;
+}
+function modelParts(e, m){
+  var rings = ringsOf(e), outer = null, i;
+  for(i=0;i<rings.length;i++)
+    if(rings[i].role === "outer" && rings[i].pts.length > 2){ outer = rings[i].pts; break; }
+  if(!outer) return [];
+  var box = orientedBox(outer, null);
+  if(!box) return [];
+  var out = [];
+  for(i=0;i<(m.parts||[]).length;i++){
+    var p = m.parts[i], geom;
+    if(p.on === "footprint"){
+      geom = e.geometry;
+    }else{
+      /* placed in fractions of the footprint's own half-extents, so it scales
+         and rotates with the building actually on the map */
+      var cu = (p.at ? p.at[0] : 0)*box.hu, cv = (p.at ? p.at[1] : 0)*box.hv;
+      var cx = box.cx + cu*box.ux - cv*box.uz;
+      var cz = box.cz + cu*box.uz + cv*box.ux;
+      var rot = (p.rot || 0)*Math.PI/180;
+      var ax = Math.cos(rot)*box.ux - Math.sin(rot)*box.uz;
+      var az = Math.cos(rot)*box.uz + Math.sin(rot)*box.ux;
+      var hw = (p.w || 6)/2, hd = (p.d || 6)/2;
+      var cs = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]], k;
+      geom = [];
+      for(k=0;k<4;k++){
+        var wx = cx + cs[k][0]*ax - cs[k][1]*az;
+        var wz = cz + cs[k][0]*az + cs[k][1]*ax;
+        var ll = worldToLatLon(wx, wz);
+        geom.push({lat:ll.lat, lon:ll.lon});
+      }
+      geom.push(geom[0]);
+    }
+    if(!geom || geom.length < 4) continue;
+    var tg = {"building:part":"yes"};
+    if(p.type) tg.building = p.type;             /* drives material and roof defaults */
+    if(p.height != null)     tg.height = String(p.height);
+    if(p.minHeight != null)  tg.min_height = String(p.minHeight);
+    if(p.roof)               tg["roof:shape"] = p.roof;
+    if(p.roofHeight != null) tg["roof:height"] = String(p.roofHeight);
+    if(p.material)           tg["building:material"] = p.material;
+    if(p.roofMaterial)       tg["roof:material"] = p.roofMaterial;
+    if(p.colour)             tg["building:colour"] = p.colour;
+    out.push({type:"way", id:"md" + m.id + "_" + i, tags:tg, geometry:geom});
+  }
+  return out;
+}
+
 /* PACKS-START */
 var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20972}];
 /* PACKS-END */
@@ -738,6 +837,15 @@ function packFor(lat, lon){
   return null;
 }
 window.TF_PACK = function(d){ PACK.data = d; PACK.state = "loaded"; };
+function loadModels(){
+  if(!MODEL_FILES.length) return;
+  for(var i=0;i<MODEL_FILES.length;i++){
+    var el = document.createElement("script");
+    el.src = "models/" + MODEL_FILES[i];
+    el.onerror = (function(f){ return function(){ report("Landmark models", new Error(f + " not found")); }; })(MODEL_FILES[i]);
+    document.head.appendChild(el);
+  }
+}
 function loadPack(p){
   PACK.p = p; PACK.state = "loading";
   var el = document.createElement("script");
@@ -1456,11 +1564,16 @@ var COL = {
    into a block of flats, which is what every big shed in the world was. */
 var SHED_RE  = /^(industrial|warehouse|factory|manufacture|works|depot|distribution|storage|shed|hangar|barn|farm_auxiliary|greenhouse|silo|garage|garages|carport|service|construction)$/;
 var HOUSE_RE = /^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|cabin|hut|static_caravan|manor|mansion|farm|residential)$/;
+var MASONRY  = /^(church|chapel|cathedral|abbey|monastery|castle|palace|windmill|watermill|hist_tower|ruins|monument|barn|stable|pub|museum)$/;
 function buildClass(t, area, h, house, depth){
   var b = t.building || "";
   if(SHED_RE.test(b)) return "shed";
   if(t.landuse === "industrial" || t.industrial || t.craft) return "shed";
   if(HOUSE_RE.test(b)) return "house";
+  /* Masonry, not curtain wall. A church tower, a castle keep and a country
+     house were all getting the office facade — two bays of tinted glazing per
+     four metres — because "not a house and not a shed" meant "office block". */
+  if(MASONRY.test(b)) return "house";
   /* a 9 m deep block is a row of houses whatever its length — without this a
      long enough terrace trips the "enormous and low" test below and gets
      corrugated steel */
@@ -2389,7 +2502,23 @@ function buildCell(data, cell){
     var cls = classify(t);
     if(cls) t.building = cls;                   /* idempotent: classify bows out after */
     if(t["building:part"]) pt.push(e);          /* a modelled volume wins over its outline */
-    else if(isStructure(t)) bl.push(e);
+    else if(isStructure(t)){
+      /* A named landmark we have a model for is replaced by its parts. The
+         outline still goes in: the parts land inside it and the existing
+         "an outline with modelled parts in it is dropped" rule removes it. */
+      var md = modelFor(t, e);
+      if(md){
+        try{
+          var mp = modelParts(e, md);
+          for(var mi=0;mi<mp.length;mi++) pt.push(mp[mi]);
+          if(mp.length){
+            t["ai:modelled"] = "1";             /* so it keeps its label */
+            if(!modelSeen[md.id]){ modelSeen[md.id] = 1; MODEL_HITS.push(md.name); }
+          }
+        }catch(err){ statSkipped++; }
+      }
+      bl.push(e);
+    }
     else if(t.railway){ if(t.tunnel !== "yes") ra.push(e); }
     else if(t.highway) rd.push(e);
     else if(t.waterway && t.waterway !== "riverbank"){ if(t.tunnel !== "yes") wa.push(e); }
@@ -2832,6 +2961,12 @@ function labelScore(t, area){
   if(/National Trust|English Heritage/i.test(t.operator || "")) s += 6000;
   if(t.man_made) s += 2500;
   if(t.wikidata) s += 1500;
+  /* A parish church is what you navigate by, and by footprint alone it loses
+     its name to any big anonymous barn in the parish. Anything we hold a model
+     for is a landmark by definition and keeps its label. */
+  if(t["ai:modelled"]) s += 12000;
+  if(/^(church|chapel|cathedral|abbey|castle|windmill|lighthouse|hist_tower)$/.test(t.building || ""))
+    s += 3000;
   return s;
 }
 function dropLabel(s){
@@ -3395,6 +3530,7 @@ $("go").onclick = function(){
   Q = QUALITY[opt.quality]; treeBudget = Q.trees;
   var pk = packFor(LAT0, LON0);
   if(pk){ loadPack(pk); armPackTimer(); }
+  loadModels();
   var ov = customOverpass();
   if(ov){
     if(OVERPASS.indexOf(ov) >= 0) OVERPASS.splice(OVERPASS.indexOf(ov), 1);
@@ -4120,6 +4256,8 @@ window.__sim = {
     return labels.map(function(s){ return {name:s.userData.name,
       x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });
   },
+  models: function(){ return {loaded:MODELS.length, matched:MODEL_HITS.slice(),
+                             names:MODELS.map(function(m){ return m.name; })}; },
   pack: function(){ return {state:PACK.state, id:PACK.p ? PACK.p.id : null,
                             inFile:PACK.data ? PACK.data.buildings.length : 0,
                             wanted:PACK.wanted, drawn:PACK.drawn, dup:PACK.dup,
