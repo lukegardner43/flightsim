@@ -1102,17 +1102,26 @@ function wpick(list, seed, salt){
   for(i=0;i<list.length;i++){ r -= list[i][1]; if(r <= 0) return list[i][0]; }
   return list[list.length-1][0];
 }
-function aiDress(t, seed, area){
+function aiDress(t, seed, area, depth){
   var p = AI.p;
   if(!p) return false;
   var b = t.building || "", cls, touched = false;
   if(b && b !== "yes"){
     cls = SHED_RE.test(b) ? "shed" : (HOUSE_RE.test(b) ? "house" : "block");
+  }else if(depth && depth <= 12.5){
+    /* Depth settles it before area gets a vote. Area alone called seven of
+       this village's terraces warehouses and would have dressed a couple of
+       hundred more as flats — the same mistake the height estimator used to
+       make, for the same reason: OS merges a row of houses into one long
+       footprint, and a long footprint is a big one. */
+    cls = "house";
   }else{
     /* Footprint size is the only evidence OSM has given us. Turning it into a
        building type is exactly the judgement the profile exists to supply. */
     cls = area > (p.shedArea || 900) ? "shed"
         : (area > 300 && hash(seed, 91) < (p.stock.block || 0) * 4) ? "block" : "house";
+  }
+  if(!b || b === "yes"){
     /* a 5,000 m2 footprint is not a garage: big sheds get their own list */
     var list = (cls === "shed" && area > 2000 && p.type.shed_large) ? p.type.shed_large : p.type[cls];
     var ty = wpick(list, seed, 92);
@@ -2592,11 +2601,11 @@ function addBuildings(list, parts, group, cell){
   }
   function raise(b){
     var seed = Math.round(b.pts[0].x*3.7 + b.pts[0].z*1.9);
-    if(AI.on && !b.part) aiDress(b.tags, seed, b.area);
-    /* the box comes first now: how deep a building is decides how tall to
-       guess it, so it cannot wait until after the guess */
+    /* the box comes first now: how deep a building is decides both what to
+       call it and how tall to guess it, so it cannot wait until afterwards */
     var box = b.pts.length < 60 ? orientedBox(b.pts, null) : null;
     var depth = box ? 2*box.hv : 0;
+    if(AI.on && !b.part) aiDress(b.tags, seed, b.area, depth);
     var v = volumeOf(b.tags, b.area, b.dist, seed, box);
     if(b.part) v.tier = "modelled";
     var h = Math.min(v.h, 400), minH = v.minH;
