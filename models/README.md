@@ -7,8 +7,19 @@ church becomes a shed; a country house becomes an office block. These files add
 the vertical structure the map does not carry — a tower, a spire, a wing, a
 pediment — so the things you navigate by look like themselves from the air.
 
-They are written by a language model from knowledge. Not survey, not
-photographs, not drawings. Each model records its own confidence, and
+The ten landmarks of `kt23-3hp.json` now follow an uploaded brief — *Landmark
+Building 3D Modelling Brief, KT23 3HP* — which carries a written architectural
+specification per building and, for six of them, an embedded reference
+photograph. Those photographs were read: the brief says the imagery governs
+where it and the text disagree, and it does disagree. Polesden Lacey's walls
+are ochre render, not brick, and its cupola is a square white lantern, not the
+tall octagon its listed-building entry describes. Thorncroft Manor is white
+stucco, not the red brick the brief's own text asks for. Both were modelled
+from the photograph.
+
+The four entries that came with no photograph, and every model outside that
+brief, are still written by a language model from knowledge or from
+listed-building descriptions. Each model records its own confidence, and
 `known_gaps` at the bottom of each file says what it does not attempt.
 
 ## The rule that makes this safe
@@ -89,3 +100,18 @@ Fly the place and look. `window.__sim.models()` in the console lists what was
 loaded and what matched. If a model does not appear, in order of likelihood:
 OSM has no footprint for it; OSM spells the name differently from `match`; or
 your `near` is further out than `radius`.
+
+## Heights are written to the eaves, stored to the ridge
+
+OpenStreetMap's `height` is the whole building including its roof, and the
+renderer clamps a roof to leave at least 1.2 m of wall under it. A part
+written as `height: 18.4, roofHeight: 9.6` therefore gets no roof at all —
+which is how St Nicolas' spire came to be missing. The authoring script adds
+the roof height on and checks the clearance; the JSON stores the total.
+
+## Small parts
+
+A chimney stack is about two metres square, and the collector rejects parts
+under 6 m² because that is what multipolygon slivers look like. Model parts
+carry `tf:part=model` and get a 0.8 m² floor instead, so a stack, a colonnade
+column or a stair turret survives while a degenerate ring still does not.

@@ -838,7 +838,7 @@ function modelParts(e, m){
       geom.push(geom[0]);
     }
     if(!geom || geom.length < 4) continue;
-    var tg = {"building:part":"yes"};
+    var tg = {"building:part":"yes", "tf:part":"model"};
     if(p.type) tg.building = p.type;             /* drives material and roof defaults */
     if(p.height != null)     tg.height = String(p.height);
     if(p.minHeight != null)  tg.min_height = String(p.minHeight);
@@ -846,6 +846,7 @@ function modelParts(e, m){
     if(p.roofHeight != null) tg["roof:height"] = String(p.roofHeight);
     if(p.material)           tg["building:material"] = p.material;
     if(p.roofMaterial)       tg["roof:material"] = p.roofMaterial;
+    if(p.roofColour)         tg["roof:colour"] = p.roofColour;
     if(p.colour)             tg["building:colour"] = p.colour;
     out.push({type:"way", id:"md" + m.id + "_" + i, tags:tg, geometry:geom});
   }
@@ -853,7 +854,7 @@ function modelParts(e, m){
 }
 
 /* PACKS-START */
-var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20972}];
+var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20630}];
 /* PACKS-END */
 var PACK = {p:null, data:null, drawn:0, dup:0, wanted:0, chunks:0, chunkFail:0, state:"none"};
 function packFor(lat, lon){
@@ -1591,7 +1592,10 @@ var COL = {
    into a block of flats, which is what every big shed in the world was. */
 var SHED_RE  = /^(industrial|warehouse|factory|manufacture|works|depot|distribution|storage|shed|hangar|barn|farm_auxiliary|greenhouse|silo|garage|garages|carport|service|construction)$/;
 var HOUSE_RE = /^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|cabin|hut|static_caravan|manor|mansion|farm|residential)$/;
-var MASONRY  = /^(church|chapel|cathedral|monastery|windmill|watermill|hist_tower|ruins|monument|barn|stable|pub)$/;
+var MASONRY  = /^(barn|stable|pub)$/;
+/* Flint and stone with tall narrow openings — a parish church, not a house
+   with a spire and not an office with a tower. */
+var ECCLES   = /^(church|chapel|cathedral|monastery|windmill|watermill|hist_tower|ruins|monument)$/;
 /* big, formal, and glazed with sashes rather than shopfronts or curtain wall */
 var GRAND    = /^(manor|mansion|palace|abbey|castle|civic|government|museum|hotel|university|college)$/;
 function buildClass(t, area, h, house, depth){
@@ -1604,7 +1608,9 @@ function buildClass(t, area, h, house, depth){
   if(HOUSE_RE.test(b)) return "house";
   /* Masonry, not curtain wall. A church tower and a windmill were getting the
      office facade — two bays of tinted glazing per four metres — because "not
-     a house and not a shed" meant "office block". */
+     a house and not a shed" meant "office block". A barn or a village pub is
+     domestic enough for the house texture; a church is not. */
+  if(ECCLES.test(b)) return "masonry";
   if(MASONRY.test(b)) return "house";
   /* a 9 m deep block is a row of houses whatever its length — without this a
      long enough terrace trips the "enormous and low" test below and gets
@@ -1624,6 +1630,9 @@ var SHED_WALL  = [0x8e9aa0, 0x9aa6a4, 0x7d8a90, 0xa9b1ae, 0x6f7d78,
                   0xb5b9b3, 0x7f8c84];
 /* stucco, ashlar, warm stone — what a big formal building is faced in */
 var GRAND_WALL = [0xd8d0bd, 0xcfc7b2, 0xc6bda6, 0xdad5c6, 0xc2b8a4];
+/* knapped flint in pale mortar, and the limestone it is dressed with — a
+   Surrey parish church is not made of the same stuff as the houses round it */
+var MASON_WALL = [0x8f9089, 0x969790, 0x87887f, 0x9d9c92, 0x8a8b84];
 function pick(list, seed, salt){
   return new THREE.Color(list[Math.floor(hash(seed, salt)*list.length) % list.length]);
 }
@@ -1632,6 +1641,7 @@ function wallColour(h, seed, cls){
   if(cls === "house")     c = pick(HOUSE_WALL, seed, 61);
   else if(cls === "shed") c = pick(SHED_WALL, seed, 63);
   else if(cls === "grand") c = pick(GRAND_WALL, seed, 65);
+  else if(cls === "masonry") c = pick(MASON_WALL, seed, 67);
   else c = COL.wallLo.clone().lerp(COL.wallHi, Math.min(1, h/70));
   c.offsetHSL((hash(seed,31)-0.5)*0.03, 0, (hash(seed,21)-0.5)*0.10);
   return c;
@@ -1812,6 +1822,35 @@ function footCovered(x, z){
   for(var i=0;i<list.length;i++){
     var b = list[i];
     if(x >= b[0]-1.5 && x <= b[2]+1.5 && z >= b[1]-1.5 && z <= b[3]+1.5) return true;
+  }
+  return false;
+}
+/* The centre test alone is not enough. Ordnance Survey draws a whole office
+   campus, or a terrace, as ONE polygon where OpenStreetMap has several; its
+   centre can then fall in the gap between them and the pack lays a single
+   flat slab straight over buildings the map already has — including modelled
+   landmarks. So also refuse a footprint that substantially overlaps one. */
+function footOverlap(bb){
+  var i0 = Math.floor(bb[0]/FOOT.cell), i1 = Math.floor(bb[2]/FOOT.cell);
+  var j0 = Math.floor(bb[1]/FOOT.cell), j1 = Math.floor(bb[3]/FOOT.cell);
+  var mine = (bb[2]-bb[0])*(bb[3]-bb[1]);
+  if(!(mine > 0)) return false;
+  var seen = {}, i, j, k, n, b, w, h, ov, theirs;
+  for(i=i0;i<=i1;i++) for(j=j0;j<=j1;j++){
+    var list = FOOT.map[i + "," + j];
+    if(!list) continue;
+    for(n=0;n<list.length;n++){
+      b = list[n];
+      k = b[0] + "," + b[1] + "," + b[2] + "," + b[3];
+      if(seen[k]) continue;
+      seen[k] = 1;
+      w = Math.min(bb[2], b[2]) - Math.max(bb[0], b[0]);
+      h = Math.min(bb[3], b[3]) - Math.max(bb[1], b[1]);
+      if(w <= 0 || h <= 0) continue;
+      ov = w*h;
+      theirs = (b[2]-b[0])*(b[3]-b[1]);
+      if(ov > 0.45*Math.min(mine, theirs)) return true;
+    }
   }
   return false;
 }
@@ -2403,6 +2442,49 @@ function sashTexture(){
   sash(40, 41, 18, 17);
   return wallTex(c, 10, 7.2);                       /* two bays, two storeys */
 }
+/* Knapped flint in pale mortar, with tall narrow pointed openings. A church
+   given the domestic texture reads as an office block with a spire on it,
+   which is what it looked like before this existed. */
+function masonTexture(){
+  var c = document.createElement("canvas");
+  c.width = 64; c.height = 64;
+  var x = c.getContext("2d"), i, j;
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 64, 64);
+  /* the flint itself: small dark nodules, irregular, in a pale bed */
+  for(i=0;i<430;i++){
+    var fx = hash(i, 11)*64, fy = hash(i, 23)*64;
+    var r = 0.7 + hash(i, 37)*1.1;
+    x.fillStyle = "rgba(0,0,0," + (0.10 + hash(i, 41)*0.22).toFixed(3) + ")";
+    x.beginPath(); x.arc(fx, fy, r, 0, 6.284); x.fill();
+    x.fillStyle = "rgba(255,255,255,.16)";
+    x.beginPath(); x.arc(fx - r*0.35, fy - r*0.35, r*0.5, 0, 6.284); x.fill();
+  }
+  /* squared limestone quoins up both edges */
+  for(j=0;j<8;j++){
+    x.fillStyle = "rgba(255,255,255,.30)";
+    x.fillRect(0, j*8 + (j%2)*2, 5, 6);
+    x.fillRect(59, j*8 + (j%2)*2, 5, 6);
+  }
+  /* a lancet: narrow, deeply reveiled, pointed */
+  function lancet(wx, wy, ww, wh){
+    x.fillStyle = "rgba(255,255,255,.42)";                  /* stone surround */
+    x.beginPath();
+    x.moveTo(wx-2, wy+wh+2); x.lineTo(wx-2, wy+ww*0.7);
+    x.quadraticCurveTo(wx+ww/2, wy-4, wx+ww+2, wy+ww*0.7);
+    x.lineTo(wx+ww+2, wy+wh+2); x.closePath(); x.fill();
+    x.fillStyle = "rgba(28,32,36,.80)";                     /* the glass, in shadow */
+    x.beginPath();
+    x.moveTo(wx, wy+wh); x.lineTo(wx, wy+ww*0.7);
+    x.quadraticCurveTo(wx+ww/2, wy-1, wx+ww, wy+ww*0.7);
+    x.lineTo(wx+ww, wy+wh); x.closePath(); x.fill();
+    x.fillStyle = "rgba(210,214,214,.45)";                  /* the one mullion */
+    x.fillRect(wx+ww/2-0.5, wy+ww*0.5, 1, wh-ww*0.5);
+  }
+  lancet(16, 26, 6, 22);
+  lancet(43, 26, 6, 22);
+  x.fillStyle = "rgba(0,0,0,.10)"; x.fillRect(0, 58, 64, 6);   /* plinth */
+  return wallTex(c, 8, 9);                                     /* one bay of a nave */
+}
 /* Profiled steel: vertical ribs, a high clerestory strip, and no glazing
    anywhere a person would stand. */
 function shedTexture(){
@@ -2422,7 +2504,9 @@ function shedTexture(){
 
 var ROOF_MAT = {
   tile:0x8a4a3a, tiles:0x8a4a3a, roof_tiles:0x8a4a3a, clay:0x9a5238,
-  slate:0x3c434c, metal:0x8d949c, copper:0x4e8f78, zinc:0x8a9099, lead:0x77797e,
+  slate:0x3c434c, slates:0x3c434c, metal:0x8d949c, copper:0x4e8f78, zinc:0x8a9099, lead:0x77797e,
+  /* Surrey churches: graduated stone slate on the aisles, shingle on a spire */
+  stone:0x8a8b83, stone_slate:0x8a8b83, shingle:0x4c4842, shingles:0x4c4842,
   tar_paper:0x33353a, asphalt:0x35383d, bitumen:0x33353a, concrete:0x8e8d88,
   glass:0x7fa3b5, thatch:0xb08d4e, wood:0x7a5c3c, eternit:0x8e8d88, gravel:0x8b8579
 };
@@ -2555,7 +2639,7 @@ function updateTraffic(dt){
 }
 
 /* ---- mesh construction for one fetched chunk ---- */
-var matBuild, matHouse, matShed, matGrand, matRoof, matFlat, matTree, matVeg;
+var matBuild, matHouse, matShed, matGrand, matMason, matRoof, matFlat, matTree, matVeg;
 function inSkip(x, z, cell){
   return cell.skipHalf > 0 && Math.abs(x) < cell.skipHalf && Math.abs(z) < cell.skipHalf;
 }
@@ -2745,7 +2829,7 @@ function roofColour(t, seed, shape, cls){
 
 function addBuildings(list, parts, group, cell){
   var wallsH = new Batch(true), wallsB = new Batch(true), wallsS = new Batch(true),
-      wallsG = new Batch(true);
+      wallsG = new Batch(true), wallsM = new Batch(true);
   var roofs = new Batch();
   var outlines = [], modelled = [], i, o, r;
 
@@ -2762,7 +2846,12 @@ function addBuildings(list, parts, group, cell){
     var inners = rings.filter(function(x){ return x.role === "inner" && x.pts.length > 2; });
     for(var k=0;k<outers.length;k++){
       var pts = outers[k].pts, area = Math.abs(signedArea(pts));
-      if(!isFinite(area) || area < (isPart ? 6 : 14)) continue;
+      /* 6 m2 rejects the slivers that fall out of real multipolygon data. A
+         landmark model's parts are authored rather than scraped, and a
+         chimney stack really is about two metres square, so they get a floor
+         that lets a chimney through and still stops a degenerate ring. */
+      var floor = isPart ? (t["tf:part"] === "model" ? 0.8 : 6) : 14;
+      if(!isFinite(area) || area < floor) continue;
       var c = centroid(pts), dist = Math.sqrt(c.x*c.x + c.z*c.z);
       if(!isFinite(c.x) || !isFinite(c.z)) continue;
       if(inSkip(c.x, c.z, cell)) continue;         /* already drawn at full detail */
@@ -2848,7 +2937,7 @@ function addBuildings(list, parts, group, cell){
     var rc = roofColour(b.tags, seed, plan.shape, cls);
     addExtrusion(geo, wc, rc, pad + minH,
                  cls === "house" ? wallsH : (cls === "shed" ? wallsS :
-                 (cls === "grand" ? wallsG : wallsB)), roofs);
+                 (cls === "grand" ? wallsG : (cls === "masonry" ? wallsM : wallsB))), roofs);
 
     var top = pad + wallTop;
     if(roofH > 0.4 && plan.shape !== "flat"){
@@ -2887,6 +2976,7 @@ function addBuildings(list, parts, group, cell){
   if(wallsB.count()) group.add(wallsB.mesh(matBuild));
   if(wallsS.count()) group.add(wallsS.mesh(matShed));
   if(wallsG.count()) group.add(wallsG.mesh(matGrand));
+  if(wallsM.count()) group.add(wallsM.mesh(matMason));
   if(roofs.count()) group.add(roofs.mesh(matRoof));
   cell.tallest = tallest;
 }
@@ -3493,14 +3583,17 @@ function initScene(){
   matHouse = new THREE.MeshLambertMaterial({vertexColors:true, map:houseTexture()});
   matShed  = new THREE.MeshLambertMaterial({vertexColors:true, map:shedTexture()});
   matGrand = new THREE.MeshLambertMaterial({vertexColors:true, map:sashTexture()});
+  matMason = new THREE.MeshLambertMaterial({vertexColors:true, map:masonTexture()});
   matBuild.name = "block"; matHouse.name = "house"; matShed.name = "shed";
-  matGrand.name = "grand";
+  matGrand.name = "grand"; matMason.name = "masonry";
   matRoof  = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
+  matRoof.name = "roof";
   matTree  = new THREE.MeshLambertMaterial({vertexColors:true});
   /* Roads, water and parks lie on the same terrain as the imagery, so they
      get a polygon offset and a later render order rather than a fixed lift. */
   matFlat  = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide,
     polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-8});
+  matFlat.name = "flatroof";
   /* Green areas tint the aerial photograph rather than replacing it: mostly
      transparent, faded out at the edges by the ramp, and no depth writing so
      two overlapping fields cannot fight. */
@@ -3922,7 +4015,14 @@ function mergePack(){
     var pts = ringToPts(geom);
     if(pts.length < 3) continue;
     var cc = centroid(pts);
-    if(footCovered(cc.x, cc.z)){ PACK.dup++; continue; }
+    var pbb = [Infinity, Infinity, -Infinity, -Infinity];
+    for(j=0;j<pts.length;j++){
+      if(pts[j].x < pbb[0]) pbb[0] = pts[j].x;
+      if(pts[j].z < pbb[1]) pbb[1] = pts[j].z;
+      if(pts[j].x > pbb[2]) pbb[2] = pts[j].x;
+      if(pts[j].z > pbb[3]) pbb[3] = pts[j].z;
+    }
+    if(footCovered(cc.x, cc.z) || footOverlap(pbb)){ PACK.dup++; continue; }
     els.push({type:"way", id:"pk" + i, tags:{building:"yes", "source":"OS OpenMap Local"},
               geometry:geom});
   }
@@ -4326,6 +4426,9 @@ window.__sim = {
   plane: function(){ return plane; },
   plan: function(){ return {density: DENSITY, dense: DENSE, halfA: HALF_A, halfM: HALF_M,
                             quality: opt.quality}; },
+  /* lat/lon -> the world metres the camera works in, so a test can point at
+     a named place without knowing the projection. */
+  world: function(lat, lon){ return toWorld(lon, lat); },
   landmarks: function(){
     return labels.map(function(s){ return {name:s.userData.name,
       x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });

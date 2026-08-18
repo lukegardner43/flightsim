@@ -148,7 +148,8 @@ const W = clon - RADIUS / mLon, E = clon + RADIUS / mLon;
 
 const Q = 1e6;
 const rings = [];
-let dropped = 0, converted = 0;
+let dropped = 0, converted = 0, duplicated = 0;
+const seenRing = new Set();
 
 function pushRing(coords) {
   /* outer ring only: the sim draws pack footprints as solid buildings and a
@@ -174,6 +175,12 @@ function pushRing(coords) {
     out.push(qa - plat, qo - plon);
     plat = qa; plon = qo;
   }
+  /* OS ships some buildings in BOTH the ordinary and the "important"
+     layer — schools, churches, civic buildings — and drawing the same
+     footprint twice gives its walls something to z-fight with. */
+  const key = out.join(',');
+  if (seenRing.has(key)) { duplicated++; return; }
+  seenRing.add(key);
   rings.push(out);
 }
 
@@ -195,7 +202,7 @@ const js = 'TF_PACK(' + JSON.stringify(pack) + ');\n';
 const outFile = path.join(__dirname, ID + '.js');
 fs.writeFileSync(outFile, js);
 console.log('kept:   ' + rings.length + ' footprints inside ' + (2 * RADIUS / 1000) + ' km square' +
-  '  (dropped ' + dropped + ' outside)');
+  '  (dropped ' + dropped + ' outside, ' + duplicated + ' duplicated between layers)');
 console.log('wrote:  ' + outFile + '  (' + Math.round(js.length / 1024) + ' KB)');
 
 /* ---- manifest inside index.html ---- */
