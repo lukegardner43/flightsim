@@ -13,13 +13,32 @@ repository, used to fill in the buildings OSM doesn't have.
 Everything happens on github.com. You don't need to install anything.
 
 1. Go to the **Actions** tab of this repository.
-2. Click **Build a building pack** in the left-hand list.
+2. Click **Build building packs** in the left-hand list.
 3. Click the **Run workflow** button on the right.
-4. Type a postcode — `KT23 3HP` — and click the green **Run workflow**.
+4. Type one or more postcodes — `KT23 3HP, DH1 3LE` — and click the green
+   **Run workflow**.
 
-Wait a few minutes. The job downloads the Ordnance Survey data, converts it,
-clips it to a 10 km square around that postcode, and commits the pack to this
-repository by itself.
+Wait a few minutes. The job works out which tiles those places need, downloads
+the Ordnance Survey data, converts it, and commits the packs by itself.
+
+## Tiles, not postcodes
+
+A pack covers one **10 km Ordnance Survey tile** — `TQ15`, `NZ24` — named the
+way a paper map names it, not one postcode. The sim's world is 10 km across,
+so flying anywhere needs at most four of them, and it loads exactly those.
+
+This matters because coverage accumulates. Two postcodes a mile apart want
+almost the same ground; per-postcode packs would store it twice and draw it
+twice. Per-tile packs share it, and building the second postcode costs only
+the tiles it actually adds — often none at all. The workflow says so when it
+happens and does nothing.
+
+Which tile a footprint belongs to is decided in British National Grid, on its
+first corner, so the tiles partition the country exactly. Nothing is stored
+twice and nothing falls down the gap where two of them meet.
+
+Older packs built around a postcode carry a bounding box instead of a tile id.
+The sim still reads them, so nothing has to be rebuilt.
 
 Then fly that postcode in the sim. The loading card will say
 `OS pack: KT23 3HP`, and the report will tell you exactly what it added:
@@ -85,6 +104,13 @@ resolution. A village 10 km square is roughly 300–800 KB; a market town 1–2 
 **Building one on your own machine instead** (only if you want to — the
 workflow above is the supported route): export the `building` layer of an
 OpenMap Local GeoPackage to GeoJSON, then
+
+```
+node packs/plan-tiles.js "KT23 3HP"            # which tiles are needed
+node packs/make-pack.js --in buildings.geojson --tiles TQ04,TQ05,TQ14,TQ15
+```
+
+The older single-square form still works:
 
 ```
 node packs/make-pack.js --in buildings.geojson --id kt23 \

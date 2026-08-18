@@ -302,9 +302,10 @@ function reportText(){
     ? "profile " + AI.p.id + " (" + AI.p.place + ") - dressed " + AI.dressed +
       " of " + AI.applied + " footprints OSM left undescribed"
     : (AI.p ? "profile " + AI.p.id + " available, not used" : "no profile for this place")));
-  L.push("pack     " + (PACK.p
-    ? PACK.p.id + " (" + PACK.p.name + ") " + PACK.state + ", " +
-      (PACK.data ? PACK.data.buildings.length + " footprints in the file" : "file not loaded") +
+  L.push("pack     " + (PACK.files.length
+    ? PACK.files.length + " tile" + (PACK.files.length > 1 ? "s" : "") + " (" + packName() + ") " +
+      packState() + ", " +
+      (packCount() ? packCount() + " footprints in the files" : "nothing loaded") +
       (packMerged ? " - wanted " + PACK.wanted + ", drew " + PACK.drawn +
                     ", skipped " + PACK.dup + " already in OSM, " +
                     PACK.chunks + " batches ok" +
@@ -696,8 +697,37 @@ function osgb(lat, lon){
   var l2 = (19-n100)*5%25 + e100%5;
   if(l1 > 7) l1++; if(l2 > 7) l2++;
   var letters = String.fromCharCode(l1+65) + String.fromCharCode(l2+65);
+  return {E:E, N:N, square:letters,
+          /* the 10 km tile, named the way a paper map names it: TQ15 */
+          tile: letters + Math.floor((E%100000)/10000) + Math.floor((N%100000)/10000)};
+}
+/* the HUD wants it as a grid reference */
+function gridRef(lat, lon){
+  var g = osgb(lat, lon);
+  if(!g) return null;
   function pad(v){ return ("0000" + Math.floor(v)).slice(-4); }
-  return letters + " " + pad((E%100000)/10) + " " + pad((N%100000)/10);
+  return g.square + " " + pad((g.E%100000)/10) + " " + pad((g.N%100000)/10);
+}
+/* Every 10 km tile a square of half-width `half` metres touches — up to four,
+   because the world is 10 km across and the tiles are 10 km. Packs are stored
+   per tile so two nearby places share their coverage instead of each carrying
+   an overlapping square of its own. */
+function tilesAround(lat, lon, half){
+  var g = osgb(lat, lon);
+  if(!g) return [];
+  var out = {}, list = [], i, j, ds = [-half, 0, half];
+  for(i=0;i<3;i++) for(j=0;j<3;j++){
+    var e = g.E + ds[i], n = g.N + ds[j];
+    var e100 = Math.floor(e/100000), n100 = Math.floor(n/100000);
+    if(e100 < 0 || e100 > 6 || n100 < 0 || n100 > 12) continue;
+    var a = (19-n100) - (19-n100)%5 + Math.floor((e100+10)/5);
+    var b = (19-n100)*5%25 + e100%5;
+    if(a > 7) a++; if(b > 7) b++;
+    var id = String.fromCharCode(a+65) + String.fromCharCode(b+65) +
+             Math.floor((e%100000)/10000) + Math.floor((n%100000)/10000);
+    if(!out[id]){ out[id] = 1; list.push(id); }
+  }
+  return list;
 }
 
 function hash(a,b){ var s = Math.sin(a*12.9898 + b*78.233)*43758.5453; return s - Math.floor(s); }
@@ -898,15 +928,71 @@ function modelParts(e, m){
 /* PACKS-START */
 var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20630}];
 /* PACKS-END */
-var PACK = {p:null, data:null, drawn:0, dup:0, wanted:0, chunks:0, chunkFail:0, state:"none"};
-function packFor(lat, lon){
-  for(var i=0;i<PACKS.length;i++){
-    var b = PACKS[i].bbox;              /* [s, w, n, e] */
-    if(lat >= b[0] && lat <= b[2] && lon >= b[1] && lon <= b[3]) return PACKS[i];
+/* Packs are stored per 10 km Ordnance Survey tile, so two nearby places share
+   their coverage instead of each carrying an overlapping square of its own.
+   The world is 10 km across and the tiles are 10 km, so up to four are needed
+   at once — which is why this holds a LIST rather than one pack. Older
+   postcode-centred packs carry a bbox instead of a tile id and are still
+   picked up by the point test below. */
+var PACK = {files:[], drawn:0, dup:0, wanted:0, chunks:0, chunkFail:0};
+function packsFor(lat, lon){
+  /* the sim builds a 10 km square, so look 5.2 km out in each direction */
+  var want = tilesAround(lat, lon, 5200), out = [], i, j;
+  for(i=0;i<PACKS.length;i++){
+    var p = PACKS[i], take = false;
+    if(p.tile){
+      for(j=0;j<want.length;j++) if(want[j] === p.tile){ take = true; break; }
+    }else if(p.bbox){
+      var b = p.bbox;                     /* [s, w, n, e] — the old shape */
+      take = lat >= b[0] && lat <= b[2] && lon >= b[1] && lon <= b[3];
+    }
+    if(take) out.push(p);
   }
-  return null;
+  return out;
 }
-window.TF_PACK = function(d){ PACK.data = d; PACK.state = "loaded"; };
+function packState(){
+  if(!PACK.files.length) return "none";
+  var loading = 0, loaded = 0, i;
+  for(i=0;i<PACK.files.length;i++){
+    if(PACK.files[i].state === "loading") loading++;
+    else if(PACK.files[i].state === "loaded") loaded++;
+  }
+  if(loading) return "loading";
+  return loaded ? "loaded" : "failed";
+}
+function packName(){
+  var names = [], i;
+  for(i=0;i<PACK.files.length;i++)
+    if(PACK.files[i].state === "loaded") names.push(PACK.files[i].p.name);
+  return names.length ? names.join(", ") : "pack";
+}
+function packCount(){
+  var n = 0, i;
+  for(i=0;i<PACK.files.length;i++)
+    if(PACK.files[i].data) n += PACK.files[i].data.buildings.length;
+  return n;
+}
+window.TF_PACK = function(d){
+  for(var i=0;i<PACK.files.length;i++){
+    var f = PACK.files[i];
+    if(f.p.id === d.id || f.p.tile === d.tile){ f.data = d; f.state = "loaded"; return; }
+  }
+  /* injected without a manifest entry — take it anyway rather than drop it */
+  PACK.files.push({p:{id:d.id, name:d.name || d.id, file:d.id + ".js", tile:d.tile}, data:d, state:"loaded"});
+};
+function loadPacks(list){
+  for(var i=0;i<list.length;i++) loadOnePack(list[i]);
+}
+function loadOnePack(p){
+  var f = {p:p, data:null, state:"loading"};
+  PACK.files.push(f);
+  var el = document.createElement("script");
+  el.src = "packs/" + p.file;
+  el.onerror = function(){ if(f.state === "loading") f.state = "failed"; };
+  document.head.appendChild(el);
+  /* a missing file on a slow host must not wedge the load */
+  setTimeout(function(){ if(f.state === "loading") f.state = "failed"; }, 20000);
+}
 function loadModels(){
   if(!MODEL_FILES.length) return;
   for(var i=0;i<MODEL_FILES.length;i++){
@@ -916,16 +1002,6 @@ function loadModels(){
     document.head.appendChild(el);
   }
 }
-function loadPack(p){
-  PACK.p = p; PACK.state = "loading";
-  var el = document.createElement("script");
-  el.src = "packs/" + p.file;
-  el.onerror = function(){ PACK.state = "failed"; };
-  document.head.appendChild(el);
-  /* a missing file on a slow host must not wedge the load */
-  setTimeout(function(){ if(PACK.state === "loading") PACK.state = "failed"; }, 20000);
-}
-
 /* AI-PROFILES-START */
 var AI_PROFILES = [
  {
@@ -3737,8 +3813,8 @@ $("go").onclick = function(){
   LAT0 = chosen.lat; LON0 = chosen.lon;
   M0 = merc(LON0, LAT0); K = Math.cos(LAT0*Math.PI/180);
   Q = QUALITY[opt.quality]; treeBudget = Q.trees;
-  var pk = packFor(LAT0, LON0);
-  if(pk){ loadPack(pk); armPackTimer(); }
+  var pk = packsFor(LAT0, LON0);
+  if(pk.length){ loadPacks(pk); armPackTimer(); }
   loadModels();
   var ov = customOverpass();
   if(ov){
@@ -3749,9 +3825,9 @@ $("go").onclick = function(){
   AI.on = !!(AI.p && $("aiuse").checked);
   AI.applied = AI.dressed = 0;
   $("setup").style.display = "none"; $("load").classList.add("on");
-  $("here").textContent = chosen.name + " · " + (osgb(LAT0, LON0) || "outside the OS grid") +
+  $("here").textContent = chosen.name + " · " + (gridRef(LAT0, LON0) || "outside the OS grid") +
                          (AI.on ? " · AI interpretation: " + AI.p.place : "") +
-                         (PACK.p ? " · OS pack: " + PACK.p.name : "");
+                         (PACK.files.length ? " · OS pack: " + packName() : "");
   drawGridSvg();
   try{ initScene(); }
   catch(err){ report("Scene setup failed", err); status("failed — see diagnostics"); return; }
@@ -4022,13 +4098,13 @@ var PACK_CHUNK = 1200;
    actually cover the same ground have settled, and unconditionally after a
    while whatever the servers are doing. */
 function packDue(){
-  if(packMerged || PACK.state !== "loaded") return false;
+  if(packMerged || packState() !== "loaded") return false;
   if(coverage.a === 0 || coverage.a === 1) return false;      /* core still coming */
   for(var i=0;i<4;i++) if(coverage.m[i] === 0 || coverage.m[i] === 1) return false;
   return true;
 }
 function tryPack(after){
-  if(packMerged || PACK.state !== "loaded") return;
+  if(packMerged || packState() !== "loaded") return;
   if(!after && !packDue()) return;
   whenGround(mergePack);
 }
@@ -4088,33 +4164,41 @@ function claimPackFootprints(els){
   }
 }
 function mergePack(){
-  if(packMerged || !PACK.data) return Promise.resolve();
+  if(packMerged || packState() !== "loaded") return Promise.resolve();
   packMerged = true;
-  var d = PACK.data, els = [], i, j;
-  var q = d.q || 1e6;
-  for(i=0;i<d.buildings.length;i++){
-    var r = d.buildings[i], lat = r[0]/q, lon = r[1]/q;
-    var geom = [{lat:lat, lon:lon}];
-    for(j=2;j<r.length;j+=2){
-      lat += r[j]/q; lon += r[j+1]/q;
-      geom.push({lat:lat, lon:lon});
+  var els = [], i, j, f;
+  /* Up to four tiles meet inside one 10 km world, so this walks all of them.
+     Tiles do not overlap — a footprint belongs to exactly one, decided in
+     British National Grid at build time — so there is nothing to deduplicate
+     between them. */
+  for(f=0;f<PACK.files.length;f++){
+    var d = PACK.files[f].data;
+    if(!d) continue;
+    var q = d.q || 1e6;
+    for(i=0;i<d.buildings.length;i++){
+      var r = d.buildings[i], lat = r[0]/q, lon = r[1]/q;
+      var geom = [{lat:lat, lon:lon}];
+      for(j=2;j<r.length;j+=2){
+        lat += r[j]/q; lon += r[j+1]/q;
+        geom.push({lat:lat, lon:lon});
+      }
+      var c = toWorld(geom[0].lon, geom[0].lat);
+      if(Math.abs(c.x) > LIMIT || Math.abs(c.z) > LIMIT) continue;
+      /* centre of the ring, cheaply */
+      var pts = ringToPts(geom);
+      if(pts.length < 3) continue;
+      var cc = centroid(pts);
+      var pbb = [Infinity, Infinity, -Infinity, -Infinity];
+      for(j=0;j<pts.length;j++){
+        if(pts[j].x < pbb[0]) pbb[0] = pts[j].x;
+        if(pts[j].z < pbb[1]) pbb[1] = pts[j].z;
+        if(pts[j].x > pbb[2]) pbb[2] = pts[j].x;
+        if(pts[j].z > pbb[3]) pbb[3] = pts[j].z;
+      }
+      if(footCovered(cc.x, cc.z) || footOverlap(pbb)){ PACK.dup++; continue; }
+      els.push({type:"way", id:"pk" + f + "_" + i, tags:{building:"yes", "source":"OS OpenMap Local"},
+                geometry:geom});
     }
-    var c = toWorld(geom[0].lon, geom[0].lat);
-    if(Math.abs(c.x) > LIMIT || Math.abs(c.z) > LIMIT) continue;
-    /* centre of the ring, cheaply */
-    var pts = ringToPts(geom);
-    if(pts.length < 3) continue;
-    var cc = centroid(pts);
-    var pbb = [Infinity, Infinity, -Infinity, -Infinity];
-    for(j=0;j<pts.length;j++){
-      if(pts[j].x < pbb[0]) pbb[0] = pts[j].x;
-      if(pts[j].z < pbb[1]) pbb[1] = pts[j].z;
-      if(pts[j].x > pbb[2]) pbb[2] = pts[j].x;
-      if(pts[j].z > pbb[3]) pbb[3] = pts[j].z;
-    }
-    if(footCovered(cc.x, cc.z) || footOverlap(pbb)){ PACK.dup++; continue; }
-    els.push({type:"way", id:"pk" + i, tags:{building:"yes", "source":"OS OpenMap Local"},
-              geometry:geom});
   }
   claimPackFootprints(els);
   PACK.wanted = els.length;
@@ -4130,7 +4214,7 @@ function mergePack(){
         if(PACK.drawn > 0) STREAM.fails = 99;
         tally();
         flash("Local building pack", PACK.drawn.toLocaleString() + " footprints added from " +
-              (PACK.p ? PACK.p.name : "pack") +
+              packName() +
               (PACK.chunkFail ? " (" + PACK.chunkFail + " batches failed)" : ""));
         done();
         return;
@@ -4184,14 +4268,14 @@ function dataVerdict(){
 function maybeFinish(){
   var pending = (coverage.a === 1 ? 1 : 0) + cq.length + cqActive;
   if(pending === 0){
-    if(PACK.state === "loading"){                 /* give the pack file a moment */
+    if(packState() === "loading"){               /* give the pack files a moment */
       setTimeout(maybeFinish, 400);
       return;
     }
     /* The merge is asynchronous (it waits for the terrain), and the verdict
        below must not be reached before it has run: a total Overpass outage
        with a good pack is a flyable world, not "No map data". */
-    if(PACK.state === "loaded" && !packMerged){
+    if(packState() === "loaded" && !packMerged){
       whenGround(mergePack).then(maybeFinish);
       return;
     }
@@ -4440,7 +4524,7 @@ function updateHud(dt){
   $("thrfill").style.height = (st.throttle*100)+"%";
   if(window.__thrFill) window.__thrFill.style.height = (st.throttle*100)+"%";
   var ll = worldToLatLon(plane.position.x, plane.position.z);
-  $("osgb").textContent = osgb(ll.lat, ll.lon) || ll.lat.toFixed(4)+", "+ll.lon.toFixed(4);
+  $("osgb").textContent = gridRef(ll.lat, ll.lon) || ll.lat.toFixed(4)+", "+ll.lon.toFixed(4);
   drawNav(h);
 }
 function drawNav(h){
@@ -4527,8 +4611,10 @@ window.__sim = {
   models: function(){ return {loaded:MODELS.length, matched:MODEL_HITS.slice(), missed:MODEL_MISS.slice(),
                              fromPack:MODEL_FROMPACK.slice(),
                              names:MODELS.map(function(m){ return m.name; })}; },
-  pack: function(){ return {state:PACK.state, id:PACK.p ? PACK.p.id : null,
-                            inFile:PACK.data ? PACK.data.buildings.length : 0,
+  pack: function(){ return {state:packState(),
+                            id:PACK.files.map(function(f){ return f.p.id; }).join(","),
+                            tiles:PACK.files.length,
+                            inFile:packCount(),
                             wanted:PACK.wanted, drawn:PACK.drawn, dup:PACK.dup,
                             chunks:PACK.chunks, chunkFail:PACK.chunkFail,
                             merged:packMerged}; },

@@ -1,14 +1,15 @@
-name: Build a building pack
+name: Build building packs
 
 # Fills OpenStreetMap's gaps with Ordnance Survey's surveyed building
-# footprints, for one area, entirely on GitHub. Nothing to install.
+# footprints, entirely on GitHub. Nothing to install.
 #
-#   Actions tab  ->  "Build a building pack"  ->  Run workflow
-#   ->  type a postcode  ->  Run workflow
+#   Actions tab  ->  "Build building packs"  ->  Run workflow
+#   ->  type one or more postcodes  ->  Run workflow
 #
-# It downloads OS OpenMap Local (free, Open Government Licence), converts it,
-# clips it to a 10 km square around the postcode, and commits the pack. When it
-# finishes, fly that postcode: the pack is picked up automatically.
+# Packs are stored per 10 km Ordnance Survey tile rather than per postcode, so
+# two nearby places share their coverage instead of each carrying an
+# overlapping square of its own — and building a second postcode down the road
+# often costs nothing at all, because its tiles are already here.
 #
 # Every input reaches the shell through the environment rather than being
 # pasted into the script, so a postcode containing shell characters is a
@@ -17,17 +18,17 @@ name: Build a building pack
 on:
   workflow_dispatch:
     inputs:
-      postcode:
-        description: 'Postcode to centre the pack on, e.g. KT23 3HP'
+      places:
+        description: 'Postcodes, comma separated, e.g. KT23 3HP, DH1 3LE'
         required: true
-      name:
-        description: 'Name to show in the sim (blank = use the postcode)'
-        required: false
-        default: ''
       radius:
-        description: 'Half-width in metres. 5200 covers the sim''s whole 10 km square.'
+        description: 'How far around each one to cover, in metres. 5200 is the sim''s whole square.'
         required: false
         default: '5200'
+      rebuild:
+        description: 'Rebuild tiles that are already in the repository'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -35,6 +36,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 350
     defaults:
       run:
         shell: bash
@@ -45,96 +47,58 @@ jobs:
         with:
           node-version: '20'
 
-      # --- where are we, and which OS grid square is that? ---
-      - name: Locate the postcode
-        id: loc
+      # --- which 10 km tiles do these places need, and which are new? ---
+      - name: Work out the tiles
+        id: plan
         env:
-          POSTCODE: ${{ inputs.postcode }}
-          PACK_NAME: ${{ inputs.name }}
-        run: |
-          set -euo pipefail
-          node packs/grid-square.js "$POSTCODE" > loc.txt
-          SQ=$(sed -n 1p loc.txt)
-          LAT=$(sed -n 2p loc.txt)
-          LON=$(sed -n 3p loc.txt)
-          ID=$(printf '%s' "$POSTCODE" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9')
-          NAME="$PACK_NAME"
-          if [ -z "$NAME" ]; then NAME="$POSTCODE"; fi
-          {
-            echo "square=$SQ"
-            echo "lat=$LAT"
-            echo "lon=$LON"
-            echo "id=$ID"
-            echo "name=$NAME"
-          } >> "$GITHUB_OUTPUT"
-          echo "::notice::$POSTCODE is at $LAT,$LON in OS grid square $SQ"
-
-      # --- fetch that grid square of OS OpenMap Local ---
-      # Open data: no account, no API key. The same script the coverage audit
-      # uses, so a change at Ordnance Survey is one fix, not two.
-      - name: Download OS OpenMap Local
-        env:
-          SQ: ${{ steps.loc.outputs.square }}
-        run: |
-          set -euo pipefail
-          packs/os-download.sh "$SQ" osdata
-
-      # --- OS data -> GeoJSON, in WGS84, clipped to the area we need ---
-      # GDAL runs here on GitHub's machine, not on yours.
-      - name: Convert and clip
-        id: conv
-        env:
-          LAT: ${{ steps.loc.outputs.lat }}
-          LON: ${{ steps.loc.outputs.lon }}
+          PLACES: ${{ inputs.places }}
           RADIUS: ${{ inputs.radius }}
-          SQ: ${{ steps.loc.outputs.square }}
+          REBUILD: ${{ inputs.rebuild }}
+        run: |
+          set -uo pipefail
+          HAVE=""
+          if [ "$REBUILD" != "true" ]; then
+            # a tile pack is named after its tile: packs/tq15.js
+            HAVE=$(ls packs/*.js 2>/dev/null \
+                   | sed -n 's#packs/\([a-z][a-z][0-9][0-9]\)\.js#\1#p' \
+                   | tr 'a-z' 'A-Z' | paste -sd, -)
+          fi
+          echo "already built: ${HAVE:-none}"
+          node packs/plan-tiles.js "$PLACES" --radius "$RADIUS" --have "$HAVE" > tiles.tsv
+          rc=$?
+          if [ "$rc" = "3" ]; then
+            echo "::notice::Every tile these places need is already in the repository. Nothing to do."
+            echo "nothing=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ "$rc" = "0" ] || exit "$rc"
+          cat tiles.tsv
+
+      - name: Install GDAL
+        if: steps.plan.outputs.nothing != '1'
         run: |
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq gdal-bin
-          read -r S W N E < <(node -e '
-            const lat = +process.env.LAT, lon = +process.env.LON, r = +process.env.RADIUS;
-            const mLat = 110540, mLon = 111320 * Math.cos(lat * Math.PI / 180);
-            console.log([lat - r/mLat, lon - r/mLon, lat + r/mLat, lon + r/mLon].join(" "));
-          ')
-          echo "clip to $S,$W .. $N,$E"
-          FILES=$(packs/os-clip.sh osdata out "$W" "$S" "$E" "$N")
-          echo "files=$FILES" >> "$GITHUB_OUTPUT"
-          node -e '
-            const fs = require("fs");
-            let total = 0;
-            for (const f of process.argv[1].split(",")) total += (JSON.parse(fs.readFileSync(f, "utf8")).features || []).length;
-            if (!total) { console.error("::error::the clip is empty - is the postcode really inside " +
-                                        process.env.SQ + "?"); process.exit(1); }
-          ' "$FILES"
 
-      - name: Build the pack
-        env:
-          ID: ${{ steps.loc.outputs.id }}
-          NAME: ${{ steps.loc.outputs.name }}
-          LAT: ${{ steps.loc.outputs.lat }}
-          LON: ${{ steps.loc.outputs.lon }}
-          RADIUS: ${{ inputs.radius }}
-          FILES: ${{ steps.conv.outputs.files }}
-        run: |
-          set -euo pipefail
-          node packs/make-pack.js --in "$FILES" \
-            --id "$ID" --name "$NAME" --centre "$LAT,$LON" --radius "$RADIUS"
-          ls -lh packs/
+      # --- one download per 100 km square, one clip, then split into tiles ---
+      - name: Build them
+        if: steps.plan.outputs.nothing != '1'
+        run: packs/build-tiles.sh tiles.tsv
 
-      - name: Commit it
+      - name: Commit them
+        if: steps.plan.outputs.nothing != '1'
         env:
-          POSTCODE: ${{ inputs.postcode }}
+          PLACES: ${{ inputs.places }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add packs/ index.html
           if git diff --cached --quiet; then
-            echo "::warning::nothing changed — that pack is already up to date"
-            exit 0
+            echo "::warning::nothing changed"; exit 0
           fi
-          git commit -m "Building pack for $POSTCODE from OS OpenMap Local" \
+          git commit -m "Building pack tiles for $PLACES from OS OpenMap Local" \
                      -m "Contains OS data (c) Crown copyright and database right. Open Government Licence v3. Built by .github/workflows/build-pack.yml."
           git push
-          echo "::notice::Pack committed. Fly $POSTCODE — the report's pack line says how much of it was used."
+          echo "::notice::Tiles committed. Fly any of those postcodes — the report's pack line says how much of each was used."
