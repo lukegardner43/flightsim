@@ -1,0 +1,120 @@
+[
+ {
+  "postcode": "G31 5EQ",
+  "lat": 55.851986,
+  "lon": -4.197042,
+  "square": "NS",
+  "district": "Glasgow City",
+  "region": "Scotland",
+  "country": "Scotland"
+ },
+ {
+  "postcode": "KY5 0UX",
+  "lat": 56.171473,
+  "lon": -3.227747,
+  "square": "NT",
+  "district": "Fife",
+  "region": "Scotland",
+  "country": "Scotland"
+ },
+ {
+  "postcode": "EH53 0RT",
+  "lat": 55.885337,
+  "lon": -3.493427,
+  "square": "NT",
+  "district": "West Lothian",
+  "region": "Scotland",
+  "country": "Scotland"
+ },
+ {
+  "postcode": "NG21 9HL",
+  "lat": 53.182135,
+  "lon": -1.122777,
+  "square": "SK",
+  "district": "Newark and Sherwood",
+  "region": "East Midlands",
+  "country": "England"
+ },
+ {
+  "postcode": "SA15 5EF",
+  "lat": 51.780355,
+  "lon": -4.17585,
+  "square": "SN",
+  "district": "Carmarthenshire",
+  "region": "Wales",
+  "country": "Wales"
+ },
+ {
+  "postcode": "PE34 4PP",
+  "lat": 52.739146,
+  "lon": 0.293953,
+  "square": "TF",
+  "district": "King's Lynn and West Norfolk",
+  "region": "East of England",
+  "country": "England"
+ },
+ {
+  "postcode": "NR11 8TZ",
+  "lat": 52.858101,
+  "lon": 1.330862,
+  "square": "TG",
+  "district": "North Norfolk",
+  "region": "East of England",
+  "country": "England"
+ },
+ {
+  "postcode": "E1 8JA",
+  "lat": 51.50965,
+  "lon": -0.067426,
+  "square": "TQ",
+  "district": "Tower Hamlets",
+  "region": "London",
+  "country": "England"
+ },
+ {
+  "postcode": "SS4 3RQ",
+  "lat": 51.601432,
+  "lon": 0.727057,
+  "square": "TQ",
+  "district": "Rochford",
+  "region": "East of England",
+  "country": "England"
+ },
+ {
+  "postcode": "RH11 8JY",
+  "lat": 51.106777,
+  "lon": -0.21947,
+  "square": "TQ",
+  "district": "Crawley",
+  "region": "South East",
+  "country": "England"
+ },
+ {
+  "postcode": "SE17 1HF",
+  "lat": 51.49302,
+  "lon": -0.08595,
+  "square": "TQ",
+  "district": "Southwark",
+  "region": "London",
+  "country": "England"
+ },
+ {
+  "postcode": "NW5 9ND",
+  "lat": 51.550839,
+  "lon": -0.146701,
+  "square": "TQ",
+  "district": "Camden",
+  "region": "London",
+  "country": "England"
+ },
+ {
+  "postcode": "KT23 3HP",
+  "lat": 51.28668,
+  "lon": -0.384959,
+  "square": "TQ",
+  "district": "Mole Valley",
+  "region": "South East",
+  "country": "England",
+  "reference": true
+ }
+]

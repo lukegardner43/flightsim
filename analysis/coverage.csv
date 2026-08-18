@@ -1,0 +1,9 @@
+postcode,district,region,grid_square,lat,lon,os_footprints,osm_footprints,os_area_m2,osm_area_m2,missing_footprints,missing_area_m2,missing_share,missing_area_share,missing_outbuilding,missing_housesized,missing_large,osm_only_footprints,chosen_not_drawn
+G31 5EQ,Glasgow City,Scotland,NS,55.851986,-4.197042,8938,13509,3728553,3479163,754,60193,0.084,0.016,451,284,19,785,
+KY5 0UX,Fife,Scotland,NT,56.171473,-3.227747,1187,2863,547392,721219,214,17271,0.18,0.032,135,72,7,1384,
+EH53 0RT,West Lothian,Scotland,NT,55.885337,-3.493427,8097,17923,2205049,2079571,400,23528,0.049,0.011,305,91,4,848,
+PE34 4PP,King's Lynn and West Norfolk,East of England,TF,52.739146,0.293953,2173,1943,358171,379102,415,31439,0.191,0.088,276,132,7,83,
+NR11 8TZ,North Norfolk,East of England,TG,52.858101,1.330862,1038,898,164236,138986,223,13106,0.215,0.08,150,72,1,45,
+SS4 3RQ,Rochford,East of England,TQ,51.601432,0.727057,4370,714,827527,155562,3874,634318,0.886,0.767,842,2794,238,20,
+SE17 1HF,Southwark,London,TQ,51.49302,-0.08595,9017,25175,8085095,7489246,568,45411,0.063,0.006,399,149,20,629,
+NW5 9ND,Camden,London,TQ,51.550839,-0.146701,10077,32108,6493654,5883439,826,55525,0.082,0.009,538,275,13,448,
