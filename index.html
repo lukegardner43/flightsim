@@ -846,6 +846,19 @@ function modelFor(t, e){
         continue;
       }
     }
+    /* ONE building per model. match is a substring test, so on a National
+       Trust estate where the house, the stables, the rose garden and the
+       cafe are all called Polesden Lacey something, every one of them that
+       got past the exclude list was being given a complete copy of the
+       house. The first is kept and the rest are refused, which is why the
+       radius wants to be tight enough that the first one is the right one. */
+    /* Cells overlap, so the SAME building comes round more than once. That is
+       not another building and must not be reported as one. */
+    var key = (e.type === "relation" ? "r" : "w") + e.id;
+    if(modelSeen[m.id] && modelSeen[m.id] !== key){
+      MODEL_MISS.push(t.name + ": " + m.id + " is already standing on another building");
+      continue;
+    }
     return m;
   }
   return null;
@@ -2460,7 +2473,8 @@ function buildCell(data, cell){
           for(var mi=0;mi<mp.length;mi++) pt.push(mp[mi]);
           if(mp.length){
             t["ai:modelled"] = "1";             /* so it keeps its label */
-            if(!modelSeen[md.id]){ modelSeen[md.id] = 1; MODEL_HITS.push(md.name); }
+            var mk = (e.type === "relation" ? "r" : "w") + e.id;
+            if(!modelSeen[md.id]){ modelSeen[md.id] = mk; MODEL_HITS.push(md.name); }
           }
         }catch(err){ statSkipped++; }
       }
@@ -3808,7 +3822,7 @@ function claimPackFootprints(els){
   var want = [], i, j;
   for(i=0;i<MODELS.length;i++){
     var m = MODELS[i];
-    if(modelSeen[m.id] || !m.near) continue;
+    if(modelSeen[m.id] || !m.near) continue;   /* already on a real building */
     var c = toWorld(m.near[1], m.near[0]);
     if(Math.abs(c.x) > LIMIT || Math.abs(c.z) > LIMIT) continue;
     /* The name match can afford a generous radius because the name is strong

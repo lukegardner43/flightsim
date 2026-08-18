@@ -466,9 +466,10 @@
    ],
    "near": [
     51.2647,
-    -0.3745
+    -0.37448
    ],
-   "radius": 1200,
+   "radius": 300,
+   "packRadius": 150,
    "orient": "compass",
    "replaceOutline": true,
    "confidence": "high — rebuilt from the uploaded brief and two reference photographs",

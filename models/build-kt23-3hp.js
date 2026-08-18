@@ -193,7 +193,12 @@ models.push({
        this the house lands on the stable block and the visitor centre too. */
     exclude:['stables','stable','folly','estate','cottage','farm','lodge',
              'garden','car park','shop','restaurant','visitor'],
-    near:[51.2647,-0.3745], radius:1200,
+    /* Verified against the Ordnance Survey pack rather than recalled: there
+       is a 2,007 m2 courtyard footprint, 52 by 68 metres with twelve
+       corners, at exactly this point, and nothing else like it within 800 m.
+       A wide radius was covering for not knowing that; it does not need to
+       any more, and a tight one is what keeps the model off the stables. */
+    near:[51.26470,-0.37448], radius:300, packRadius:150,
     orient:'compass', replaceOutline:true,
     confidence:'high — rebuilt from the uploaded brief and two reference photographs',
     sources:[
