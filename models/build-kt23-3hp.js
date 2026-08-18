@@ -193,18 +193,24 @@ models.push({
        this the house lands on the stable block and the visitor centre too. */
     exclude:['stables','stable','folly','estate','cottage','farm','lodge',
              'garden','car park','shop','restaurant','visitor'],
-    /* Verified against the Ordnance Survey pack rather than recalled: there
-       is a 2,007 m2 courtyard footprint, 52 by 68 metres with twelve
-       corners, at exactly this point, and nothing else like it within 800 m.
-       A wide radius was covering for not knowing that; it does not need to
-       any more, and a tight one is what keeps the model off the stables. */
-    near:[51.26470,-0.37448], radius:300, packRadius:150,
+    /* TQ 1358 5218. Fixed against two sources that agree, after twice being
+       placed 800 m north of the house on a recalled coordinate:
+         - the National Trust gives TQ 133524 for the car park, and the house
+           stands south-east of it;
+         - the Ordnance Survey pack holds a 2,078 m2 quadrangle, 59 by 59
+           metres with twelve corners, 360 m south-east of that car park, with
+           the stable courtyard 150-215 m north of it and nothing else over
+           1,100 m2 within 400 m.
+       What was here before, TQ 1350 5298, is 580 m NORTH of the car park —
+       the wrong side of it — and is Polesden Lacey Farm. */
+    near:[51.25752,-0.37367], radius:300, packRadius:150,
     orient:'compass', replaceOutline:true,
     confidence:'high — rebuilt from the uploaded brief and two reference photographs',
     sources:[
       'Uploaded brief, entry 4, with reference photograph "Polesden Lacey House by Dave Spicer, via Geograph/Wikimedia Commons, CC BY-SA 2.0" and a second oblique view of the same front.',
       'Brief: "large symmetrical central composition with projecting side wings and multiple interconnected volumes"; "warm honey-coloured/red-brown brick with extensive pale stone or rendered architectural detailing"; "Model the small square cupola/turret rising above the main roof, with windows, projecting cornice and dark domed roof"; "numerous brick chimney stacks, dormer windows".',
-      'Historic England list entry 1028665 (Grade II*): "in the form of a quadrangle around a large central courtyard"; "stucco on brick, slate roofs, and stuccoed chimneys"; "two storeys, with a prominent cornice carried round".'
+      'Historic England list entry 1028665 (Grade II*): "in the form of a quadrangle around a large central courtyard"; "stucco on brick, slate roofs, and stuccoed chimneys"; "two storeys, with a prominent cornice carried round".',
+      'Position: National Trust visitor information gives grid reference TQ 133524 for the car park (nationaltrust.org.uk/visit/surrey/polesden-lacey), and the OS OpenMap Local pack holds a 2,078 m2 twelve-cornered quadrangle 360 m south-east of it at TQ 1358 5218.'
     ],
     note:'The photographs overturn most of what I had built from the list entry. The walls are a strong ochre-yellow RENDER, not brick. The cupola is SQUARE and white with clock faces under a dark domed lead roof, not the tall octagon the listing describes — the listing and the photograph disagree and the photograph wins, as the brief instructs. The show front is long, flat and shallow-centred rather than deeply E-planned, it carries a run of dormers, about ten tall slim stuccoed stacks, and a giant-order colonnade along its eastern half. The quadrangle plan is kept from the listing because it is not visible in either photograph and is not contradicted by them.',
     parts:parts

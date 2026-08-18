@@ -465,8 +465,8 @@
     "visitor"
    ],
    "near": [
-    51.2647,
-    -0.37448
+    51.25752,
+    -0.37367
    ],
    "radius": 300,
    "packRadius": 150,
@@ -476,7 +476,8 @@
    "sources": [
     "Uploaded brief, entry 4, with reference photograph \"Polesden Lacey House by Dave Spicer, via Geograph/Wikimedia Commons, CC BY-SA 2.0\" and a second oblique view of the same front.",
     "Brief: \"large symmetrical central composition with projecting side wings and multiple interconnected volumes\"; \"warm honey-coloured/red-brown brick with extensive pale stone or rendered architectural detailing\"; \"Model the small square cupola/turret rising above the main roof, with windows, projecting cornice and dark domed roof\"; \"numerous brick chimney stacks, dormer windows\".",
-    "Historic England list entry 1028665 (Grade II*): \"in the form of a quadrangle around a large central courtyard\"; \"stucco on brick, slate roofs, and stuccoed chimneys\"; \"two storeys, with a prominent cornice carried round\"."
+    "Historic England list entry 1028665 (Grade II*): \"in the form of a quadrangle around a large central courtyard\"; \"stucco on brick, slate roofs, and stuccoed chimneys\"; \"two storeys, with a prominent cornice carried round\".",
+    "Position: National Trust visitor information gives grid reference TQ 133524 for the car park (nationaltrust.org.uk/visit/surrey/polesden-lacey), and the OS OpenMap Local pack holds a 2,078 m2 twelve-cornered quadrangle 360 m south-east of it at TQ 1358 5218."
    ],
    "note": "The photographs overturn most of what I had built from the list entry. The walls are a strong ochre-yellow RENDER, not brick. The cupola is SQUARE and white with clock faces under a dark domed lead roof, not the tall octagon the listing describes — the listing and the photograph disagree and the photograph wins, as the brief instructs. The show front is long, flat and shallow-centred rather than deeply E-planned, it carries a run of dormers, about ten tall slim stuccoed stacks, and a giant-order colonnade along its eastern half. The quadrangle plan is kept from the listing because it is not visible in either photograph and is not contradicted by them.",
    "parts": [
