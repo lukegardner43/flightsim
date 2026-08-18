@@ -670,5 +670,6 @@
     "A model only applies if OpenStreetMap has the building mapped AND named close to the way this file spells it. Where OSM has no footprint, nothing is drawn \u2014 deliberately, so a wrong guess can never put a building in an empty field.",
     "Coordinates are approximate. They exist only to stop 'St Mary's Church' matching the wrong St Mary's; the radius is generous for that reason.",
     "Polesden Lacey is modelled range by range because it is a courtyard house; the others are massing in two or three volumes. All of them are still proportion and silhouette, not architecture."
-  ]
+  ],
+  "sources_caveat": "The network proxy in the build environment blocks historicengland.org.uk, wikipedia.org and nationaltrust.org.uk directly, so the quotations recorded above came back through web search results quoting those pages rather than from reading the pages first-hand. They read as verbatim listing text and are consistent across sources, but they have not been checked against the primary entry. No photographs were used at any point: this tool reads text, not images."
 }
