@@ -1140,7 +1140,17 @@ function parseLen(v){
   var n = parseFloat(v.replace(/[^\d.\-]/g,""));
   return isNaN(n) ? NaN : n;
 }
+/* A fairground ride is not a building, whatever it is tagged as. The London
+   Eye is a 120 m circle carrying height=135; extruded like a building that is
+   a dark drum the size of a hill standing where a wheel should be. Only its
+   base is built — the boarding platform really is there — and it keeps its
+   name, so the map still tells you what you are looking at. Drawing the wheel
+   itself needs a part that stands on edge, which nothing here can express
+   yet. */
+var RIDE = /^(big_wheel|roller_coaster|water_slide|carousel|bumper_car|drop_tower|swing_carousel|pirate_ship|log_flume|maze|observation_tower)$/;
+function isRide(t){ return !!(t.attraction && RIDE.test(t.attraction)); }
 function estimateHeight(tags, area, dist, seed, box){
+  if(isRide(tags)) return 8.5 + hash(seed, 11)*4;
   var h = parseLen(tags.height || tags["building:height"]);
   if(!isNaN(h) && h > 1 && h < 900) return h;
   var lv = parseFloat(tags["building:levels"]);
@@ -2542,6 +2552,10 @@ function pointInPoly(p, pts){
 var LEVEL_H = 2.95;
 function volumeOf(t, area, dist, seed, box){
   var v = {tier:"estimated"};
+  /* Before the height tag is believed: a ride's height is the height of the
+     RIDE, not of anything solid, and taking it at face value builds a drum
+     the size of a hill. */
+  if(isRide(t)){ v.h = estimateHeight(t, area, dist, seed, box); v.minH = 0; v.roofH = 0; return v; }
   var explicit = parseLen(t.height || t["building:height"]);
   var lv = parseFloat(t["building:levels"]);
   var ai = parseFloat(t["ai:levels"]);
@@ -2577,6 +2591,7 @@ var ROOF_ALIAS = {
   "double_saltbox":"gabled", saltbox:"gabled", flat:"flat"
 };
 function roofPlan(t, pts, box, area, house, roofH, cls, seed){
+  if(isRide(t)) return {shape:"flat", h:0};     /* a platform, not a roof */
   var s = ROOF_ALIAS[String(t["roof:shape"] || "").trim().toLowerCase()];
   var tagged = !!s;
   var boxy = box && box.area > 0 && area/box.area > 0.72;   /* is it really a rectangle? */
@@ -2902,7 +2917,7 @@ function oneArea(e, b, v, cell){
 /* A landmark is only "included" if you can find it from the air. One small
    billboard per named one — capped, and hidden past a few kilometres so the
    horizon doesn't fill with text. */
-var labelGroup = null, labels = [], LABEL_MAX = 64, LABEL_FAR = 4200;
+var labelGroup = null, labels = [], LABEL_MAX = 40, LABEL_FAR = 3000;
 function labelTexture(text){
   var fs = 30, pad = 11, font = "600 " + fs + "px ui-monospace, Menlo, Consolas, monospace";
   var c = document.createElement("canvas");
@@ -2970,12 +2985,52 @@ function addLabel(name, x, z, top, score){
   labels.push(s);
   statLandmarks = labels.length;
 }
+/* Labels are held at a fixed size on screen, so distance does nothing to
+   separate them: forty of them a couple of kilometres off collapse into one
+   unreadable black bar along the horizon, which is what London looked like.
+   Culling by distance alone cannot fix that — the ones that pile up are all
+   at much the same distance.
+
+   So they are decluttered in SCREEN space, every frame. Each is projected,
+   the best-ranked are placed first, and any that would overlap one already
+   placed is simply not drawn. Rank is the landmark's own score damped by how
+   far away it is, so a church you are flying over outranks a grander one on
+   the skyline. The far ones also fade out rather than stacking up. */
+var labelV = null;
 function updateLabels(){
-  if(!labels.length || !plane) return;
+  if(!labels.length || !plane || !camera) return;
+  if(!labelV) labelV = new THREE.Vector3();
   var px = plane.position.x, pz = plane.position.z;
-  for(var i=0;i<labels.length;i++){
-    var s = labels[i], dx = s.position.x - px, dz = s.position.z - pz;
-    s.visible = dx*dx + dz*dz < LABEL_FAR*LABEL_FAR;
+  var P = camera.projectionMatrix.elements, p00 = P[0], p11 = P[5];
+  var cand = [], i, j;
+  for(i=0;i<labels.length;i++){
+    var s = labels[i];
+    s.visible = false;
+    var dx = s.position.x - px, dz = s.position.z - pz;
+    var d2 = dx*dx + dz*dz;
+    if(d2 > LABEL_FAR*LABEL_FAR) continue;
+    labelV.copy(s.position).project(camera);
+    /* behind the aircraft, or far enough off the edge that it cannot matter */
+    if(labelV.z > 1 || labelV.x < -1.3 || labelV.x > 1.3 ||
+       labelV.y < -1.3 || labelV.y > 1.3) continue;
+    var d = Math.sqrt(d2);
+    cand.push({s:s, x:labelV.x, y0:labelV.y, y1:labelV.y + s.scale.y*p11,
+               hw:s.scale.x*p00*0.5, d:d,
+               rank:s.userData.score/(1 + d/500)});
+  }
+  cand.sort(function(a, b){ return b.rank - a.rank; });
+  var shown = [];
+  for(i=0;i<cand.length;i++){
+    var c = cand[i], clash = false;
+    for(j=0;j<shown.length;j++){
+      var o = shown[j];
+      if(Math.abs(c.x - o.x) < c.hw + o.hw && c.y0 < o.y1 && c.y1 > o.y0){ clash = true; break; }
+    }
+    if(clash) continue;
+    shown.push(c);
+    c.s.visible = true;
+    var fade = LABEL_FAR*0.62;
+    c.s.material.opacity = c.d > fade ? Math.max(0.12, 1 - (c.d - fade)/(LABEL_FAR - fade)) : 1;
   }
 }
 
