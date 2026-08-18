@@ -40,24 +40,36 @@ const OUT = arg('out');
 if (BB.length !== 4 || BB.some(isNaN)) { console.error('--bbox wants S,W,N,E'); process.exit(1); }
 const [S, W, N, E] = BB;
 
-const QUERY =
-  '[out:json][timeout:240];(' +
-  'way["building"](' + S + ',' + W + ',' + N + ',' + E + ');' +
-  'relation["building"](' + S + ',' + W + ',' + N + ',' + E + ');' +
-  ');out geom;';
+function queryFor(s, w, n, e) {
+  return '[out:json][timeout:240];(' +
+    'way["building"](' + s + ',' + w + ',' + n + ',' + e + ');' +
+    'relation["building"](' + s + ',' + w + ',' + n + ',' + e + ');' +
+    ');out geom;';
+}
+
+/* Overpass instances require a User-Agent that says who is calling and how to
+   reach them, and overpass-api.de answers a request without one with an
+   instant 406. Node's fetch sends nothing by default, which is how the first
+   audit run came to lose its most reliable mirror on every single box and
+   quietly fall back to running on one server. */
+const UA = 'terraflight-coverage-audit/1.0 (+https://github.com/lukegardner43/flightsim)';
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function ask(url) {
+async function ask(url, query) {
   const t0 = Date.now();
   const r = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(QUERY)
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': UA,
+      'Accept': 'application/json'
+    },
+    body: 'data=' + encodeURIComponent(query)
   });
   const text = await r.text();
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' after ' + secs + 's');
+  if (!r.ok) { const err = new Error('HTTP ' + r.status + ' after ' + secs + 's'); err.status = r.status; throw err; }
   let j;
   try { j = JSON.parse(text); }
   catch (e) { throw new Error('not JSON after ' + secs + 's: ' + text.slice(0, 160).replace(/\s+/g, ' ')); }
@@ -114,33 +126,98 @@ function toFeatures(els) {
   return feats;
 }
 
-(async () => {
-  /* With one endpoint configured there is no second mirror to confirm an
-     empty answer against, so ask that one twice. */
-  const order = MIRRORS.length > 1 ? MIRRORS.slice() : [MIRRORS[0], MIRRORS[0]];
-  let zeros = 0, tried = 0;
-  const problems = [];
-  for (const url of order) {
-    tried++;
-    let els;
-    try { els = await ask(url); }
-    catch (e) { problems.push(url.split('/')[2] + ': ' + (e.message || e)); await sleep(1500); continue; }
+/* One box, from whichever mirror will answer.
 
-    if (!els.length) {
-      /* Empty is the failure shape as often as it is the truth. Only two
-         mirrors agreeing makes it a measurement. */
-      zeros++;
-      problems.push(url.split('/')[2] + ': empty answer');
-      if (zeros < 2) { await sleep(1500); continue; }
-      console.error('    two mirrors agree this box is empty — recording zero');
+   The first run taught the shape of the failures: a rejected request comes
+   back instantly, a rate limit comes back instantly, and an overloaded server
+   times out after forty seconds. So one pass over the ring is not enough —
+   the ring is retried after a wait, because a 429 means "not now", not
+   "never". The starting mirror is rotated per box so the same server is not
+   the one taking every first hit. */
+async function fetchRing(query, label, passes) {
+  const problems = [];
+  const rot = Math.abs(Math.round((S + W) * 1000)) % MIRRORS.length;
+  const ring = MIRRORS.length > 1
+    ? MIRRORS.slice(rot).concat(MIRRORS.slice(0, rot))
+    : [MIRRORS[0], MIRRORS[0]];
+  let zeros = 0;
+
+  for (let pass = 0; pass < (passes || 1); pass++) {
+    if (pass) {
+      console.error('    ' + label + ': every mirror said no, waiting 45s and going round again');
+      await sleep(45000);
     }
-    const feats = toFeatures(els);
-    fs.writeFileSync(OUT, JSON.stringify({ type: 'FeatureCollection', features: feats }));
-    console.error('    OSM: ' + feats.length + ' building polygons -> ' + OUT +
-      (problems.length ? '   (after ' + problems.length + ' bad mirror' + (problems.length > 1 ? 's' : '') + ')' : ''));
-    process.exit(0);
+    for (const url of ring) {
+      let els;
+      try { els = await ask(url, query); }
+      catch (e) {
+        problems.push(url.split('/')[2] + ': ' + (e.message || e));
+        /* A rate limit is worth more of a pause than a dead socket. */
+        await sleep(e.status === 429 ? 6000 : 1500);
+        continue;
+      }
+      if (!els.length) {
+        /* Empty is the failure shape as often as it is the truth. Only two
+           mirrors agreeing makes it a measurement. */
+        zeros++;
+        problems.push(url.split('/')[2] + ': empty answer');
+        if (zeros < 2) { await sleep(1500); continue; }
+        console.error('    two mirrors agree this box is empty — recording zero');
+      }
+      return { els: els, problems: problems };
+    }
   }
-  console.error('    ! every mirror failed for this box after ' + tried + ' tries:');
-  for (const p of problems) console.error('      ' + p);
-  process.exit(2);
+  return { els: null, problems: problems };
+}
+
+/* A 25 km2 box over inner London is a heavy query and the servers that are
+   still answering time out on it. Four smaller boxes ask for exactly the same
+   buildings and each one is cheap, so a box that cannot be had whole is had
+   in quarters rather than dropped from the audit. */
+async function fetchSplit() {
+  const midLat = (S + N) / 2, midLon = (W + E) / 2;
+  const quads = [[S, W, midLat, midLon], [S, midLon, midLat, E],
+                 [midLat, W, N, midLon], [midLat, midLon, N, E]];
+  const all = [];
+  const seen = {};
+  for (let i = 0; i < quads.length; i++) {
+    const q = quads[i];
+    const r = await fetchRing(queryFor(q[0], q[1], q[2], q[3]), 'quarter ' + (i + 1), 1);
+    if (r.els === null) {
+      console.error('    quarter ' + (i + 1) + ' failed too — giving up on this box');
+      for (const p of r.problems) console.error('      ' + p);
+      return null;
+    }
+    /* The quarters share their edges, so the same way comes back more than
+       once and must not be counted twice. */
+    for (const e of r.els) {
+      const k = e.type + e.id;
+      if (seen[k]) continue;
+      seen[k] = 1;
+      all.push(e);
+    }
+    await sleep(4000);
+  }
+  console.error('    stitched ' + all.length + ' elements from four quarters');
+  return all;
+}
+
+(async () => {
+  let els, problems = [];
+  const whole = await fetchRing(queryFor(S, W, N, E), 'box', 2);
+  if (whole.els !== null) {
+    els = whole.els;
+    problems = whole.problems;
+  } else {
+    console.error('    ! no mirror would answer the whole box:');
+    for (const p of whole.problems) console.error('      ' + p);
+    console.error('    trying it in four quarters instead');
+    els = await fetchSplit();
+    if (els === null) process.exit(2);
+  }
+
+  const feats = toFeatures(els);
+  fs.writeFileSync(OUT, JSON.stringify({ type: 'FeatureCollection', features: feats }));
+  console.error('    OSM: ' + feats.length + ' building polygons -> ' + OUT +
+    (problems.length ? '   (after ' + problems.length + ' bad mirror' + (problems.length > 1 ? 's' : '') + ')' : ''));
 })();

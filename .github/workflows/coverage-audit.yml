@@ -84,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           cp sites.json analysis/sites.json
-          node analysis/report.js --in stats --out analysis
+          node analysis/report.js --in stats --out analysis --sites sites.json
           echo "::notice::$(sed -n '/^| Buildings Ordnance Survey has/p;/^| OS footprints with nothing/p' analysis/coverage.md | tr '\n' ' ')"
 
       - name: Commit it

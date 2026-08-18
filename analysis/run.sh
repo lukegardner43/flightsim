@@ -13,7 +13,7 @@ set -uo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 SITES=${1:?give sites.json}
 RADIUS=${2:-2500}
-PAUSE=${OVERPASS_PAUSE:-10}          # Overpass is free and volunteer-run
+PAUSE=${OVERPASS_PAUSE:-15}          # Overpass is free and volunteer-run
 
 mkdir -p stats work
 node "$ROOT/analysis/plan.js" --sites "$SITES" --work work --radius "$RADIUS" > work/list.tsv || exit 1

@@ -6,13 +6,17 @@ to get a fresh draw.
 
 ## The answer
 
+**8 of 13 chosen places were measured.** 5 dropped out because no OpenStreetMap
+mirror would answer for them, not because of anything about the places themselves: NG21 9HL, SA15 5EF, E1 8JA, RH11 8JY, KT23 3HP (the reference).
+Everything below is the places that did answer.
+
 Across **8 places** drawn at random from Great Britain:
 
 | | |
 |---|---|
 | Buildings Ordnance Survey has | **44,897** |
 | Buildings OpenStreetMap has | **95,133** |
-| OS footprints with nothing from OSM on them | **7,274** — 16% of every building measured |
+| OS footprints with nothing from OSM on them | **7,274** — 16% of the OS footprints |
 | …of those, house-sized (50–400 m²) | **3,869** |
 | Share of OS floor area OSM does not have | **4%** |
 | Buildings OSM has that OS does not | 4,242 |
@@ -58,6 +62,8 @@ Sorted worst first. "Missing" is an OS building with no OpenStreetMap building a
   every time. It is the closest this data comes to counting missing houses, and it will
   undercount flats — one block of flats is one large footprint, not forty houses.
 - OS OpenMap Local is Great Britain only, so Northern Ireland is not in this sample.
+- **5 chosen places are missing from these numbers** — Overpass would not answer for them. That is a gap in the sample, not a
+  finding about those places, and it makes the sample smaller than it was meant to be.
 
 Contains OS data © Crown copyright and database right. Open Government Licence v3.
 Contains OpenStreetMap data © OpenStreetMap contributors, Open Database Licence.

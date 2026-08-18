@@ -29,6 +29,17 @@ let refs = all.filter(s => s.site.reference);
 let sites = all.filter(s => !s.site.reference);
 if (!sites.length) { sites = all; refs = []; }
 
+/* Which places were chosen but never measured. A partial answer that does not
+   say it is partial is worse than no answer, and the first run lost five of
+   thirteen — including the reference — without the report mentioning it. */
+let lost = [];
+const sitesFile = arg('sites', '');
+if (sitesFile && fs.existsSync(sitesFile)) {
+  const done = {};
+  for (const s of all) done[s.site.postcode] = 1;
+  lost = JSON.parse(fs.readFileSync(sitesFile, 'utf8')).filter(p => !done[p.postcode]);
+}
+
 const pct = v => (v == null ? '' : (100 * v).toFixed(0) + '%');
 const num = v => (v == null ? '' : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
 const sum = f => sites.reduce((t, s) => t + (f(s) || 0), 0);
@@ -81,6 +92,14 @@ L.push('to get a fresh draw.');
 L.push('');
 L.push('## The answer');
 L.push('');
+if (lost.length) {
+  L.push('**' + (totals.sites + refs.length) + ' of ' + (totals.sites + refs.length + lost.length) +
+    ' chosen places were measured.** ' + lost.length + ' dropped out because no OpenStreetMap');
+  L.push('mirror would answer for them, not because of anything about the places themselves: ' +
+    lost.map(p => p.postcode + (p.reference ? ' (the reference)' : '')).join(', ') + '.');
+  L.push('Everything below is the places that did answer.');
+  L.push('');
+}
 L.push('Across **' + totals.sites + ' place' + (totals.sites === 1 ? '' : 's') +
   '** drawn at random from Great Britain:');
 L.push('');
@@ -88,7 +107,7 @@ L.push('| | |');
 L.push('|---|---|');
 L.push('| Buildings Ordnance Survey has | **' + num(osCount) + '** |');
 L.push('| Buildings OpenStreetMap has | **' + num(osmCount) + '** |');
-L.push('| OS footprints with nothing from OSM on them | **' + num(missCount) + '** — ' + pct(totals.missingShare) + ' of every building measured |');
+L.push('| OS footprints with nothing from OSM on them | **' + num(missCount) + '** — ' + pct(totals.missingShare) + ' of the OS footprints |');
 L.push('| …of those, house-sized (50–400 m²) | **' + num(houses) + '** |');
 L.push('| Share of OS floor area OSM does not have | **' + pct(totals.missingAreaShare) + '** |');
 L.push('| Buildings OSM has that OS does not | ' + num(totals.extraCount) + ' |');
@@ -175,6 +194,13 @@ L.push('- **House-sized** is footprint area between 50 and 400 m², which is a d
 L.push('  every time. It is the closest this data comes to counting missing houses, and it will');
 L.push('  undercount flats — one block of flats is one large footprint, not forty houses.');
 L.push('- OS OpenMap Local is Great Britain only, so Northern Ireland is not in this sample.');
+if (lost.length) {
+  L.push('- **' + lost.length + ' chosen place' + (lost.length > 1 ? 's are' : ' is') +
+    ' missing from these numbers** — Overpass would not answer for ' +
+    (lost.length > 1 ? 'them' : 'it') + '. That is a gap in the sample, not a');
+  L.push('  finding about ' + (lost.length > 1 ? 'those places' : 'that place') +
+    ', and it makes the sample smaller than it was meant to be.');
+}
 L.push('');
 L.push('Contains OS data © Crown copyright and database right. Open Government Licence v3.');
 L.push('Contains OpenStreetMap data © OpenStreetMap contributors, Open Database Licence.');
