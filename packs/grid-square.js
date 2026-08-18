@@ -57,6 +57,12 @@ function gridLetters(lat, lon) {
   return String.fromCharCode(l1 + 65) + String.fromCharCode(l2 + 65);
 }
 
+module.exports = { gridLetters };
+
+/* Only act as a command when run as one — analysis/sample.js requires this
+   file for gridLetters and must not have it start resolving postcodes. */
+if (require.main !== module) return;
+
 (async () => {
   const args = process.argv.slice(2).join(' ').trim();
   if (!args) { console.error('give a postcode, or a latitude and longitude'); process.exit(1); }

@@ -1,0 +1,108 @@
+name: Audit OSM coverage against Ordnance Survey
+
+# Answers one question with measurements instead of opinion: how many
+# buildings is OpenStreetMap missing across Great Britain, and was Bookham
+# unlucky or ordinary?
+#
+#   Actions tab  ->  "Audit OSM coverage against Ordnance Survey"
+#   ->  Run workflow  ->  Run workflow
+#
+# It draws postcodes at random from postcodes.io, and for each one downloads
+# Ordnance Survey's surveyed building footprints, asks OpenStreetMap for the
+# same box, matches the two polygon by polygon, and commits the result to
+# analysis/coverage.md and analysis/coverage.csv.
+#
+# The places are drawn at random on purpose. If I picked them, the answer
+# would be worth nothing.
+#
+# Every input reaches the shell through the environment rather than being
+# pasted into the script, so a postcode containing shell characters is a
+# postcode, not a command.
+
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: 'How many random places to measure. 12 takes about an hour.'
+        required: false
+        default: '12'
+      postcodes:
+        description: 'Or name them yourself, comma separated. Overrides the random draw.'
+        required: false
+        default: ''
+      radius:
+        description: 'Half-width of each measured box, in metres. 2500 = a 5 km square.'
+        required: false
+        default: '2500'
+      reference:
+        description: 'Measured alongside the draw and reported separately. Blank for none.'
+        required: false
+        default: 'KT23 3HP'
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install GDAL
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gdal-bin
+
+      - name: Choose the places
+        env:
+          SAMPLES: ${{ inputs.samples }}
+          POSTCODES: ${{ inputs.postcodes }}
+          REFERENCE: ${{ inputs.reference }}
+        run: |
+          set -euo pipefail
+          if [ -n "$POSTCODES" ]; then
+            node analysis/sample.js --list "$POSTCODES" --reference "$REFERENCE" > sites.json
+          else
+            node analysis/sample.js --random "$SAMPLES" --reference "$REFERENCE" > sites.json
+          fi
+
+      - name: Measure each one
+        env:
+          RADIUS: ${{ inputs.radius }}
+        run: analysis/run.sh sites.json "$RADIUS"
+
+      - name: Write it up
+        run: |
+          set -euo pipefail
+          cp sites.json analysis/sites.json
+          node analysis/report.js --in stats --out analysis
+          echo "::notice::$(sed -n '/^| Buildings Ordnance Survey has/p;/^| OS footprints with nothing/p' analysis/coverage.md | tr '\n' ' ')"
+
+      - name: Commit it
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add analysis/
+          if git diff --cached --quiet; then
+            echo "::warning::nothing changed"; exit 0
+          fi
+          git commit -m "OSM coverage audit against OS OpenMap Local" \
+                     -m "Contains OS data (c) Crown copyright and database right. Open Government Licence v3. Contains OpenStreetMap data (c) OpenStreetMap contributors, Open Database Licence. Built by .github/workflows/coverage-audit.yml."
+          git push
+          echo "::notice::Written to analysis/coverage.md"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: per-site-stats
+          path: stats/
