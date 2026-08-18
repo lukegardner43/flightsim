@@ -3817,8 +3817,14 @@ function armPackTimer(){
    is the large thing among its outbuildings. This does not weaken the rule
    that matters: nothing is invented, because Ordnance Survey surveyed that
    footprint. It only stops the name being the single point of failure. */
-function claimPackFootprints(els){
-  if(!MODELS.length || !els.length) return;
+function claimPackFootprints(els, dropped){
+  if(!MODELS.length) return;
+  /* Candidates are every surveyed footprint, including the ones that will not
+     be drawn because OpenStreetMap already has them. If one of those wins, it
+     is added back: its parts then replace the OSM outline underneath by the
+     ordinary "an outline with modelled parts inside it is dropped" rule. */
+  var all = els.concat(dropped || []);
+  if(!all.length) return;
   var want = [], i, j;
   for(i=0;i<MODELS.length;i++){
     var m = MODELS[i];
@@ -3833,23 +3839,29 @@ function claimPackFootprints(els){
     want.push({m:m, x:c.x, z:c.z, r:r, best:null, score:0});
   }
   if(!want.length) return;
-  for(i=0;i<els.length;i++){
-    var pts = ringToPts(els[i].geometry);
+  for(i=0;i<all.length;i++){
+    var pts = ringToPts(all[i].geometry);
     if(pts.length < 3) continue;
     var cc = centroid(pts), area = Math.abs(signedArea(pts));
-    if(!(area > 40)) continue;                   /* not a garage */
+    /* No landmark this system models is the size of a garden shed. Without
+       this floor the nearest outbuilding wins whenever the real building is
+       not among the candidates, and a country house gets built on a 108 m2
+       store. */
+    if(!(area > 200)) continue;
     for(j=0;j<want.length;j++){
       var w = want[j];
       var dx = cc.x - w.x, dz = cc.z - w.z, d = Math.sqrt(dx*dx + dz*dz);
       if(d > w.r) continue;
       var sc = area/(1 + d/100);                 /* big and near beats small and nearer */
-      if(sc > w.score){ w.score = sc; w.best = els[i]; w.dist = d; w.area = area; }
+      if(sc > w.score){ w.score = sc; w.best = all[i]; w.dist = d; w.area = area; }
     }
   }
   for(j=0;j<want.length;j++){
     if(!want[j].best) continue;
     want[j].best.tags.name = want[j].m.name;
     want[j].best.tags["tf:anchor"] = "pack";
+    /* it may be one of the footprints that was not going to be drawn */
+    if(els.indexOf(want[j].best) < 0) els.push(want[j].best);
     MODEL_FROMPACK.push(want[j].m.name + " (" + Math.round(want[j].area) + " m2, " +
                         Math.round(want[j].dist) + " m from where it was expected)");
   }
@@ -3857,7 +3869,7 @@ function claimPackFootprints(els){
 function mergePack(){
   if(packMerged || packState() !== "loaded") return Promise.resolve();
   packMerged = true;
-  var els = [], i, j, f;
+  var els = [], dropped = [], i, j, f;
   /* Up to four tiles meet inside one 10 km world, so this walks all of them.
      Tiles do not overlap — a footprint belongs to exactly one, decided in
      British National Grid at build time — so there is nothing to deduplicate
@@ -3886,12 +3898,20 @@ function mergePack(){
         if(pts[j].x > pbb[2]) pbb[2] = pts[j].x;
         if(pts[j].z > pbb[3]) pbb[3] = pts[j].z;
       }
-      if(footCovered(cc.x, cc.z) || footOverlap(pbb)){ PACK.dup++; continue; }
-      els.push({type:"way", id:"pk" + f + "_" + i, tags:{building:"yes", "source":"OS OpenMap Local"},
-                geometry:geom});
+      var el = {type:"way", id:"pk" + f + "_" + i, tags:{building:"yes", "source":"OS OpenMap Local"},
+                geometry:geom};
+      /* "OpenStreetMap already has this one" is the right reason not to DRAW a
+         pack footprint, and the wrong reason to forget it. It is still a
+         surveyed outline of a real building, and it is the one a landmark
+         model most wants to stand on — the house is exactly the building OSM
+         is most likely to have. Dropping these before the claim is why
+         Polesden Lacey ended up on a 108 m2 shed: the only candidates left
+         near it were the outbuildings OSM had not bothered with. */
+      if(footCovered(cc.x, cc.z) || footOverlap(pbb)){ PACK.dup++; dropped.push(el); continue; }
+      els.push(el);
     }
   }
-  claimPackFootprints(els);
+  claimPackFootprints(els, dropped);
   PACK.wanted = els.length;
   /* In chunks, and not all in the same tick. Twenty thousand footprints in one
      batch is a thirty-megabyte buffer built in a single synchronous block:
