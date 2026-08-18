@@ -3,7 +3,7 @@
   "name": "Landmarks around Great Bookham",
   "produced_by": "Claude Opus 5",
   "produced_on": "2026-08-17",
-  "method": "Written from the model's knowledge of these places. No survey, no photographs, no drawings, no site visit. Each model is massing \u2014 number of storeys, roof form, whether there is a tower and roughly how tall \u2014 fitted to whatever footprint OpenStreetMap actually holds. Coordinates are approximate and used only to tell one 'St Mary's Church' from another; the name match does the work. Each part also carries the building type it represents, so a church tower is built of masonry rather than the office curtain wall a typeless volume would default to.",
+  "method": "Massing models fitted to whatever footprint OpenStreetMap holds. Polesden Lacey, St Barnabas Ranmore and St Nicolas Great Bookham are rebuilt from published descriptions of the buildings \u2014 chiefly listed-building entries \u2014 and cite them in a sources field. The rest are still written from the model's own knowledge and say so in their confidence field. No photographs were used: this tool reads text, not images, and a listing describes form and material more precisely than a photograph would anyway.",
   "confidence_scale": "high = I am confident this building has this form. medium = the form is typical of the building type and I believe it applies here. low = plausible massing, treat as a placeholder.",
   "models": [
     {
@@ -17,9 +17,16 @@
         -0.3707
       ],
       "radius": 600,
-      "confidence": "the courtyard plan and two storeys are high; the turret is the least certain thing here and is one line to delete",
+      "orient": "compass",
       "replaceOutline": true,
-      "note": "A Regency villa of Thomas Cubitt's, remodelled for Mrs Ronald Greville in 1906 by Mewes and Davis \u2014 the Ritz architects \u2014 and given to the National Trust with her collection. The thing to get right is that it is built AROUND A COURTYARD: four two-storey ranges enclosing a paved court, not a solid block. Modelling it as one mass is the single biggest thing you can get wrong about this house. Pale rendered walls, hipped slate roofs, and the grouped chimney stacks of its date. The south range faces the famous view down the valley and carries a taller centre bay. Every range is sized as a fraction of whatever quadrangle OpenStreetMap actually holds, so the courtyard stays open at the real proportions.",
+      "confidence": "high \u2014 rebuilt from the Grade II* list entry, not from memory",
+      "sources": [
+        "Historic England list entry 1028665 (Grade II*), via search: 'The two-storey house is stuccoed, and is in the form of a quadrangle around a large central courtyard with an apsidal end'; 'stucco on brick, slate roofs, and stuccoed chimneys'; 'two storeys, with a prominent cornice carried round'; 'windows are mainly 12-pane sashes'.",
+        "Same entry on the cupola: 'In the centre of the roof is a tall octagonal 2-stage cupola with windows in the lower stage, clock-faces in the upper, a prominent cornice, and domed roof with finial.'",
+        "Same entry on the east front: 'The symmetrical east front is E-plan ... 3:3:3 bays between projecting wings, and has a projecting pedimented centre ... a semi-circular bow front to the right hand wing by Mewes and Davis.'",
+        "Build history: 1821-24 by Thomas Cubitt for Joseph Bonsor; extended 1902-6 by Sir Ambrose Poynter for William McEwan; enlarged 1906-9 for Ronald Greville by Mewes and Davis."
+      ],
+      "note": "Rebuilt from the listed-building description rather than from memory. The quadrangle around a central courtyard is confirmed, and so is the thing I had guessed at and flagged: there IS a clock feature, but it is a tall OCTAGONAL two-stage cupola with a domed roof and finial, not the square turret I invented. The grand front is the EAST front, E-plan, with projecting wings, a pedimented centre, and a semi-circular bow on one wing \u2014 which is why this model is placed by compass rather than by whichever edge of the polygon is longest. Chimneys are stuccoed, not brick.",
       "parts": [
         {
           "at": [
@@ -34,7 +41,7 @@
           "type": "manor",
           "material": "plaster",
           "roofMaterial": "slate",
-          "note": "north range \u2014 the entrance side, off the courtyard"
+          "note": "north range (single-depth)"
         },
         {
           "at": [
@@ -49,14 +56,14 @@
           "type": "manor",
           "material": "plaster",
           "roofMaterial": "slate",
-          "note": "south range \u2014 the garden front, facing the view"
+          "note": "south range, facing the valley"
         },
         {
           "at": [
-            -0.82,
+            -0.83,
             0
           ],
-          "wF": 0.18,
+          "wF": 0.17,
           "dF": 1.0,
           "height": 10.5,
           "roof": "hipped",
@@ -68,10 +75,10 @@
         },
         {
           "at": [
-            0.82,
+            0.83,
             0
           ],
-          "wF": 0.18,
+          "wF": 0.17,
           "dF": 1.0,
           "height": 10.5,
           "roof": "hipped",
@@ -79,149 +86,211 @@
           "type": "manor",
           "material": "plaster",
           "roofMaterial": "slate",
-          "note": "east range"
+          "note": "east range \u2014 the grand front"
         },
         {
           "at": [
-            0,
-            0.72
+            0.93,
+            -0.66
           ],
-          "wF": 0.24,
-          "dF": 0.31,
-          "height": 12.5,
+          "wF": 0.13,
+          "dF": 0.28,
+          "height": 10.5,
           "roof": "hipped",
-          "roofHeight": 3.4,
+          "roofHeight": 4.0,
           "type": "manor",
           "material": "plaster",
           "roofMaterial": "slate",
-          "note": "the centre bay of the garden front, standing slightly forward and taller"
+          "note": "E-plan: north projecting wing of the east front"
         },
         {
           "at": [
-            0,
-            -0.75
+            0.93,
+            0.66
           ],
-          "w": 4.2,
-          "d": 4.2,
-          "minHeight": 13.0,
-          "height": 21.0,
-          "roof": "pyramidal",
+          "wF": 0.13,
+          "dF": 0.28,
+          "height": 10.5,
+          "roof": "hipped",
+          "roofHeight": 4.0,
+          "type": "manor",
+          "material": "plaster",
+          "roofMaterial": "slate",
+          "note": "E-plan: south projecting wing of the east front"
+        },
+        {
+          "at": [
+            0.99,
+            0.66
+          ],
+          "sides": 16,
+          "wF": 0.09,
+          "dF": 0.2,
+          "height": 10.5,
+          "roof": "hipped",
           "roofHeight": 2.6,
           "type": "manor",
           "material": "plaster",
+          "roofMaterial": "slate",
+          "note": "the semi-circular bow front Mewes and Davis added to the right-hand wing"
+        },
+        {
+          "at": [
+            0.95,
+            0
+          ],
+          "wF": 0.11,
+          "dF": 0.24,
+          "height": 11.9,
+          "roof": "gabled",
+          "roofHeight": 3.0,
+          "type": "manor",
+          "material": "plaster",
+          "roofMaterial": "slate",
+          "note": "the projecting pedimented centre of the east front (Ionic doorcase below)"
+        },
+        {
+          "at": [
+            0.83,
+            0
+          ],
+          "sides": 8,
+          "w": 7.0,
+          "d": 7.0,
+          "minHeight": 13.5,
+          "height": 20.5,
+          "roof": "flat",
+          "type": "manor",
+          "material": "plaster",
+          "note": "cupola, lower stage \u2014 octagonal, windowed"
+        },
+        {
+          "at": [
+            0.83,
+            0
+          ],
+          "sides": 8,
+          "w": 6.0,
+          "d": 6.0,
+          "minHeight": 20.5,
+          "height": 25.0,
+          "roof": "dome",
+          "roofHeight": 4.2,
+          "type": "manor",
+          "material": "plaster",
           "roofMaterial": "lead",
-          "note": "clock turret over the entrance range \u2014 the least certain element in this file"
+          "note": "cupola, upper stage \u2014 clock faces, cornice, domed roof with finial"
         },
         {
           "at": [
-            -0.46,
+            -0.48,
             -0.75
           ],
           "w": 3.0,
           "d": 2.2,
           "minHeight": 10.5,
-          "height": 18.1,
+          "height": 17.9,
           "roof": "flat",
           "type": "manor",
-          "material": "brick",
+          "material": "plaster",
           "note": "north range stack"
         },
         {
           "at": [
-            0.46,
+            0.48,
             -0.75
           ],
           "w": 3.0,
           "d": 2.2,
           "minHeight": 10.5,
-          "height": 18.1,
+          "height": 17.9,
           "roof": "flat",
           "type": "manor",
-          "material": "brick",
+          "material": "plaster",
           "note": "north range stack"
         },
         {
           "at": [
-            -0.46,
+            -0.48,
             0.75
           ],
           "w": 3.0,
           "d": 2.2,
           "minHeight": 10.5,
-          "height": 18.1,
+          "height": 17.9,
           "roof": "flat",
           "type": "manor",
-          "material": "brick",
+          "material": "plaster",
           "note": "south range stack"
         },
         {
           "at": [
-            0.46,
+            0.48,
             0.75
           ],
           "w": 3.0,
           "d": 2.2,
           "minHeight": 10.5,
-          "height": 18.1,
+          "height": 17.9,
           "roof": "flat",
           "type": "manor",
-          "material": "brick",
+          "material": "plaster",
           "note": "south range stack"
         },
         {
           "at": [
-            -0.82,
-            -0.42
+            -0.83,
+            -0.45
           ],
           "w": 3.0,
           "d": 2.2,
           "minHeight": 10.5,
-          "height": 18.1,
+          "height": 17.9,
           "roof": "flat",
           "type": "manor",
-          "material": "brick",
+          "material": "plaster",
           "note": "west range stack"
         },
         {
           "at": [
-            -0.82,
-            0.42
+            -0.83,
+            0.45
           ],
           "w": 3.0,
           "d": 2.2,
           "minHeight": 10.5,
-          "height": 18.1,
+          "height": 17.9,
           "roof": "flat",
           "type": "manor",
-          "material": "brick",
+          "material": "plaster",
           "note": "west range stack"
         },
         {
           "at": [
-            0.82,
-            -0.42
+            0.83,
+            -0.45
           ],
           "w": 3.0,
           "d": 2.2,
           "minHeight": 10.5,
-          "height": 18.1,
+          "height": 17.9,
           "roof": "flat",
           "type": "manor",
-          "material": "brick",
+          "material": "plaster",
           "note": "east range stack"
         },
         {
           "at": [
-            0.82,
-            0.42
+            0.83,
+            0.45
           ],
           "w": 3.0,
           "d": 2.2,
           "minHeight": 10.5,
-          "height": 18.1,
+          "height": 17.9,
           "roof": "flat",
           "type": "manor",
-          "material": "brick",
+          "material": "plaster",
           "note": "east range stack"
         }
       ]
@@ -238,17 +307,18 @@
         -0.3746
       ],
       "radius": 500,
-      "confidence": "high on the form",
-      "note": "Norman origins, much rebuilt. Flint and stone, with a west tower carrying a shingled broach spire \u2014 the spire is the thing you see across the village, and the reason this one is worth modelling at all.",
+      "confidence": "high \u2014 checked against the parish's own building history",
+      "note": "Saxon nave, Norman tower stonework, and a 14th-century WOODEN tower stage carrying the shingled spire \u2014 which is the thing you see across the village. Modelled in three stages accordingly: stone below, timber above, shingles on top. There is also a 1380 south porch with a priest's room over it, modelled as the small block on the south side.",
       "parts": [
         {
           "on": "footprint",
           "height": 9.5,
           "roof": "gabled",
           "roofHeight": 5,
+          "type": "church",
           "material": "stone",
           "roofMaterial": "tile",
-          "type": "church"
+          "note": "Saxon nave and 1341 chancel, stone and flint"
         },
         {
           "at": [
@@ -257,10 +327,25 @@
           ],
           "w": 6.5,
           "d": 6.5,
-          "height": 15,
-          "material": "stone",
+          "height": 11,
           "roof": "flat",
-          "type": "church"
+          "type": "church",
+          "material": "stone",
+          "note": "Norman tower stonework, 12th century"
+        },
+        {
+          "at": [
+            -0.88,
+            0
+          ],
+          "w": 6.0,
+          "d": 6.0,
+          "minHeight": 11,
+          "height": 17,
+          "roof": "flat",
+          "type": "church",
+          "material": "wood",
+          "note": "the 14th-century wooden tower stage"
         },
         {
           "at": [
@@ -269,14 +354,33 @@
           ],
           "w": 5.4,
           "d": 5.4,
-          "minHeight": 15,
-          "height": 31,
+          "minHeight": 17,
+          "height": 19,
           "roof": "cone",
-          "roofHeight": 12,
+          "roofHeight": 13,
+          "type": "church",
           "material": "wood",
           "roofMaterial": "wood",
-          "type": "church"
+          "note": "shingle-covered spire"
+        },
+        {
+          "at": [
+            -0.3,
+            0.85
+          ],
+          "w": 4.0,
+          "d": 3.2,
+          "height": 6.5,
+          "roof": "gabled",
+          "roofHeight": 2.6,
+          "type": "church",
+          "material": "stone",
+          "roofMaterial": "tile",
+          "note": "south porch of 1380 with the priest's room above it"
         }
+      ],
+      "sources": [
+        "Grade I listed. Nave built 1042-1080 (two Saxon windows survive high on the north side); Normans extended the nave and added the tower stonework in the 12th century; 'a wooden tower and shingle covered spire was built in the 14th-century'; large chancel 1341; south porch 1380 with a priest's room above. Stone and flint."
       ]
     },
     {
@@ -291,45 +395,67 @@
         -0.3549
       ],
       "radius": 700,
-      "confidence": "high on the form",
-      "note": "The 'Church on the North Downs', built for the Cubitt family at Denbies. Its tall stone spire on a central tower is visible for miles along the ridge and is the single most recognisable structure south of Bookham.",
+      "confidence": "high \u2014 checked against descriptions of the building",
+      "note": "Gilbert Scott's 'High Victoriana' estate church for the Cubitts of Denbies, Early English Gothic Revival. Two things the sources corrected: the exterior is rounded FLINT COBBLE, not ashlar stone, and the spire does not sit straight on the tower \u2014 it rises off an OCTAGONAL stage, which is modelled here as an octagon between the two.",
       "parts": [
         {
           "on": "footprint",
           "height": 11,
           "roof": "gabled",
           "roofHeight": 6,
+          "type": "church",
           "material": "stone",
           "roofMaterial": "tile",
-          "type": "church"
+          "note": "nave and chancel, flint-faced"
         },
         {
           "at": [
             0.1,
             0
           ],
-          "w": 7,
-          "d": 7,
-          "height": 22,
-          "material": "stone",
+          "w": 7.0,
+          "d": 7.0,
+          "height": 21,
           "roof": "flat",
-          "type": "church"
+          "type": "church",
+          "material": "stone",
+          "note": "square tower stage"
         },
         {
           "at": [
             0.1,
             0
           ],
-          "w": 6,
-          "d": 6,
-          "minHeight": 22,
-          "height": 46,
+          "sides": 8,
+          "w": 6.4,
+          "d": 6.4,
+          "minHeight": 21,
+          "height": 27,
+          "roof": "flat",
+          "type": "church",
+          "material": "stone",
+          "note": "the octagon the spire stands on"
+        },
+        {
+          "at": [
+            0.1,
+            0
+          ],
+          "sides": 8,
+          "w": 5.6,
+          "d": 5.6,
+          "minHeight": 27,
+          "height": 33,
           "roof": "cone",
-          "roofHeight": 16,
+          "roofHeight": 19,
+          "type": "church",
           "material": "stone",
           "roofMaterial": "stone",
-          "type": "church"
+          "note": "the tall slender spire seen from every hill in Surrey"
         }
+      ],
+      "sources": [
+        "Sir George Gilbert Scott, consecrated 1859, for George Cubitt of Denbies. 'The exterior is entirely faced in rounded flint cobbles'; 'a prominent spire on an octagon'; the tall slender spire stands 700 ft above sea level and is seen from hills across Surrey."
       ]
     },
     {

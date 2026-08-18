@@ -785,6 +785,16 @@ function modelParts(e, m){
   if(!outer) return [];
   var box = orientedBox(outer, null);
   if(!box) return [];
+  if(m.orient === "compass"){
+    /* A country house has an east front and a garden front, and which is
+       which is a fact about the compass, not about whichever edge of the
+       polygon happens to be longest. In this mode at[0] runs west->east and
+       at[1] north->south. */
+    var bb = bboxOf(outer);
+    box = {cx:(bb[0]+bb[2])/2, cz:(bb[1]+bb[3])/2, ux:1, uz:0,
+           hu:(bb[2]-bb[0])/2, hv:(bb[3]-bb[1])/2};
+    box.area = 4*box.hu*box.hv;
+  }
   var out = [];
   for(i=0;i<(m.parts||[]).length;i++){
     var p = m.parts[i], geom;
@@ -806,9 +816,20 @@ function modelParts(e, m){
       var pw = p.wF != null ? p.wF*2*box.hu : (p.w || 6);
       var pd = p.dF != null ? p.dF*2*box.hv : (p.d || 6);
       var hw = pw/2, hd = pd/2;
-      var cs = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]], k;
+      /* sides: an octagonal cupola, the octagon a spire stands on, a
+         semicircular bow — none of which are boxes. */
+      var ns = (p.sides && p.sides >= 3) ? Math.min(24, Math.round(p.sides)) : 0;
+      var cs = [], k;
+      if(ns){
+        for(k=0;k<ns;k++){
+          var th = (k + 0.5)/ns*Math.PI*2;
+          cs.push([Math.cos(th)*hw, Math.sin(th)*hd]);
+        }
+      }else{
+        cs = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]];
+      }
       geom = [];
-      for(k=0;k<4;k++){
+      for(k=0;k<cs.length;k++){
         var wx = cx + cs[k][0]*ax - cs[k][1]*az;
         var wz = cz + cs[k][0]*az + cs[k][1]*ax;
         var ll = worldToLatLon(wx, wz);
@@ -1570,20 +1591,25 @@ var COL = {
    into a block of flats, which is what every big shed in the world was. */
 var SHED_RE  = /^(industrial|warehouse|factory|manufacture|works|depot|distribution|storage|shed|hangar|barn|farm_auxiliary|greenhouse|silo|garage|garages|carport|service|construction)$/;
 var HOUSE_RE = /^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|cabin|hut|static_caravan|manor|mansion|farm|residential)$/;
-var MASONRY  = /^(church|chapel|cathedral|abbey|monastery|castle|palace|windmill|watermill|hist_tower|ruins|monument|barn|stable|pub|museum)$/;
+var MASONRY  = /^(church|chapel|cathedral|monastery|windmill|watermill|hist_tower|ruins|monument|barn|stable|pub)$/;
+/* big, formal, and glazed with sashes rather than shopfronts or curtain wall */
+var GRAND    = /^(manor|mansion|palace|abbey|castle|civic|government|museum|hotel|university|college)$/;
 function buildClass(t, area, h, house, depth){
   var b = t.building || "";
   if(SHED_RE.test(b)) return "shed";
   if(t.landuse === "industrial" || t.industrial || t.craft) return "shed";
+  /* GRAND before HOUSE_RE: "manor" and "mansion" appear in both, and a country
+     house wants sashes, not the windows of a semi. */
+  if(GRAND.test(b)) return "grand";
   if(HOUSE_RE.test(b)) return "house";
-  /* Masonry, not curtain wall. A church tower, a castle keep and a country
-     house were all getting the office facade — two bays of tinted glazing per
-     four metres — because "not a house and not a shed" meant "office block". */
+  /* Masonry, not curtain wall. A church tower and a windmill were getting the
+     office facade — two bays of tinted glazing per four metres — because "not
+     a house and not a shed" meant "office block". */
   if(MASONRY.test(b)) return "house";
   /* a 9 m deep block is a row of houses whatever its length — without this a
      long enough terrace trips the "enormous and low" test below and gets
      corrugated steel */
-  if(depth && depth <= 12.5 && h < 12) return "house";
+  if(depth && depth <= 12.5 && h < 12 && !GRAND.test(b)) return "house";
   /* Untagged, enormous, and low: a distribution shed, not a tower of flats.
      Nothing three storeys high covers a third of a hectare and has people
      living in it. */
@@ -1596,6 +1622,8 @@ var HOUSE_WALL = [0x9d5f4a, 0xa86f55, 0x8d6047, 0xb08a6a,          /* brick */
                   0xbdb6a6, 0xaaa497];                              /* pebbledash */
 var SHED_WALL  = [0x8e9aa0, 0x9aa6a4, 0x7d8a90, 0xa9b1ae, 0x6f7d78,
                   0xb5b9b3, 0x7f8c84];
+/* stucco, ashlar, warm stone — what a big formal building is faced in */
+var GRAND_WALL = [0xd8d0bd, 0xcfc7b2, 0xc6bda6, 0xdad5c6, 0xc2b8a4];
 function pick(list, seed, salt){
   return new THREE.Color(list[Math.floor(hash(seed, salt)*list.length) % list.length]);
 }
@@ -1603,6 +1631,7 @@ function wallColour(h, seed, cls){
   var c;
   if(cls === "house")     c = pick(HOUSE_WALL, seed, 61);
   else if(cls === "shed") c = pick(SHED_WALL, seed, 63);
+  else if(cls === "grand") c = pick(GRAND_WALL, seed, 65);
   else c = COL.wallLo.clone().lerp(COL.wallHi, Math.min(1, h/70));
   c.offsetHSL((hash(seed,31)-0.5)*0.03, 0, (hash(seed,21)-0.5)*0.10);
   return c;
@@ -2341,6 +2370,39 @@ function houseTexture(){
   win(40, 42, 16, 15);
   return wallTex(c, 4, 3.2);
 }
+/* A country house is not a terrace either. Polesden Lacey's listing says
+   "windows are mainly 12-pane sashes" with "a prominent cornice carried
+   round", and drawn with domestic windows at four-metre centres it came out
+   looking like a barracks. Tall sashes on a wider bay, and a cornice band. */
+function sashTexture(){
+  var c = document.createElement("canvas");
+  c.width = 64; c.height = 64;
+  var x = c.getContext("2d"), i;
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 64, 64);
+  /* the cornice, carried round under the eaves */
+  x.fillStyle = "rgba(0,0,0,.13)";       x.fillRect(0, 0, 64, 3);
+  x.fillStyle = "rgba(255,255,255,.55)"; x.fillRect(0, 3, 64, 2);
+  /* a string course between the storeys */
+  x.fillStyle = "rgba(0,0,0,.07)";       x.fillRect(0, 33, 64, 2);
+  function sash(wx, wy, ww, wh){
+    x.fillStyle = "rgba(248,246,240,.97)";          /* painted frame and reveal */
+    x.fillRect(wx-2.5, wy-2.5, ww+5, wh+5);
+    var g = x.createLinearGradient(0, wy, 0, wy+wh);
+    g.addColorStop(0, "rgba(38,47,58,.92)");
+    g.addColorStop(1, "rgba(78,92,106,.74)");
+    x.fillStyle = g; x.fillRect(wx, wy, ww, wh);
+    x.fillStyle = "rgba(248,246,240,.92)";          /* twelve panes: 3 x 4 */
+    for(i=1;i<3;i++) x.fillRect(wx + ww*i/3 - 0.6, wy, 1.2, wh);
+    for(i=1;i<4;i++) x.fillRect(wx, wy + wh*i/4 - 0.6, ww, 1.2);
+    x.fillStyle = "rgba(248,246,240,.99)";
+    x.fillRect(wx - 1, wy + wh, ww + 2, 2);         /* cill */
+  }
+  sash(11, 10, 18, 19);
+  sash(40, 10, 18, 19);
+  sash(11, 41, 18, 17);
+  sash(40, 41, 18, 17);
+  return wallTex(c, 10, 7.2);                       /* two bays, two storeys */
+}
 /* Profiled steel: vertical ribs, a high clerestory strip, and no glazing
    anywhere a person would stand. */
 function shedTexture(){
@@ -2493,7 +2555,7 @@ function updateTraffic(dt){
 }
 
 /* ---- mesh construction for one fetched chunk ---- */
-var matBuild, matHouse, matShed, matRoof, matFlat, matTree, matVeg;
+var matBuild, matHouse, matShed, matGrand, matRoof, matFlat, matTree, matVeg;
 function inSkip(x, z, cell){
   return cell.skipHalf > 0 && Math.abs(x) < cell.skipHalf && Math.abs(z) < cell.skipHalf;
 }
@@ -2613,7 +2675,7 @@ function volumeOf(t, area, dist, seed, box){
 }
 /* Buildings that get a pitched roof however big their footprint is, and the
    handful that end in a point. */
-var PITCHED = /^(manor|mansion|palace|abbey|castle|church|chapel|cathedral|barn|stable|farm|farm_auxiliary|watermill|ruins|school|civic|museum|grandstand|train_station|hotel|pub|house|terrace|bungalow)$/;
+var PITCHED = /^(manor|mansion|palace|abbey|castle|civic|museum|hotel|church|chapel|cathedral|barn|stable|farm|farm_auxiliary|watermill|ruins|school|civic|museum|grandstand|train_station|hotel|pub|house|terrace|bungalow)$/;
 var TOWERY  = /^(windmill|lighthouse|hist_tower|mast|chimney|silo|water_tower)$/;
 var ROOF_ALIAS = {
   "half-hipped":"hipped", gambrel:"hipped", mansard:"hipped", round:"dome",
@@ -2676,12 +2738,14 @@ function roofColour(t, seed, shape, cls){
                            (hash(seed,41)-0.5)*0.26, (hash(seed,51)-0.64)*0.22);
   if(cls === "house")     c = pick(HOUSE_ROOF, seed, 44);
   else if(cls === "shed") c = pick(SHED_ROOF, seed, 46);
+  else if(cls === "grand") c = new THREE.Color(0x4a5057);   /* slate */
   else c = (shape === "flat" ? COL.roofFlat : COL.roofHouse).clone();
   return c.offsetHSL(0, (hash(seed,41)-0.5)*0.07, (hash(seed,51)-0.5)*0.07);
 }
 
 function addBuildings(list, parts, group, cell){
-  var wallsH = new Batch(true), wallsB = new Batch(true), wallsS = new Batch(true);
+  var wallsH = new Batch(true), wallsB = new Batch(true), wallsS = new Batch(true),
+      wallsG = new Batch(true);
   var roofs = new Batch();
   var outlines = [], modelled = [], i, o, r;
 
@@ -2783,7 +2847,8 @@ function addBuildings(list, parts, group, cell){
     }
     var rc = roofColour(b.tags, seed, plan.shape, cls);
     addExtrusion(geo, wc, rc, pad + minH,
-                 cls === "house" ? wallsH : (cls === "shed" ? wallsS : wallsB), roofs);
+                 cls === "house" ? wallsH : (cls === "shed" ? wallsS :
+                 (cls === "grand" ? wallsG : wallsB)), roofs);
 
     var top = pad + wallTop;
     if(roofH > 0.4 && plan.shape !== "flat"){
@@ -2821,6 +2886,7 @@ function addBuildings(list, parts, group, cell){
   if(wallsH.count()) group.add(wallsH.mesh(matHouse));
   if(wallsB.count()) group.add(wallsB.mesh(matBuild));
   if(wallsS.count()) group.add(wallsS.mesh(matShed));
+  if(wallsG.count()) group.add(wallsG.mesh(matGrand));
   if(roofs.count()) group.add(roofs.mesh(matRoof));
   cell.tallest = tallest;
 }
@@ -3426,7 +3492,9 @@ function initScene(){
   matBuild = new THREE.MeshLambertMaterial({vertexColors:true, map:facadeTexture()});
   matHouse = new THREE.MeshLambertMaterial({vertexColors:true, map:houseTexture()});
   matShed  = new THREE.MeshLambertMaterial({vertexColors:true, map:shedTexture()});
+  matGrand = new THREE.MeshLambertMaterial({vertexColors:true, map:sashTexture()});
   matBuild.name = "block"; matHouse.name = "house"; matShed.name = "shed";
+  matGrand.name = "grand";
   matRoof  = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
   matTree  = new THREE.MeshLambertMaterial({vertexColors:true});
   /* Roads, water and parks lie on the same terrain as the imagery, so they
