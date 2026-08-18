@@ -317,6 +317,9 @@ function reportText(){
     : "none"));
   /* A model that does not appear is the hardest thing to diagnose from the
      ground, so say what nearly matched and why it was turned away. */
+  if(MODEL_FROMPACK.length)
+    L.push("         OSM had no named building for " + MODEL_FROMPACK.length +
+           ", so they took an OS pack footprint: " + MODEL_FROMPACK.slice(0, 4).join("; "));
   if(MODEL_MISS.length)
     L.push("         turned away: " + MODEL_MISS.slice(0, 6).join("; ") +
            (MODEL_MISS.length > 6 ? " (+" + (MODEL_MISS.length - 6) + " more)" : ""));
@@ -784,7 +787,7 @@ function modelAnchor(e){
 /* Names that matched a model but were turned away, and why — so a model that
    silently does not appear can be diagnosed from the report instead of by
    guessing. */
-var MODEL_MISS = [];
+var MODEL_MISS = [], MODEL_FROMPACK = [];
 function modelFor(t, e){
   if(!MODELS.length || !t.name) return null;
   var g = modelAnchor(e);
@@ -4036,6 +4039,54 @@ function armPackTimer(){
      risks almost no double-drawing — far less than the cost of not merging */
   packTimer = setTimeout(function(){ tryPack(true); }, 30000);
 }
+/* A model attaches to a footprint somebody surveyed, matched by NAME — and
+   OpenStreetMap does not always put the name on the building. It is often on
+   the estate, or on a node in the middle of it, and then a model has nothing
+   to attach to and simply never appears. Polesden Lacey is exactly that: the
+   house is in the Ordnance Survey pack and the name is not on it.
+
+   So a model that found no OSM building of its name takes the pack footprint
+   nearest the point it expects to be at, preferring the big one — a landmark
+   is the large thing among its outbuildings. This does not weaken the rule
+   that matters: nothing is invented, because Ordnance Survey surveyed that
+   footprint. It only stops the name being the single point of failure. */
+function claimPackFootprints(els){
+  if(!MODELS.length || !els.length) return;
+  var want = [], i, j;
+  for(i=0;i<MODELS.length;i++){
+    var m = MODELS[i];
+    if(modelSeen[m.id] || !m.near) continue;
+    var c = toWorld(m.near[1], m.near[0]);
+    if(Math.abs(c.x) > LIMIT || Math.abs(c.z) > LIMIT) continue;
+    /* The name match can afford a generous radius because the name is strong
+       evidence. This has no name at all — only position — so it must be much
+       stricter, or a country house model lands on a farm shed a third of a
+       mile away and looks like a bug rather than a blank. */
+    var r = Math.min(m.radius || 500, m.packRadius || 220);
+    want.push({m:m, x:c.x, z:c.z, r:r, best:null, score:0});
+  }
+  if(!want.length) return;
+  for(i=0;i<els.length;i++){
+    var pts = ringToPts(els[i].geometry);
+    if(pts.length < 3) continue;
+    var cc = centroid(pts), area = Math.abs(signedArea(pts));
+    if(!(area > 40)) continue;                   /* not a garage */
+    for(j=0;j<want.length;j++){
+      var w = want[j];
+      var dx = cc.x - w.x, dz = cc.z - w.z, d = Math.sqrt(dx*dx + dz*dz);
+      if(d > w.r) continue;
+      var sc = area/(1 + d/100);                 /* big and near beats small and nearer */
+      if(sc > w.score){ w.score = sc; w.best = els[i]; w.dist = d; w.area = area; }
+    }
+  }
+  for(j=0;j<want.length;j++){
+    if(!want[j].best) continue;
+    want[j].best.tags.name = want[j].m.name;
+    want[j].best.tags["tf:anchor"] = "pack";
+    MODEL_FROMPACK.push(want[j].m.name + " (" + Math.round(want[j].area) + " m2, " +
+                        Math.round(want[j].dist) + " m from where it was expected)");
+  }
+}
 function mergePack(){
   if(packMerged || !PACK.data) return Promise.resolve();
   packMerged = true;
@@ -4065,6 +4116,7 @@ function mergePack(){
     els.push({type:"way", id:"pk" + i, tags:{building:"yes", "source":"OS OpenMap Local"},
               geometry:geom});
   }
+  claimPackFootprints(els);
   PACK.wanted = els.length;
   /* In chunks, and not all in the same tick. Twenty thousand footprints in one
      batch is a thirty-megabyte buffer built in a single synchronous block:
@@ -4473,6 +4525,7 @@ window.__sim = {
       x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });
   },
   models: function(){ return {loaded:MODELS.length, matched:MODEL_HITS.slice(), missed:MODEL_MISS.slice(),
+                             fromPack:MODEL_FROMPACK.slice(),
                              names:MODELS.map(function(m){ return m.name; })}; },
   pack: function(){ return {state:PACK.state, id:PACK.p ? PACK.p.id : null,
                             inFile:PACK.data ? PACK.data.buildings.length : 0,
