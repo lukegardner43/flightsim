@@ -6,22 +6,18 @@ to get a fresh draw.
 
 ## The answer
 
-**8 of 13 chosen places were measured.** 5 dropped out because no OpenStreetMap
-mirror would answer for them, not because of anything about the places themselves: NG21 9HL, SA15 5EF, E1 8JA, RH11 8JY, KT23 3HP (the reference).
-Everything below is the places that did answer.
-
-Across **8 places** drawn at random from Great Britain:
+Across **12 places** drawn at random from Great Britain:
 
 | | |
 |---|---|
-| Buildings Ordnance Survey has | **44,897** |
-| Buildings OpenStreetMap has | **95,133** |
-| OS footprints with nothing from OSM on them | **7,274** — 16% of the OS footprints |
-| …of those, house-sized (50–400 m²) | **3,869** |
-| Share of OS floor area OSM does not have | **4%** |
-| Buildings OSM has that OS does not | 4,242 |
+| Buildings Ordnance Survey has | **103,034** |
+| Buildings OpenStreetMap has | **174,490** |
+| OS footprints with nothing from OSM on them | **36,975** — 36% of the OS footprints |
+| …of those, house-sized (50–400 m²) | **21,948** |
+| Share of OS floor area OSM does not have | **19%** |
+| Buildings OSM has that OS does not | 10,349 |
 
-In a **typical place**, though, **18%** of the buildings are missing.
+In a **typical place**, though, **28%** of the buildings are missing.
 
 Those two numbers are both true and they are not the same measurement. The first
 pools every building in the sample, so it is dominated by the cities, which hold most
@@ -29,25 +25,46 @@ of the buildings and are mapped best. The second is the middle place, which is w
 most of Great Britain by area actually is. Cities are close to finished; everywhere
 else is not.
 
-Places essentially complete (under 10% missing): **4 of 8**. Places missing half or more: **1 of 8**.
+Places essentially complete (under 10% missing): **2 of 12**. Places missing half or more: **4 of 12**.
 
-- Worst: **SS4 3RQ**, Rochford — 89% missing (3,874 footprints)
-- Best: **EH53 0RT**, West Lothian — 5% missing
+- Worst: **DA12 2JT**, Gravesham — 82% missing (7,213 footprints)
+- Best: **NE28 8PW**, North Tyneside — 9% missing
+
+## The place this started with
+
+**KT23 3HP** — Mole Valley, South East
+
+| | |
+|---|---|
+| Buildings Ordnance Survey has | **7,011** |
+| Buildings OpenStreetMap has | **2,951** |
+| Missing from OpenStreetMap | **4,794** (68%) |
+| …house-sized | **3,686** |
+| The random sample, for comparison | 28% missing at the median place |
+
+It is worse than **83%** of the places drawn at random. That makes it worse mapped than most places, but well inside the range the rest of the country shows.
+
+So: not a blindspot. A normal amount of missing, at a place where there was a lot to miss.
 
 ## Every place measured
 
-Sorted worst first. "Missing" is an OS building with no OpenStreetMap building anywhere on it.
+Sorted worst first. "Missing" is an OS building with no OpenStreetMap building anywhere on it. A * marks a place chosen rather than drawn — it is not in the totals above.
 
 | Place | District | OS | OSM | Missing | % missing | House-sized | OSM-only |
 |---|---|---:|---:|---:|---:|---:|---:|
-| SS4 3RQ | Rochford | 4,370 | 714 | 3,874 | 89% | 2,794 | 20 |
-| NR11 8TZ | North Norfolk | 1,038 | 898 | 223 | 22% | 72 | 45 |
-| PE34 4PP | King's Lynn and West Norfolk | 2,173 | 1,943 | 415 | 19% | 132 | 83 |
-| KY5 0UX | Fife | 1,187 | 2,863 | 214 | 18% | 72 | 1,384 |
-| G31 5EQ | Glasgow City | 8,938 | 13,509 | 754 | 8% | 284 | 785 |
-| NW5 9ND | Camden | 10,077 | 32,108 | 826 | 8% | 275 | 448 |
-| SE17 1HF | Southwark | 9,017 | 25,175 | 568 | 6% | 149 | 629 |
-| EH53 0RT | West Lothian | 8,097 | 17,923 | 400 | 5% | 91 | 848 |
+| DA12 2JT | Gravesham | 8,815 | 3,617 | 7,213 | 82% | 4,919 | 174 |
+| HA0 3FF | Brent | 14,216 | 6,487 | 10,576 | 74% | 6,188 | 96 |
+| KT23 3HP * | Mole Valley | 7,011 | 2,951 | 4,794 | 68% | 3,686 | 240 |
+| OL10 2ED | Rochdale | 8,673 | 5,662 | 5,758 | 66% | 4,420 | 94 |
+| SK17 7DX | High Peak | 4,661 | 2,417 | 2,981 | 64% | 2,303 | 200 |
+| NR28 0SS | North Norfolk | 4,510 | 4,238 | 1,876 | 42% | 1,309 | 262 |
+| PO3 6NU | Portsmouth | 6,315 | 24,296 | 1,772 | 28% | 727 | 4,883 |
+| YO18 7DT | North Yorkshire | 3,243 | 3,779 | 586 | 18% | 236 | 138 |
+| S71 5PT | Barnsley | 12,085 | 21,609 | 2,034 | 17% | 613 | 161 |
+| SN3 4DU | Swindon | 11,958 | 32,612 | 1,406 | 12% | 368 | 1,101 |
+| YO23 3US | York | 4,277 | 6,751 | 502 | 12% | 131 | 237 |
+| BS3 9GJ | Bristol, City of | 12,598 | 44,198 | 1,244 | 10% | 368 | 2,510 |
+| NE28 8PW | North Tyneside | 11,683 | 18,824 | 1,027 | 9% | 366 | 493 |
 
 ## How to read this
 
@@ -62,8 +79,6 @@ Sorted worst first. "Missing" is an OS building with no OpenStreetMap building a
   every time. It is the closest this data comes to counting missing houses, and it will
   undercount flats — one block of flats is one large footprint, not forty houses.
 - OS OpenMap Local is Great Britain only, so Northern Ireland is not in this sample.
-- **5 chosen places are missing from these numbers** — Overpass would not answer for them. That is a gap in the sample, not a
-  finding about those places, and it makes the sample smaller than it was meant to be.
 
 Contains OS data © Crown copyright and database right. Open Government Licence v3.
 Contains OpenStreetMap data © OpenStreetMap contributors, Open Database Licence.

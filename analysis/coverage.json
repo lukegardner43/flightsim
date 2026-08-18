@@ -1,372 +1,549 @@
 {
  "totals": {
-  "sites": 8,
-  "osCount": 44897,
-  "osmCount": 95133,
-  "osArea": 22409677,
-  "osmArea": 20326288,
-  "missCount": 7274,
-  "missArea": 880791,
-  "houses": 3869,
-  "extraCount": 4242,
-  "missingShare": 0.162015279417333,
-  "missingAreaShare": 0.03930404708644395,
-  "areaRatio": 0.9070317256246041,
-  "medianSiteMissing": 0.18,
+  "sites": 12,
+  "osCount": 103034,
+  "osmCount": 174490,
+  "osArea": 31782617,
+  "osmArea": 23885898,
+  "missCount": 36975,
+  "missArea": 6194397,
+  "houses": 21948,
+  "extraCount": 10349,
+  "missingShare": 0.3588621231826387,
+  "missingAreaShare": 0.19489889709208025,
+  "areaRatio": 0.7515396859862107,
+  "medianSiteMissing": 0.281,
   "worst": {
    "site": {
-    "postcode": "SS4 3RQ",
-    "lat": 51.601432,
-    "lon": 0.727057,
+    "postcode": "DA12 2JT",
+    "lat": 51.43831,
+    "lon": 0.391798,
     "square": "TQ",
-    "district": "Rochford",
-    "region": "East of England",
+    "district": "Gravesham",
+    "region": "South East",
     "country": "England"
    },
    "os": {
-    "count": 4370,
-    "area": 827527,
-    "median": 130
-   },
-   "osm": {
-    "count": 714,
-    "area": 155562,
-    "median": 100
-   },
-   "missing": {
-    "count": 3874,
-    "area": 634318,
-    "outbuilding": 842,
-    "housesized": 2794,
-    "large": 238
-   },
-   "extra": {
-    "count": 20,
-    "area": 2428
-   },
-   "areaRatio": 0.188,
-   "missingShare": 0.886,
-   "missingAreaShare": 0.767
-  },
-  "best": {
-   "site": {
-    "postcode": "EH53 0RT",
-    "lat": 55.885337,
-    "lon": -3.493427,
-    "square": "NT",
-    "district": "West Lothian",
-    "region": "Scotland",
-    "country": "Scotland"
-   },
-   "os": {
-    "count": 8097,
-    "area": 2205049,
+    "count": 8815,
+    "area": 2348683,
     "median": 136
    },
    "osm": {
-    "count": 17923,
-    "area": 2079571,
-    "median": 57
+    "count": 3617,
+    "area": 775273,
+    "median": 71
    },
    "missing": {
-    "count": 400,
-    "area": 23528,
-    "outbuilding": 305,
-    "housesized": 91,
-    "large": 4
+    "count": 7213,
+    "area": 1298217,
+    "outbuilding": 1661,
+    "housesized": 4919,
+    "large": 633
    },
    "extra": {
-    "count": 848,
-    "area": 42203
+    "count": 174,
+    "area": 15244
    },
-   "areaRatio": 0.943,
-   "missingShare": 0.049,
-   "missingAreaShare": 0.011
+   "areaRatio": 0.33,
+   "missingShare": 0.818,
+   "missingAreaShare": 0.553
   },
-  "complete": 4,
-  "half": 1
+  "best": {
+   "site": {
+    "postcode": "NE28 8PW",
+    "lat": 55.004125,
+    "lon": -1.548415,
+    "square": "NZ",
+    "district": "North Tyneside",
+    "region": "North East",
+    "country": "England"
+   },
+   "os": {
+    "count": 11683,
+    "area": 3745081,
+    "median": 159
+   },
+   "osm": {
+    "count": 18824,
+    "area": 3307018,
+    "median": 91
+   },
+   "missing": {
+    "count": 1027,
+    "area": 88879,
+    "outbuilding": 651,
+    "housesized": 366,
+    "large": 10
+   },
+   "extra": {
+    "count": 493,
+    "area": 39872
+   },
+   "areaRatio": 0.883,
+   "missingShare": 0.088,
+   "missingAreaShare": 0.024
+  },
+  "complete": 2,
+  "half": 4
  },
  "sites": [
   {
    "site": {
-    "postcode": "G31 5EQ",
-    "lat": 55.851986,
-    "lon": -4.197042,
-    "square": "NS",
-    "district": "Glasgow City",
-    "region": "Scotland",
-    "country": "Scotland"
-   },
-   "os": {
-    "count": 8938,
-    "area": 3728553,
-    "median": 155
-   },
-   "osm": {
-    "count": 13509,
-    "area": 3479163,
-    "median": 125
-   },
-   "missing": {
-    "count": 754,
-    "area": 60193,
-    "outbuilding": 451,
-    "housesized": 284,
-    "large": 19
-   },
-   "extra": {
-    "count": 785,
-    "area": 41575
-   },
-   "areaRatio": 0.933,
-   "missingShare": 0.084,
-   "missingAreaShare": 0.016
-  },
-  {
-   "site": {
-    "postcode": "KY5 0UX",
-    "lat": 56.171473,
-    "lon": -3.227747,
-    "square": "NT",
-    "district": "Fife",
-    "region": "Scotland",
-    "country": "Scotland"
-   },
-   "os": {
-    "count": 1187,
-    "area": 547392,
-    "median": 142
-   },
-   "osm": {
-    "count": 2863,
-    "area": 721219,
-    "median": 62
-   },
-   "missing": {
-    "count": 214,
-    "area": 17271,
-    "outbuilding": 135,
-    "housesized": 72,
-    "large": 7
-   },
-   "extra": {
-    "count": 1384,
-    "area": 177430
-   },
-   "areaRatio": 1.318,
-   "missingShare": 0.18,
-   "missingAreaShare": 0.032
-  },
-  {
-   "site": {
-    "postcode": "EH53 0RT",
-    "lat": 55.885337,
-    "lon": -3.493427,
-    "square": "NT",
-    "district": "West Lothian",
-    "region": "Scotland",
-    "country": "Scotland"
-   },
-   "os": {
-    "count": 8097,
-    "area": 2205049,
-    "median": 136
-   },
-   "osm": {
-    "count": 17923,
-    "area": 2079571,
-    "median": 57
-   },
-   "missing": {
-    "count": 400,
-    "area": 23528,
-    "outbuilding": 305,
-    "housesized": 91,
-    "large": 4
-   },
-   "extra": {
-    "count": 848,
-    "area": 42203
-   },
-   "areaRatio": 0.943,
-   "missingShare": 0.049,
-   "missingAreaShare": 0.011
-  },
-  {
-   "site": {
-    "postcode": "PE34 4PP",
-    "lat": 52.739146,
-    "lon": 0.293953,
-    "square": "TF",
-    "district": "King's Lynn and West Norfolk",
-    "region": "East of England",
+    "postcode": "NE28 8PW",
+    "lat": 55.004125,
+    "lon": -1.548415,
+    "square": "NZ",
+    "district": "North Tyneside",
+    "region": "North East",
     "country": "England"
    },
    "os": {
-    "count": 2173,
-    "area": 358171,
-    "median": 124
+    "count": 11683,
+    "area": 3745081,
+    "median": 159
    },
    "osm": {
-    "count": 1943,
-    "area": 379102,
-    "median": 106
+    "count": 18824,
+    "area": 3307018,
+    "median": 91
    },
    "missing": {
-    "count": 415,
-    "area": 31439,
-    "outbuilding": 276,
-    "housesized": 132,
-    "large": 7
+    "count": 1027,
+    "area": 88879,
+    "outbuilding": 651,
+    "housesized": 366,
+    "large": 10
    },
    "extra": {
-    "count": 83,
-    "area": 23330
+    "count": 493,
+    "area": 39872
    },
-   "areaRatio": 1.058,
-   "missingShare": 0.191,
-   "missingAreaShare": 0.088
+   "areaRatio": 0.883,
+   "missingShare": 0.088,
+   "missingAreaShare": 0.024
   },
   {
    "site": {
-    "postcode": "NR11 8TZ",
-    "lat": 52.858101,
-    "lon": 1.330862,
+    "postcode": "OL10 2ED",
+    "lat": 53.587388,
+    "lon": -2.209317,
+    "square": "SD",
+    "district": "Rochdale",
+    "region": "North West",
+    "country": "England"
+   },
+   "os": {
+    "count": 8673,
+    "area": 2350839,
+    "median": 131
+   },
+   "osm": {
+    "count": 5662,
+    "area": 1201204,
+    "median": 49
+   },
+   "missing": {
+    "count": 5758,
+    "area": 1000533,
+    "outbuilding": 909,
+    "housesized": 4420,
+    "large": 429
+   },
+   "extra": {
+    "count": 94,
+    "area": 8764
+   },
+   "areaRatio": 0.511,
+   "missingShare": 0.664,
+   "missingAreaShare": 0.426
+  },
+  {
+   "site": {
+    "postcode": "YO18 7DT",
+    "lat": 54.243233,
+    "lon": -0.771984,
+    "square": "SE",
+    "district": "North Yorkshire",
+    "region": "Yorkshire and The Humber",
+    "country": "England"
+   },
+   "os": {
+    "count": 3243,
+    "area": 612934,
+    "median": 111
+   },
+   "osm": {
+    "count": 3779,
+    "area": 517126,
+    "median": 78
+   },
+   "missing": {
+    "count": 586,
+    "area": 43811,
+    "outbuilding": 341,
+    "housesized": 236,
+    "large": 9
+   },
+   "extra": {
+    "count": 138,
+    "area": 6736
+   },
+   "areaRatio": 0.844,
+   "missingShare": 0.181,
+   "missingAreaShare": 0.071
+  },
+  {
+   "site": {
+    "postcode": "YO23 3US",
+    "lat": 53.919065,
+    "lon": -1.146076,
+    "square": "SE",
+    "district": "York",
+    "region": "Yorkshire and The Humber",
+    "country": "England"
+   },
+   "os": {
+    "count": 4277,
+    "area": 790925,
+    "median": 121
+   },
+   "osm": {
+    "count": 6751,
+    "area": 637637,
+    "median": 65
+   },
+   "missing": {
+    "count": 502,
+    "area": 28750,
+    "outbuilding": 366,
+    "housesized": 131,
+    "large": 5
+   },
+   "extra": {
+    "count": 237,
+    "area": 9096
+   },
+   "areaRatio": 0.806,
+   "missingShare": 0.117,
+   "missingAreaShare": 0.036
+  },
+  {
+   "site": {
+    "postcode": "S71 5PT",
+    "lat": 53.5557,
+    "lon": -1.439035,
+    "square": "SE",
+    "district": "Barnsley",
+    "region": "Yorkshire and The Humber",
+    "country": "England"
+   },
+   "os": {
+    "count": 12085,
+    "area": 2300399,
+    "median": 110
+   },
+   "osm": {
+    "count": 21609,
+    "area": 1831358,
+    "median": 45
+   },
+   "missing": {
+    "count": 2034,
+    "area": 119035,
+    "outbuilding": 1405,
+    "housesized": 613,
+    "large": 16
+   },
+   "extra": {
+    "count": 161,
+    "area": 15286
+   },
+   "areaRatio": 0.796,
+   "missingShare": 0.168,
+   "missingAreaShare": 0.052
+  },
+  {
+   "site": {
+    "postcode": "SK17 7DX",
+    "lat": 53.264,
+    "lon": -1.902781,
+    "square": "SK",
+    "district": "High Peak",
+    "region": "East Midlands",
+    "country": "England"
+   },
+   "os": {
+    "count": 4661,
+    "area": 1093069,
+    "median": 136
+   },
+   "osm": {
+    "count": 2417,
+    "area": 538904,
+    "median": 107
+   },
+   "missing": {
+    "count": 2981,
+    "area": 471092,
+    "outbuilding": 538,
+    "housesized": 2303,
+    "large": 140
+   },
+   "extra": {
+    "count": 200,
+    "area": 4531
+   },
+   "areaRatio": 0.493,
+   "missingShare": 0.64,
+   "missingAreaShare": 0.431
+  },
+  {
+   "site": {
+    "postcode": "BS3 9GJ",
+    "lat": 51.438707,
+    "lon": -2.601529,
+    "square": "ST",
+    "district": "Bristol, City of",
+    "region": "South West",
+    "country": "England"
+   },
+   "os": {
+    "count": 12598,
+    "area": 5257990,
+    "median": 150
+   },
+   "osm": {
+    "count": 44198,
+    "area": 4713109,
+    "median": 56
+   },
+   "missing": {
+    "count": 1244,
+    "area": 80273,
+    "outbuilding": 859,
+    "housesized": 368,
+    "large": 17
+   },
+   "extra": {
+    "count": 2510,
+    "area": 70110
+   },
+   "areaRatio": 0.896,
+   "missingShare": 0.099,
+   "missingAreaShare": 0.015
+  },
+  {
+   "site": {
+    "postcode": "SN3 4DU",
+    "lat": 51.57249,
+    "lon": -1.747301,
+    "square": "SU",
+    "district": "Swindon",
+    "region": "South West",
+    "country": "England"
+   },
+   "os": {
+    "count": 11958,
+    "area": 3954567,
+    "median": 147
+   },
+   "osm": {
+    "count": 32612,
+    "area": 4018655,
+    "median": 60
+   },
+   "missing": {
+    "count": 1406,
+    "area": 79307,
+    "outbuilding": 1024,
+    "housesized": 368,
+    "large": 14
+   },
+   "extra": {
+    "count": 1101,
+    "area": 175862
+   },
+   "areaRatio": 1.016,
+   "missingShare": 0.118,
+   "missingAreaShare": 0.02
+  },
+  {
+   "site": {
+    "postcode": "PO3 6NU",
+    "lat": 50.808622,
+    "lon": -1.056368,
+    "square": "SU",
+    "district": "Portsmouth",
+    "region": "South East",
+    "country": "England"
+   },
+   "os": {
+    "count": 6315,
+    "area": 3367127,
+    "median": 204
+   },
+   "osm": {
+    "count": 24296,
+    "area": 3484448,
+    "median": 62
+   },
+   "missing": {
+    "count": 1772,
+    "area": 430039,
+    "outbuilding": 751,
+    "housesized": 727,
+    "large": 294
+   },
+   "extra": {
+    "count": 4883,
+    "area": 1033593
+   },
+   "areaRatio": 1.035,
+   "missingShare": 0.281,
+   "missingAreaShare": 0.128
+  },
+  {
+   "site": {
+    "postcode": "NR28 0SS",
+    "lat": 52.828323,
+    "lon": 1.388971,
     "square": "TG",
     "district": "North Norfolk",
     "region": "East of England",
     "country": "England"
    },
    "os": {
-    "count": 1038,
-    "area": 164236,
-    "median": 117
+    "count": 4510,
+    "area": 882629,
+    "median": 133
    },
    "osm": {
-    "count": 898,
-    "area": 138986,
-    "median": 106
-   },
-   "missing": {
-    "count": 223,
-    "area": 13106,
-    "outbuilding": 150,
-    "housesized": 72,
-    "large": 1
-   },
-   "extra": {
-    "count": 45,
-    "area": 3779
-   },
-   "areaRatio": 0.846,
-   "missingShare": 0.215,
-   "missingAreaShare": 0.08
-  },
-  {
-   "site": {
-    "postcode": "SS4 3RQ",
-    "lat": 51.601432,
-    "lon": 0.727057,
-    "square": "TQ",
-    "district": "Rochford",
-    "region": "East of England",
-    "country": "England"
-   },
-   "os": {
-    "count": 4370,
-    "area": 827527,
-    "median": 130
-   },
-   "osm": {
-    "count": 714,
-    "area": 155562,
-    "median": 100
-   },
-   "missing": {
-    "count": 3874,
-    "area": 634318,
-    "outbuilding": 842,
-    "housesized": 2794,
-    "large": 238
-   },
-   "extra": {
-    "count": 20,
-    "area": 2428
-   },
-   "areaRatio": 0.188,
-   "missingShare": 0.886,
-   "missingAreaShare": 0.767
-  },
-  {
-   "site": {
-    "postcode": "SE17 1HF",
-    "lat": 51.49302,
-    "lon": -0.08595,
-    "square": "TQ",
-    "district": "Southwark",
-    "region": "London",
-    "country": "England"
-   },
-   "os": {
-    "count": 9017,
-    "area": 8085095,
-    "median": 395
-   },
-   "osm": {
-    "count": 25175,
-    "area": 7489246,
-    "median": 84
-   },
-   "missing": {
-    "count": 568,
-    "area": 45411,
-    "outbuilding": 399,
-    "housesized": 149,
-    "large": 20
-   },
-   "extra": {
-    "count": 629,
-    "area": 118143
-   },
-   "areaRatio": 0.926,
-   "missingShare": 0.063,
-   "missingAreaShare": 0.006
-  },
-  {
-   "site": {
-    "postcode": "NW5 9ND",
-    "lat": 51.550839,
-    "lon": -0.146701,
-    "square": "TQ",
-    "district": "Camden",
-    "region": "London",
-    "country": "England"
-   },
-   "os": {
-    "count": 10077,
-    "area": 6493654,
-    "median": 296
-   },
-   "osm": {
-    "count": 32108,
-    "area": 5883439,
+    "count": 4238,
+    "area": 547269,
     "median": 77
    },
    "missing": {
-    "count": 826,
-    "area": 55525,
-    "outbuilding": 538,
-    "housesized": 275,
-    "large": 13
+    "count": 1876,
+    "area": 246658,
+    "outbuilding": 522,
+    "housesized": 1309,
+    "large": 45
    },
    "extra": {
-    "count": 448,
-    "area": 34599
+    "count": 262,
+    "area": 10857
    },
-   "areaRatio": 0.906,
-   "missingShare": 0.082,
-   "missingAreaShare": 0.009
+   "areaRatio": 0.62,
+   "missingShare": 0.416,
+   "missingAreaShare": 0.279
+  },
+  {
+   "site": {
+    "postcode": "HA0 3FF",
+    "lat": 51.558747,
+    "lon": -0.312039,
+    "square": "TQ",
+    "district": "Brent",
+    "region": "London",
+    "country": "England"
+   },
+   "os": {
+    "count": 14216,
+    "area": 5078374,
+    "median": 153
+   },
+   "osm": {
+    "count": 6487,
+    "area": 2313897,
+    "median": 103
+   },
+   "missing": {
+    "count": 10576,
+    "area": 2307803,
+    "outbuilding": 2931,
+    "housesized": 6188,
+    "large": 1457
+   },
+   "extra": {
+    "count": 96,
+    "area": 31408
+   },
+   "areaRatio": 0.456,
+   "missingShare": 0.744,
+   "missingAreaShare": 0.454
+  },
+  {
+   "site": {
+    "postcode": "DA12 2JT",
+    "lat": 51.43831,
+    "lon": 0.391798,
+    "square": "TQ",
+    "district": "Gravesham",
+    "region": "South East",
+    "country": "England"
+   },
+   "os": {
+    "count": 8815,
+    "area": 2348683,
+    "median": 136
+   },
+   "osm": {
+    "count": 3617,
+    "area": 775273,
+    "median": 71
+   },
+   "missing": {
+    "count": 7213,
+    "area": 1298217,
+    "outbuilding": 1661,
+    "housesized": 4919,
+    "large": 633
+   },
+   "extra": {
+    "count": 174,
+    "area": 15244
+   },
+   "areaRatio": 0.33,
+   "missingShare": 0.818,
+   "missingAreaShare": 0.553
   }
  ],
- "reference": []
+ "reference": [
+  {
+   "site": {
+    "postcode": "KT23 3HP",
+    "lat": 51.28668,
+    "lon": -0.384959,
+    "square": "TQ",
+    "district": "Mole Valley",
+    "region": "South East",
+    "country": "England",
+    "reference": true
+   },
+   "os": {
+    "count": 7011,
+    "area": 1192419,
+    "median": 135
+   },
+   "osm": {
+    "count": 2951,
+    "area": 433190,
+    "median": 108
+   },
+   "missing": {
+    "count": 4794,
+    "area": 723817,
+    "outbuilding": 932,
+    "housesized": 3686,
+    "large": 176
+   },
+   "extra": {
+    "count": 240,
+    "area": 15332
+   },
+   "areaRatio": 0.363,
+   "missingShare": 0.684,
+   "missingAreaShare": 0.607
+  }
+ ]
 }
