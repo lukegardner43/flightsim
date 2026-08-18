@@ -450,11 +450,25 @@
    "match": [
     "polesden lacey"
    ],
+   "exclude": [
+    "stables",
+    "stable",
+    "folly",
+    "estate",
+    "cottage",
+    "farm",
+    "lodge",
+    "garden",
+    "car park",
+    "shop",
+    "restaurant",
+    "visitor"
+   ],
    "near": [
     51.2647,
     -0.3745
    ],
-   "radius": 700,
+   "radius": 1200,
    "orient": "compass",
    "replaceOutline": true,
    "confidence": "high — rebuilt from the uploaded brief and two reference photographs",

@@ -315,6 +315,11 @@ function reportText(){
     ? MODELS.length + " landmark models loaded, " + MODEL_HITS.length + " matched a mapped building" +
       (MODEL_HITS.length ? ": " + MODEL_HITS.slice(0, 12).join(", ") : "")
     : "none"));
+  /* A model that does not appear is the hardest thing to diagnose from the
+     ground, so say what nearly matched and why it was turned away. */
+  if(MODEL_MISS.length)
+    L.push("         turned away: " + MODEL_MISS.slice(0, 6).join("; ") +
+           (MODEL_MISS.length > 6 ? " (+" + (MODEL_MISS.length - 6) + " more)" : ""));
   L.push("terrain  " + (HF.ready ? "ok, ground " + Math.round(HF.elev0) + "m, relief " +
                                    Math.round(HF.max-HF.min) + "m" : "none"));
   L.push("cells    core=" + coverage.a + " mid=" + coverage.m.join("") + " outer=" + coverage.b.join("") +
@@ -760,19 +765,53 @@ var MODEL_HITS = [], modelSeen = {};
 window.TF_MODELS = function(d){
   if(d && d.models) MODELS = MODELS.concat(d.models);
 };
+/* Where is this building, in one point? A way carries its own geometry; a
+   MULTIPOLYGON RELATION does not — it carries member ways. A courtyard house
+   is a multipolygon, because the courtyard is an inner ring, so reading the
+   anchor off e.geometry alone meant no model could ever attach to one. That
+   is exactly the shape of Polesden Lacey. */
+function modelAnchor(e){
+  if(e.geometry && e.geometry[0]) return e.geometry[0];
+  if(e.type === "relation" && e.members){
+    for(var i=0;i<e.members.length;i++){
+      var mem = e.members[i];
+      if(mem.type === "way" && mem.geometry && mem.geometry[0] &&
+         (mem.role === "outer" || !mem.role)) return mem.geometry[0];
+    }
+  }
+  return null;
+}
+/* Names that matched a model but were turned away, and why — so a model that
+   silently does not appear can be diagnosed from the report instead of by
+   guessing. */
+var MODEL_MISS = [];
 function modelFor(t, e){
-  if(!MODELS.length || !t.name || !e.geometry || !e.geometry[0]) return null;
+  if(!MODELS.length || !t.name) return null;
+  var g = modelAnchor(e);
+  if(!g) return null;
   var n = String(t.name).toLowerCase(), i, j;
   for(i=0;i<MODELS.length;i++){
     var m = MODELS[i], hit = false;
     for(j=0;j<(m.match||[]).length;j++)
       if(n.indexOf(String(m.match[j]).toLowerCase()) >= 0){ hit = true; break; }
     if(!hit) continue;
+    /* "Polesden Lacey Stables" contains "polesden lacey". Without this the
+       house model lands on the stable block as well as the house. */
+    if(m.exclude){
+      var skip = false;
+      for(j=0;j<m.exclude.length;j++)
+        if(n.indexOf(String(m.exclude[j]).toLowerCase()) >= 0){ skip = true; break; }
+      if(skip){ MODEL_MISS.push(t.name + ": excluded by " + m.id); continue; }
+    }
     if(m.near){                                  /* right name, right place */
-      var g = e.geometry[0];
       var w = toWorld(g.lon, g.lat), c = toWorld(m.near[1], m.near[0]);
       var r = m.radius || 500;
-      if((w.x-c.x)*(w.x-c.x) + (w.z-c.z)*(w.z-c.z) > r*r) continue;
+      var d = Math.sqrt((w.x-c.x)*(w.x-c.x) + (w.z-c.z)*(w.z-c.z));
+      if(d > r){
+        MODEL_MISS.push(t.name + ": " + Math.round(d) + " m from where " + m.id +
+                        " expects it, limit " + Math.round(r) + " m");
+        continue;
+      }
     }
     return m;
   }
@@ -4433,7 +4472,7 @@ window.__sim = {
     return labels.map(function(s){ return {name:s.userData.name,
       x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });
   },
-  models: function(){ return {loaded:MODELS.length, matched:MODEL_HITS.slice(),
+  models: function(){ return {loaded:MODELS.length, matched:MODEL_HITS.slice(), missed:MODEL_MISS.slice(),
                              names:MODELS.map(function(m){ return m.name; })}; },
   pack: function(){ return {state:PACK.state, id:PACK.p ? PACK.p.id : null,
                             inFile:PACK.data ? PACK.data.buildings.length : 0,

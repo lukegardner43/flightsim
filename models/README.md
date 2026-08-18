@@ -109,6 +109,28 @@ written as `height: 18.4, roofHeight: 9.6` therefore gets no roof at all —
 which is how St Nicolas' spire came to be missing. The authoring script adds
 the roof height on and checks the clearance; the JSON stores the total.
 
+## Courtyard houses are relations, not ways
+
+A building with a hole in it — a quadrangle round a courtyard — is a
+multipolygon RELATION in OpenStreetMap, and a relation carries member ways
+rather than geometry of its own. `modelFor` used to read the building's
+position straight off `e.geometry`, so it could never attach to one, and
+Polesden Lacey is precisely that shape. It now reads the anchor from the
+first outer member when there is no geometry.
+
+## `exclude`
+
+Everything on the Polesden Lacey estate is called Polesden Lacey something,
+and `match` is a substring test, so the house model landed on the stable
+block too. A model may list `exclude` substrings that veto a match.
+
+## When a model does not appear
+
+The report says so. Any name that matched a model and was then turned away —
+by `exclude`, or by being outside `radius` — is listed under `models` with the
+distance, so "it isn't there" becomes "it is 840 m from where the model
+expects it" without anyone having to guess.
+
 ## Small parts
 
 A chimney stack is about two metres square, and the collector rejects parts

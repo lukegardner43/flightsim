@@ -188,7 +188,12 @@ models.push({
     note:'white lantern with clock faces under a dark domed lead roof and finial' });
   models.push({
     id:'polesden', name:'Polesden Lacey',
-    match:['polesden lacey'], near:[51.2647,-0.3745], radius:700,
+    match:['polesden lacey'],
+    /* Everything on the estate is called Polesden Lacey something. Without
+       this the house lands on the stable block and the visitor centre too. */
+    exclude:['stables','stable','folly','estate','cottage','farm','lodge',
+             'garden','car park','shop','restaurant','visitor'],
+    near:[51.2647,-0.3745], radius:1200,
     orient:'compass', replaceOutline:true,
     confidence:'high — rebuilt from the uploaded brief and two reference photographs',
     sources:[
