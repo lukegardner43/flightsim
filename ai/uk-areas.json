@@ -1,0 +1,5055 @@
+{
+ "id": "uk-areas",
+ "kind": "areas",
+ "name": "UK postcode areas",
+ "produced_by": "Claude Opus 5",
+ "produced_on": "2026-08-18",
+ "method": "Written from the model's training knowledge of British building stock by region. No live lookup, no aerial imagery, no OSM query, no site visit. Stored as archetypes plus an area-to-archetype map rather than 121 separate weight tables, because the differences between Bolton and Bradford are not differences a language model actually knows; the differences between Bolton and Bath are.",
+ "confidence": {
+  "archetypes": "medium — the broad character of British regional building stock is the kind of thing a language model does hold: terrace or semi, brick or stone or render, slate or tile.",
+  "assignment": "medium for areas named after one city, lower for the large rural areas, which contain several characters and get the commonest one.",
+  "proportions": "low to medium — the weights are considered estimates, not surveys, and are the thing most worth correcting.",
+  "edges": "low — a postcode area is not a county and its edges are arbitrary. GU covers both Guildford and Aldershot; LL covers both Llandudno and Wrexham."
+ },
+ "caveat": "Every value here is inference. aiDress writes ai:levels, ai:wallmat and ai:roofmat, never building:levels, so nothing from this file is ever counted as a measurement.",
+ "archetypes": {
+  "london-inner": {
+   "character": "Inner London: Georgian and Victorian terraces, mansion blocks and post-war estates, in London stock brick and slate, three to five storeys, with commercial frontage at ground level.",
+   "shedArea": 1400,
+   "stock": {
+    "house": 0.38,
+    "block": 0.52,
+    "shed": 0.1
+   },
+   "type": {
+    "house": [
+     [
+      "terrace",
+      0.74
+     ],
+     [
+      "house",
+      0.14
+     ],
+     [
+      "semidetached_house",
+      0.08
+     ],
+     [
+      "detached",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.58
+     ],
+     [
+      "commercial",
+      0.18
+     ],
+     [
+      "retail",
+      0.14
+     ],
+     [
+      "office",
+      0.1
+     ]
+    ],
+    "shed": [
+     [
+      "warehouse",
+      0.4
+     ],
+     [
+      "industrial",
+      0.25
+     ],
+     [
+      "garage",
+      0.2
+     ],
+     [
+      "shed",
+      0.15
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.46
+     ],
+     [
+      "industrial",
+      0.3
+     ],
+     [
+      "factory",
+      0.24
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      3,
+      0.44
+     ],
+     [
+      2,
+      0.3
+     ],
+     [
+      4,
+      0.2
+     ],
+     [
+      5,
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      5,
+      0.3
+     ],
+     [
+      4,
+      0.28
+     ],
+     [
+      6,
+      0.18
+     ],
+     [
+      3,
+      0.14
+     ],
+     [
+      8,
+      0.1
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "brick",
+      0.5
+     ],
+     [
+      "red_brick",
+      0.22
+     ],
+     [
+      "render",
+      0.14
+     ],
+     [
+      "plaster",
+      0.08
+     ],
+     [
+      "stone",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "brick",
+      0.44
+     ],
+     [
+      "concrete",
+      0.24
+     ],
+     [
+      "render",
+      0.18
+     ],
+     [
+      "glass",
+      0.14
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.5
+     ],
+     [
+      "brick",
+      0.24
+     ],
+     [
+      "concrete",
+      0.2
+     ],
+     [
+      "wood",
+      0.06
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.5
+     ],
+     [
+      "hipped",
+      0.22
+     ],
+     [
+      "flat",
+      0.2
+     ],
+     [
+      "pyramidal",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "flat",
+      0.62
+     ],
+     [
+      "hipped",
+      0.24
+     ],
+     [
+      "gabled",
+      0.14
+     ]
+    ],
+    "shed": [
+     [
+      "flat",
+      0.55
+     ],
+     [
+      "gabled",
+      0.45
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.62
+     ],
+     [
+      "tile",
+      0.22
+     ],
+     [
+      "clay",
+      0.1
+     ],
+     [
+      "metal",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "bitumen",
+      0.42
+     ],
+     [
+      "gravel",
+      0.26
+     ],
+     [
+      "slate",
+      0.2
+     ],
+     [
+      "tile",
+      0.12
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.7
+     ],
+     [
+      "bitumen",
+      0.2
+     ],
+     [
+      "eternit",
+      0.1
+     ]
+    ]
+   }
+  },
+  "london-outer": {
+   "character": "Outer London: interwar semi-detached suburbia, hipped tile roofs, bay windows, red brick with render and mock timber, on long arterial roads and crescents.",
+   "shedArea": 1100,
+   "stock": {
+    "house": 0.78,
+    "block": 0.12,
+    "shed": 0.1
+   },
+   "type": {
+    "house": [
+     [
+      "semidetached_house",
+      0.52
+     ],
+     [
+      "terrace",
+      0.22
+     ],
+     [
+      "detached",
+      0.14
+     ],
+     [
+      "bungalow",
+      0.07
+     ],
+     [
+      "house",
+      0.05
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.66
+     ],
+     [
+      "retail",
+      0.18
+     ],
+     [
+      "commercial",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "garage",
+      0.36
+     ],
+     [
+      "warehouse",
+      0.24
+     ],
+     [
+      "shed",
+      0.2
+     ],
+     [
+      "industrial",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.48
+     ],
+     [
+      "industrial",
+      0.32
+     ],
+     [
+      "factory",
+      0.2
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.84
+     ],
+     [
+      3,
+      0.1
+     ],
+     [
+      1,
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      4,
+      0.4
+     ],
+     [
+      3,
+      0.34
+     ],
+     [
+      5,
+      0.18
+     ],
+     [
+      6,
+      0.08
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "red_brick",
+      0.42
+     ],
+     [
+      "render",
+      0.2
+     ],
+     [
+      "brick",
+      0.18
+     ],
+     [
+      "plaster",
+      0.1
+     ],
+     [
+      "timber_framing",
+      0.05
+     ],
+     [
+      "concrete",
+      0.05
+     ]
+    ],
+    "block": [
+     [
+      "brick",
+      0.48
+     ],
+     [
+      "render",
+      0.3
+     ],
+     [
+      "concrete",
+      0.22
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.56
+     ],
+     [
+      "concrete",
+      0.2
+     ],
+     [
+      "brick",
+      0.16
+     ],
+     [
+      "wood",
+      0.08
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "hipped",
+      0.52
+     ],
+     [
+      "gabled",
+      0.4
+     ],
+     [
+      "flat",
+      0.05
+     ],
+     [
+      "pyramidal",
+      0.03
+     ]
+    ],
+    "block": [
+     [
+      "hipped",
+      0.44
+     ],
+     [
+      "flat",
+      0.42
+     ],
+     [
+      "gabled",
+      0.14
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.78
+     ],
+     [
+      "flat",
+      0.22
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "tile",
+      0.58
+     ],
+     [
+      "slate",
+      0.28
+     ],
+     [
+      "clay",
+      0.14
+     ]
+    ],
+    "block": [
+     [
+      "tile",
+      0.44
+     ],
+     [
+      "gravel",
+      0.3
+     ],
+     [
+      "slate",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.74
+     ],
+     [
+      "eternit",
+      0.26
+     ]
+    ]
+   }
+  },
+  "home-counties": {
+   "character": "Home counties: interwar and post-war low-density suburbia and commuter villages — detached and semi-detached, generous plots, red and brown brick with render, pebbledash and tile hanging, concrete and clay tile roofs, very little above three storeys.",
+   "shedArea": 900,
+   "stock": {
+    "house": 0.82,
+    "block": 0.04,
+    "shed": 0.14
+   },
+   "type": {
+    "house": [
+     [
+      "detached",
+      0.44
+     ],
+     [
+      "semidetached_house",
+      0.32
+     ],
+     [
+      "bungalow",
+      0.11
+     ],
+     [
+      "terrace",
+      0.08
+     ],
+     [
+      "house",
+      0.05
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.7
+     ],
+     [
+      "retail",
+      0.2
+     ],
+     [
+      "commercial",
+      0.1
+     ]
+    ],
+    "shed": [
+     [
+      "garage",
+      0.34
+     ],
+     [
+      "barn",
+      0.24
+     ],
+     [
+      "shed",
+      0.2
+     ],
+     [
+      "warehouse",
+      0.12
+     ],
+     [
+      "industrial",
+      0.1
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.42
+     ],
+     [
+      "industrial",
+      0.28
+     ],
+     [
+      "barn",
+      0.18
+     ],
+     [
+      "factory",
+      0.12
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.76
+     ],
+     [
+      1,
+      0.17
+     ],
+     [
+      3,
+      0.07
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.55
+     ],
+     [
+      4,
+      0.35
+     ],
+     [
+      2,
+      0.1
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "red_brick",
+      0.4
+     ],
+     [
+      "brick",
+      0.17
+     ],
+     [
+      "render",
+      0.15
+     ],
+     [
+      "plaster",
+      0.09
+     ],
+     [
+      "timber_framing",
+      0.07
+     ],
+     [
+      "stone",
+      0.05
+     ],
+     [
+      "concrete",
+      0.04
+     ],
+     [
+      "wood",
+      0.03
+     ]
+    ],
+    "block": [
+     [
+      "brick",
+      0.5
+     ],
+     [
+      "render",
+      0.3
+     ],
+     [
+      "concrete",
+      0.2
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.55
+     ],
+     [
+      "concrete",
+      0.2
+     ],
+     [
+      "brick",
+      0.15
+     ],
+     [
+      "wood",
+      0.1
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "hipped",
+      0.46
+     ],
+     [
+      "gabled",
+      0.44
+     ],
+     [
+      "pyramidal",
+      0.07
+     ],
+     [
+      "flat",
+      0.03
+     ]
+    ],
+    "block": [
+     [
+      "hipped",
+      0.45
+     ],
+     [
+      "flat",
+      0.4
+     ],
+     [
+      "gabled",
+      0.15
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.8
+     ],
+     [
+      "flat",
+      0.2
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "tile",
+      0.52
+     ],
+     [
+      "slate",
+      0.34
+     ],
+     [
+      "clay",
+      0.14
+     ]
+    ],
+    "block": [
+     [
+      "tile",
+      0.45
+     ],
+     [
+      "gravel",
+      0.3
+     ],
+     [
+      "slate",
+      0.25
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.75
+     ],
+     [
+      "eternit",
+      0.25
+     ]
+    ]
+   }
+  },
+  "northern-industrial": {
+   "character": "Northern mill and industrial towns: terraced streets of red brick under Welsh slate, two storeys, gable end to the street, with mills and sheds among them.",
+   "shedArea": 1000,
+   "stock": {
+    "house": 0.74,
+    "block": 0.1,
+    "shed": 0.16
+   },
+   "type": {
+    "house": [
+     [
+      "terrace",
+      0.58
+     ],
+     [
+      "semidetached_house",
+      0.22
+     ],
+     [
+      "detached",
+      0.1
+     ],
+     [
+      "house",
+      0.06
+     ],
+     [
+      "bungalow",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.56
+     ],
+     [
+      "retail",
+      0.24
+     ],
+     [
+      "commercial",
+      0.2
+     ]
+    ],
+    "shed": [
+     [
+      "industrial",
+      0.3
+     ],
+     [
+      "warehouse",
+      0.26
+     ],
+     [
+      "garage",
+      0.24
+     ],
+     [
+      "shed",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "factory",
+      0.36
+     ],
+     [
+      "warehouse",
+      0.34
+     ],
+     [
+      "industrial",
+      0.3
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.84
+     ],
+     [
+      3,
+      0.12
+     ],
+     [
+      1,
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      4,
+      0.38
+     ],
+     [
+      3,
+      0.34
+     ],
+     [
+      5,
+      0.18
+     ],
+     [
+      6,
+      0.1
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "red_brick",
+      0.58
+     ],
+     [
+      "brick",
+      0.16
+     ],
+     [
+      "stone",
+      0.12
+     ],
+     [
+      "render",
+      0.08
+     ],
+     [
+      "concrete",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "red_brick",
+      0.44
+     ],
+     [
+      "concrete",
+      0.28
+     ],
+     [
+      "render",
+      0.16
+     ],
+     [
+      "glass",
+      0.12
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.52
+     ],
+     [
+      "brick",
+      0.24
+     ],
+     [
+      "concrete",
+      0.18
+     ],
+     [
+      "wood",
+      0.06
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.74
+     ],
+     [
+      "hipped",
+      0.18
+     ],
+     [
+      "flat",
+      0.05
+     ],
+     [
+      "pyramidal",
+      0.03
+     ]
+    ],
+    "block": [
+     [
+      "flat",
+      0.52
+     ],
+     [
+      "gabled",
+      0.26
+     ],
+     [
+      "hipped",
+      0.22
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.72
+     ],
+     [
+      "flat",
+      0.28
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.58
+     ],
+     [
+      "tile",
+      0.3
+     ],
+     [
+      "clay",
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      "bitumen",
+      0.4
+     ],
+     [
+      "slate",
+      0.3
+     ],
+     [
+      "tile",
+      0.3
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.68
+     ],
+     [
+      "eternit",
+      0.22
+     ],
+     [
+      "bitumen",
+      0.1
+     ]
+    ]
+   }
+  },
+  "scottish-urban": {
+   "character": "Scottish cities: sandstone and granite tenements of three and four storeys under steep slate roofs, with post-war blocks and render-and-harl suburbs beyond them.",
+   "shedArea": 1100,
+   "stock": {
+    "house": 0.56,
+    "block": 0.32,
+    "shed": 0.12
+   },
+   "type": {
+    "house": [
+     [
+      "terrace",
+      0.34
+     ],
+     [
+      "semidetached_house",
+      0.3
+     ],
+     [
+      "detached",
+      0.24
+     ],
+     [
+      "bungalow",
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.78
+     ],
+     [
+      "retail",
+      0.12
+     ],
+     [
+      "commercial",
+      0.1
+     ]
+    ],
+    "shed": [
+     [
+      "industrial",
+      0.3
+     ],
+     [
+      "warehouse",
+      0.26
+     ],
+     [
+      "garage",
+      0.24
+     ],
+     [
+      "shed",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.42
+     ],
+     [
+      "industrial",
+      0.34
+     ],
+     [
+      "factory",
+      0.24
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.74
+     ],
+     [
+      1,
+      0.16
+     ],
+     [
+      3,
+      0.1
+     ]
+    ],
+    "block": [
+     [
+      4,
+      0.42
+     ],
+     [
+      3,
+      0.32
+     ],
+     [
+      5,
+      0.18
+     ],
+     [
+      6,
+      0.08
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "sandstone",
+      0.34
+     ],
+     [
+      "render",
+      0.24
+     ],
+     [
+      "red_brick",
+      0.16
+     ],
+     [
+      "granite",
+      0.12
+     ],
+     [
+      "stone",
+      0.1
+     ],
+     [
+      "concrete",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "sandstone",
+      0.34
+     ],
+     [
+      "concrete",
+      0.28
+     ],
+     [
+      "render",
+      0.22
+     ],
+     [
+      "granite",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.56
+     ],
+     [
+      "concrete",
+      0.22
+     ],
+     [
+      "brick",
+      0.16
+     ],
+     [
+      "wood",
+      0.06
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.62
+     ],
+     [
+      "hipped",
+      0.3
+     ],
+     [
+      "flat",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "gabled",
+      0.42
+     ],
+     [
+      "flat",
+      0.36
+     ],
+     [
+      "hipped",
+      0.22
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.7
+     ],
+     [
+      "flat",
+      0.3
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.74
+     ],
+     [
+      "tile",
+      0.18
+     ],
+     [
+      "clay",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "slate",
+      0.48
+     ],
+     [
+      "bitumen",
+      0.32
+     ],
+     [
+      "tile",
+      0.2
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.72
+     ],
+     [
+      "eternit",
+      0.28
+     ]
+    ]
+   }
+  },
+  "scottish-rural": {
+   "character": "Rural and highland Scotland: white harled render and exposed stone, steep slate roofs, one and a half or two storeys, crofts and scattered steadings rather than streets.",
+   "shedArea": 800,
+   "stock": {
+    "house": 0.72,
+    "block": 0.06,
+    "shed": 0.22
+   },
+   "type": {
+    "house": [
+     [
+      "detached",
+      0.48
+     ],
+     [
+      "semidetached_house",
+      0.2
+     ],
+     [
+      "terrace",
+      0.16
+     ],
+     [
+      "bungalow",
+      0.16
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.62
+     ],
+     [
+      "retail",
+      0.22
+     ],
+     [
+      "commercial",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "barn",
+      0.36
+     ],
+     [
+      "shed",
+      0.26
+     ],
+     [
+      "garage",
+      0.22
+     ],
+     [
+      "industrial",
+      0.16
+     ]
+    ],
+    "shed_large": [
+     [
+      "barn",
+      0.44
+     ],
+     [
+      "warehouse",
+      0.3
+     ],
+     [
+      "industrial",
+      0.26
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.5
+     ],
+     [
+      1,
+      0.42
+     ],
+     [
+      3,
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.56
+     ],
+     [
+      2,
+      0.28
+     ],
+     [
+      4,
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "render",
+      0.42
+     ],
+     [
+      "stone",
+      0.18
+     ],
+     [
+      "plaster",
+      0.16
+     ],
+     [
+      "granite",
+      0.1
+     ],
+     [
+      "red_brick",
+      0.08
+     ],
+     [
+      "wood",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "render",
+      0.46
+     ],
+     [
+      "concrete",
+      0.28
+     ],
+     [
+      "stone",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.58
+     ],
+     [
+      "wood",
+      0.18
+     ],
+     [
+      "concrete",
+      0.16
+     ],
+     [
+      "stone",
+      0.08
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.78
+     ],
+     [
+      "hipped",
+      0.18
+     ],
+     [
+      "flat",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "gabled",
+      0.56
+     ],
+     [
+      "hipped",
+      0.28
+     ],
+     [
+      "flat",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.82
+     ],
+     [
+      "flat",
+      0.18
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.58
+     ],
+     [
+      "tile",
+      0.24
+     ],
+     [
+      "metal",
+      0.12
+     ],
+     [
+      "clay",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "slate",
+      0.52
+     ],
+     [
+      "tile",
+      0.28
+     ],
+     [
+      "bitumen",
+      0.2
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.8
+     ],
+     [
+      "eternit",
+      0.2
+     ]
+    ]
+   }
+  },
+  "welsh-valleys": {
+   "character": "South Wales: terraced rows following the contour, render and pebbledash over stone and brick, steep slate roofs, two storeys, stepping down the hillside.",
+   "shedArea": 900,
+   "stock": {
+    "house": 0.78,
+    "block": 0.07,
+    "shed": 0.15
+   },
+   "type": {
+    "house": [
+     [
+      "terrace",
+      0.52
+     ],
+     [
+      "semidetached_house",
+      0.24
+     ],
+     [
+      "detached",
+      0.16
+     ],
+     [
+      "bungalow",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.6
+     ],
+     [
+      "retail",
+      0.22
+     ],
+     [
+      "commercial",
+      0.18
+     ]
+    ],
+    "shed": [
+     [
+      "industrial",
+      0.28
+     ],
+     [
+      "garage",
+      0.26
+     ],
+     [
+      "shed",
+      0.24
+     ],
+     [
+      "warehouse",
+      0.22
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.4
+     ],
+     [
+      "industrial",
+      0.36
+     ],
+     [
+      "factory",
+      0.24
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.86
+     ],
+     [
+      3,
+      0.09
+     ],
+     [
+      1,
+      0.05
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.52
+     ],
+     [
+      4,
+      0.3
+     ],
+     [
+      2,
+      0.18
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "render",
+      0.34
+     ],
+     [
+      "stone",
+      0.22
+     ],
+     [
+      "red_brick",
+      0.2
+     ],
+     [
+      "plaster",
+      0.12
+     ],
+     [
+      "brick",
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      "render",
+      0.44
+     ],
+     [
+      "red_brick",
+      0.3
+     ],
+     [
+      "concrete",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.56
+     ],
+     [
+      "concrete",
+      0.2
+     ],
+     [
+      "brick",
+      0.16
+     ],
+     [
+      "stone",
+      0.08
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.8
+     ],
+     [
+      "hipped",
+      0.16
+     ],
+     [
+      "flat",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "gabled",
+      0.48
+     ],
+     [
+      "flat",
+      0.32
+     ],
+     [
+      "hipped",
+      0.2
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.76
+     ],
+     [
+      "flat",
+      0.24
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.72
+     ],
+     [
+      "tile",
+      0.2
+     ],
+     [
+      "clay",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "slate",
+      0.44
+     ],
+     [
+      "bitumen",
+      0.32
+     ],
+     [
+      "tile",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.74
+     ],
+     [
+      "eternit",
+      0.26
+     ]
+    ]
+   }
+  },
+  "limestone-country": {
+   "character": "Limestone country: honey and grey stone walls, stone slate and clay tile, steep gables, two storeys, villages of stone rather than brick.",
+   "shedArea": 850,
+   "stock": {
+    "house": 0.8,
+    "block": 0.05,
+    "shed": 0.15
+   },
+   "type": {
+    "house": [
+     [
+      "detached",
+      0.36
+     ],
+     [
+      "terrace",
+      0.26
+     ],
+     [
+      "semidetached_house",
+      0.24
+     ],
+     [
+      "bungalow",
+      0.08
+     ],
+     [
+      "house",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.6
+     ],
+     [
+      "retail",
+      0.24
+     ],
+     [
+      "commercial",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "barn",
+      0.34
+     ],
+     [
+      "garage",
+      0.24
+     ],
+     [
+      "shed",
+      0.22
+     ],
+     [
+      "warehouse",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "barn",
+      0.36
+     ],
+     [
+      "warehouse",
+      0.36
+     ],
+     [
+      "industrial",
+      0.28
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.8
+     ],
+     [
+      3,
+      0.11
+     ],
+     [
+      1,
+      0.09
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.58
+     ],
+     [
+      4,
+      0.26
+     ],
+     [
+      2,
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "limestone",
+      0.44
+     ],
+     [
+      "sandstone",
+      0.16
+     ],
+     [
+      "stone",
+      0.14
+     ],
+     [
+      "red_brick",
+      0.14
+     ],
+     [
+      "render",
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      "limestone",
+      0.4
+     ],
+     [
+      "render",
+      0.32
+     ],
+     [
+      "concrete",
+      0.28
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.48
+     ],
+     [
+      "stone",
+      0.22
+     ],
+     [
+      "concrete",
+      0.18
+     ],
+     [
+      "wood",
+      0.12
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.7
+     ],
+     [
+      "hipped",
+      0.24
+     ],
+     [
+      "flat",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "gabled",
+      0.44
+     ],
+     [
+      "hipped",
+      0.32
+     ],
+     [
+      "flat",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.8
+     ],
+     [
+      "flat",
+      0.2
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "stone",
+      0.3
+     ],
+     [
+      "clay",
+      0.3
+     ],
+     [
+      "slate",
+      0.26
+     ],
+     [
+      "tile",
+      0.14
+     ]
+    ],
+    "block": [
+     [
+      "slate",
+      0.4
+     ],
+     [
+      "tile",
+      0.34
+     ],
+     [
+      "bitumen",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.66
+     ],
+     [
+      "eternit",
+      0.2
+     ],
+     [
+      "stone",
+      0.14
+     ]
+    ]
+   }
+  },
+  "east-anglian": {
+   "character": "East Anglia: soft red brick, flint and rendered timber frame, pantile and clay tile, the occasional thatch, two storeys, in market towns and long villages.",
+   "shedArea": 950,
+   "stock": {
+    "house": 0.79,
+    "block": 0.06,
+    "shed": 0.15
+   },
+   "type": {
+    "house": [
+     [
+      "detached",
+      0.34
+     ],
+     [
+      "semidetached_house",
+      0.28
+     ],
+     [
+      "terrace",
+      0.24
+     ],
+     [
+      "bungalow",
+      0.09
+     ],
+     [
+      "house",
+      0.05
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.62
+     ],
+     [
+      "retail",
+      0.22
+     ],
+     [
+      "commercial",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "barn",
+      0.32
+     ],
+     [
+      "garage",
+      0.24
+     ],
+     [
+      "warehouse",
+      0.24
+     ],
+     [
+      "shed",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "barn",
+      0.34
+     ],
+     [
+      "warehouse",
+      0.36
+     ],
+     [
+      "industrial",
+      0.3
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.82
+     ],
+     [
+      1,
+      0.11
+     ],
+     [
+      3,
+      0.07
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.58
+     ],
+     [
+      4,
+      0.28
+     ],
+     [
+      2,
+      0.14
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "red_brick",
+      0.42
+     ],
+     [
+      "brick",
+      0.18
+     ],
+     [
+      "render",
+      0.16
+     ],
+     [
+      "plaster",
+      0.12
+     ],
+     [
+      "stone",
+      0.07
+     ],
+     [
+      "timber_framing",
+      0.05
+     ]
+    ],
+    "block": [
+     [
+      "red_brick",
+      0.44
+     ],
+     [
+      "render",
+      0.32
+     ],
+     [
+      "concrete",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.52
+     ],
+     [
+      "brick",
+      0.2
+     ],
+     [
+      "wood",
+      0.16
+     ],
+     [
+      "concrete",
+      0.12
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.62
+     ],
+     [
+      "hipped",
+      0.32
+     ],
+     [
+      "flat",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "hipped",
+      0.4
+     ],
+     [
+      "gabled",
+      0.34
+     ],
+     [
+      "flat",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.8
+     ],
+     [
+      "flat",
+      0.2
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "clay",
+      0.42
+     ],
+     [
+      "tile",
+      0.3
+     ],
+     [
+      "slate",
+      0.2
+     ],
+     [
+      "thatch",
+      0.04
+     ],
+     [
+      "eternit",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "tile",
+      0.44
+     ],
+     [
+      "bitumen",
+      0.3
+     ],
+     [
+      "slate",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.66
+     ],
+     [
+      "eternit",
+      0.22
+     ],
+     [
+      "clay",
+      0.12
+     ]
+    ]
+   }
+  },
+  "seaside-victorian": {
+   "character": "A Victorian and Edwardian seaside city: painted stucco terraces and villas of three and four storeys along the front, brick behind, slate roofs, converted flats throughout.",
+   "shedArea": 1200,
+   "stock": {
+    "house": 0.62,
+    "block": 0.26,
+    "shed": 0.12
+   },
+   "type": {
+    "house": [
+     [
+      "terrace",
+      0.48
+     ],
+     [
+      "semidetached_house",
+      0.22
+     ],
+     [
+      "detached",
+      0.18
+     ],
+     [
+      "house",
+      0.08
+     ],
+     [
+      "bungalow",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.66
+     ],
+     [
+      "retail",
+      0.16
+     ],
+     [
+      "commercial",
+      0.1
+     ],
+     [
+      "office",
+      0.08
+     ]
+    ],
+    "shed": [
+     [
+      "garage",
+      0.3
+     ],
+     [
+      "warehouse",
+      0.26
+     ],
+     [
+      "industrial",
+      0.24
+     ],
+     [
+      "shed",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.44
+     ],
+     [
+      "industrial",
+      0.34
+     ],
+     [
+      "factory",
+      0.22
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.5
+     ],
+     [
+      3,
+      0.34
+     ],
+     [
+      4,
+      0.12
+     ],
+     [
+      1,
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      4,
+      0.36
+     ],
+     [
+      5,
+      0.24
+     ],
+     [
+      3,
+      0.24
+     ],
+     [
+      6,
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "render",
+      0.38
+     ],
+     [
+      "red_brick",
+      0.2
+     ],
+     [
+      "plaster",
+      0.18
+     ],
+     [
+      "brick",
+      0.14
+     ],
+     [
+      "stone",
+      0.1
+     ]
+    ],
+    "block": [
+     [
+      "render",
+      0.4
+     ],
+     [
+      "brick",
+      0.28
+     ],
+     [
+      "concrete",
+      0.2
+     ],
+     [
+      "glass",
+      0.12
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.54
+     ],
+     [
+      "brick",
+      0.22
+     ],
+     [
+      "concrete",
+      0.18
+     ],
+     [
+      "wood",
+      0.06
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "hipped",
+      0.44
+     ],
+     [
+      "gabled",
+      0.42
+     ],
+     [
+      "flat",
+      0.14
+     ]
+    ],
+    "block": [
+     [
+      "flat",
+      0.5
+     ],
+     [
+      "hipped",
+      0.3
+     ],
+     [
+      "gabled",
+      0.2
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.7
+     ],
+     [
+      "flat",
+      0.3
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.52
+     ],
+     [
+      "tile",
+      0.3
+     ],
+     [
+      "clay",
+      0.18
+     ]
+    ],
+    "block": [
+     [
+      "bitumen",
+      0.4
+     ],
+     [
+      "slate",
+      0.32
+     ],
+     [
+      "tile",
+      0.28
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.7
+     ],
+     [
+      "eternit",
+      0.3
+     ]
+    ]
+   }
+  },
+  "midlands-suburban": {
+   "character": "The Midlands: red brick everywhere — interwar semis, Victorian terraces and post-war estates — under concrete and clay tile, two storeys, with industry threaded through.",
+   "shedArea": 1000,
+   "stock": {
+    "house": 0.78,
+    "block": 0.1,
+    "shed": 0.12
+   },
+   "type": {
+    "house": [
+     [
+      "semidetached_house",
+      0.44
+     ],
+     [
+      "terrace",
+      0.3
+     ],
+     [
+      "detached",
+      0.16
+     ],
+     [
+      "bungalow",
+      0.06
+     ],
+     [
+      "house",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.6
+     ],
+     [
+      "retail",
+      0.22
+     ],
+     [
+      "commercial",
+      0.18
+     ]
+    ],
+    "shed": [
+     [
+      "industrial",
+      0.3
+     ],
+     [
+      "warehouse",
+      0.28
+     ],
+     [
+      "garage",
+      0.24
+     ],
+     [
+      "shed",
+      0.18
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.4
+     ],
+     [
+      "factory",
+      0.32
+     ],
+     [
+      "industrial",
+      0.28
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.86
+     ],
+     [
+      3,
+      0.09
+     ],
+     [
+      1,
+      0.05
+     ]
+    ],
+    "block": [
+     [
+      4,
+      0.38
+     ],
+     [
+      3,
+      0.32
+     ],
+     [
+      5,
+      0.2
+     ],
+     [
+      6,
+      0.1
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "red_brick",
+      0.58
+     ],
+     [
+      "brick",
+      0.18
+     ],
+     [
+      "render",
+      0.12
+     ],
+     [
+      "concrete",
+      0.06
+     ],
+     [
+      "timber_framing",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "red_brick",
+      0.46
+     ],
+     [
+      "concrete",
+      0.28
+     ],
+     [
+      "render",
+      0.16
+     ],
+     [
+      "glass",
+      0.1
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.56
+     ],
+     [
+      "brick",
+      0.2
+     ],
+     [
+      "concrete",
+      0.18
+     ],
+     [
+      "wood",
+      0.06
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.58
+     ],
+     [
+      "hipped",
+      0.36
+     ],
+     [
+      "flat",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "flat",
+      0.5
+     ],
+     [
+      "hipped",
+      0.3
+     ],
+     [
+      "gabled",
+      0.2
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.74
+     ],
+     [
+      "flat",
+      0.26
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "tile",
+      0.54
+     ],
+     [
+      "slate",
+      0.32
+     ],
+     [
+      "clay",
+      0.14
+     ]
+    ],
+    "block": [
+     [
+      "bitumen",
+      0.4
+     ],
+     [
+      "tile",
+      0.34
+     ],
+     [
+      "slate",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.7
+     ],
+     [
+      "eternit",
+      0.3
+     ]
+    ]
+   }
+  },
+  "west-country": {
+   "character": "The West Country: painted render over cob and stone, granite in the far west, steep slate roofs and some thatch, two storeys, in narrow streets and scattered farms.",
+   "shedArea": 850,
+   "stock": {
+    "house": 0.78,
+    "block": 0.07,
+    "shed": 0.15
+   },
+   "type": {
+    "house": [
+     [
+      "detached",
+      0.36
+     ],
+     [
+      "terrace",
+      0.28
+     ],
+     [
+      "semidetached_house",
+      0.22
+     ],
+     [
+      "bungalow",
+      0.1
+     ],
+     [
+      "house",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.62
+     ],
+     [
+      "retail",
+      0.22
+     ],
+     [
+      "commercial",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "barn",
+      0.32
+     ],
+     [
+      "garage",
+      0.26
+     ],
+     [
+      "shed",
+      0.22
+     ],
+     [
+      "warehouse",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "barn",
+      0.38
+     ],
+     [
+      "warehouse",
+      0.34
+     ],
+     [
+      "industrial",
+      0.28
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.8
+     ],
+     [
+      1,
+      0.13
+     ],
+     [
+      3,
+      0.07
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.56
+     ],
+     [
+      4,
+      0.26
+     ],
+     [
+      2,
+      0.18
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "render",
+      0.38
+     ],
+     [
+      "stone",
+      0.22
+     ],
+     [
+      "red_brick",
+      0.16
+     ],
+     [
+      "plaster",
+      0.14
+     ],
+     [
+      "granite",
+      0.06
+     ],
+     [
+      "wood",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "render",
+      0.46
+     ],
+     [
+      "concrete",
+      0.28
+     ],
+     [
+      "stone",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.52
+     ],
+     [
+      "stone",
+      0.18
+     ],
+     [
+      "concrete",
+      0.18
+     ],
+     [
+      "wood",
+      0.12
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.72
+     ],
+     [
+      "hipped",
+      0.22
+     ],
+     [
+      "flat",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "gabled",
+      0.44
+     ],
+     [
+      "hipped",
+      0.32
+     ],
+     [
+      "flat",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.78
+     ],
+     [
+      "flat",
+      0.22
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.58
+     ],
+     [
+      "tile",
+      0.24
+     ],
+     [
+      "clay",
+      0.12
+     ],
+     [
+      "thatch",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "slate",
+      0.44
+     ],
+     [
+      "tile",
+      0.32
+     ],
+     [
+      "bitumen",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.72
+     ],
+     [
+      "eternit",
+      0.28
+     ]
+    ]
+   }
+  },
+  "northern-stone": {
+   "character": "Northern stone country: gritstone and limestone under Westmorland and Welsh slate, two storeys, strong gables, field barns among the houses.",
+   "shedArea": 850,
+   "stock": {
+    "house": 0.76,
+    "block": 0.06,
+    "shed": 0.18
+   },
+   "type": {
+    "house": [
+     [
+      "terrace",
+      0.34
+     ],
+     [
+      "detached",
+      0.3
+     ],
+     [
+      "semidetached_house",
+      0.24
+     ],
+     [
+      "bungalow",
+      0.08
+     ],
+     [
+      "house",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.6
+     ],
+     [
+      "retail",
+      0.24
+     ],
+     [
+      "commercial",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "barn",
+      0.38
+     ],
+     [
+      "garage",
+      0.22
+     ],
+     [
+      "shed",
+      0.22
+     ],
+     [
+      "warehouse",
+      0.18
+     ]
+    ],
+    "shed_large": [
+     [
+      "barn",
+      0.4
+     ],
+     [
+      "warehouse",
+      0.34
+     ],
+     [
+      "industrial",
+      0.26
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.82
+     ],
+     [
+      3,
+      0.1
+     ],
+     [
+      1,
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.58
+     ],
+     [
+      4,
+      0.26
+     ],
+     [
+      2,
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "sandstone",
+      0.34
+     ],
+     [
+      "stone",
+      0.26
+     ],
+     [
+      "limestone",
+      0.16
+     ],
+     [
+      "red_brick",
+      0.14
+     ],
+     [
+      "render",
+      0.1
+     ]
+    ],
+    "block": [
+     [
+      "sandstone",
+      0.38
+     ],
+     [
+      "render",
+      0.32
+     ],
+     [
+      "concrete",
+      0.3
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.48
+     ],
+     [
+      "stone",
+      0.24
+     ],
+     [
+      "concrete",
+      0.18
+     ],
+     [
+      "wood",
+      0.1
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.76
+     ],
+     [
+      "hipped",
+      0.18
+     ],
+     [
+      "flat",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "gabled",
+      0.46
+     ],
+     [
+      "hipped",
+      0.3
+     ],
+     [
+      "flat",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.82
+     ],
+     [
+      "flat",
+      0.18
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.62
+     ],
+     [
+      "stone",
+      0.16
+     ],
+     [
+      "tile",
+      0.14
+     ],
+     [
+      "clay",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "slate",
+      0.46
+     ],
+     [
+      "tile",
+      0.3
+     ],
+     [
+      "bitumen",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.66
+     ],
+     [
+      "eternit",
+      0.2
+     ],
+     [
+      "stone",
+      0.14
+     ]
+    ]
+   }
+  },
+  "new-town": {
+   "character": "A planned new town: post-war and later estates on a designed layout — brown and buff brick, shallow tile roofs, cul-de-sacs, grid roads, distribution sheds at the edge.",
+   "shedArea": 1300,
+   "stock": {
+    "house": 0.76,
+    "block": 0.1,
+    "shed": 0.14
+   },
+   "type": {
+    "house": [
+     [
+      "semidetached_house",
+      0.38
+     ],
+     [
+      "terrace",
+      0.32
+     ],
+     [
+      "detached",
+      0.22
+     ],
+     [
+      "bungalow",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.62
+     ],
+     [
+      "office",
+      0.16
+     ],
+     [
+      "retail",
+      0.14
+     ],
+     [
+      "commercial",
+      0.08
+     ]
+    ],
+    "shed": [
+     [
+      "warehouse",
+      0.4
+     ],
+     [
+      "industrial",
+      0.26
+     ],
+     [
+      "garage",
+      0.2
+     ],
+     [
+      "shed",
+      0.14
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.58
+     ],
+     [
+      "industrial",
+      0.26
+     ],
+     [
+      "factory",
+      0.16
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.86
+     ],
+     [
+      3,
+      0.08
+     ],
+     [
+      1,
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      4,
+      0.4
+     ],
+     [
+      3,
+      0.34
+     ],
+     [
+      5,
+      0.18
+     ],
+     [
+      6,
+      0.08
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "brick",
+      0.44
+     ],
+     [
+      "red_brick",
+      0.28
+     ],
+     [
+      "render",
+      0.14
+     ],
+     [
+      "concrete",
+      0.08
+     ],
+     [
+      "wood",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "brick",
+      0.4
+     ],
+     [
+      "concrete",
+      0.3
+     ],
+     [
+      "render",
+      0.18
+     ],
+     [
+      "glass",
+      0.12
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.68
+     ],
+     [
+      "concrete",
+      0.18
+     ],
+     [
+      "brick",
+      0.14
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.56
+     ],
+     [
+      "hipped",
+      0.38
+     ],
+     [
+      "flat",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "flat",
+      0.58
+     ],
+     [
+      "hipped",
+      0.26
+     ],
+     [
+      "gabled",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.62
+     ],
+     [
+      "flat",
+      0.38
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "tile",
+      0.66
+     ],
+     [
+      "slate",
+      0.22
+     ],
+     [
+      "clay",
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      "bitumen",
+      0.46
+     ],
+     [
+      "tile",
+      0.32
+     ],
+     [
+      "gravel",
+      0.22
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.82
+     ],
+     [
+      "eternit",
+      0.18
+     ]
+    ]
+   }
+  },
+  "northern-ireland": {
+   "character": "Northern Ireland: red brick terraces in the city, white and cream render in the country, slate and concrete tile, two storeys, with bungalows common along the roads.",
+   "shedArea": 900,
+   "stock": {
+    "house": 0.79,
+    "block": 0.08,
+    "shed": 0.13
+   },
+   "type": {
+    "house": [
+     [
+      "terrace",
+      0.34
+     ],
+     [
+      "detached",
+      0.28
+     ],
+     [
+      "semidetached_house",
+      0.24
+     ],
+     [
+      "bungalow",
+      0.14
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.6
+     ],
+     [
+      "retail",
+      0.24
+     ],
+     [
+      "commercial",
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      "barn",
+      0.3
+     ],
+     [
+      "garage",
+      0.26
+     ],
+     [
+      "industrial",
+      0.24
+     ],
+     [
+      "shed",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.4
+     ],
+     [
+      "barn",
+      0.32
+     ],
+     [
+      "industrial",
+      0.28
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.78
+     ],
+     [
+      1,
+      0.16
+     ],
+     [
+      3,
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.54
+     ],
+     [
+      4,
+      0.3
+     ],
+     [
+      5,
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "red_brick",
+      0.36
+     ],
+     [
+      "render",
+      0.3
+     ],
+     [
+      "plaster",
+      0.14
+     ],
+     [
+      "brick",
+      0.12
+     ],
+     [
+      "stone",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "red_brick",
+      0.42
+     ],
+     [
+      "render",
+      0.32
+     ],
+     [
+      "concrete",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.6
+     ],
+     [
+      "concrete",
+      0.18
+     ],
+     [
+      "brick",
+      0.14
+     ],
+     [
+      "wood",
+      0.08
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.72
+     ],
+     [
+      "hipped",
+      0.24
+     ],
+     [
+      "flat",
+      0.04
+     ]
+    ],
+    "block": [
+     [
+      "gabled",
+      0.42
+     ],
+     [
+      "flat",
+      0.34
+     ],
+     [
+      "hipped",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.76
+     ],
+     [
+      "flat",
+      0.24
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.48
+     ],
+     [
+      "tile",
+      0.4
+     ],
+     [
+      "clay",
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      "bitumen",
+      0.4
+     ],
+     [
+      "slate",
+      0.32
+     ],
+     [
+      "tile",
+      0.28
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.76
+     ],
+     [
+      "eternit",
+      0.24
+     ]
+    ]
+   }
+  },
+  "island": {
+   "character": "The islands: granite and painted render, slate roofs, two storeys, dense old town and scattered country beyond.",
+   "shedArea": 800,
+   "stock": {
+    "house": 0.76,
+    "block": 0.12,
+    "shed": 0.12
+   },
+   "type": {
+    "house": [
+     [
+      "terrace",
+      0.34
+     ],
+     [
+      "detached",
+      0.3
+     ],
+     [
+      "semidetached_house",
+      0.24
+     ],
+     [
+      "bungalow",
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      "apartments",
+      0.64
+     ],
+     [
+      "retail",
+      0.22
+     ],
+     [
+      "commercial",
+      0.14
+     ]
+    ],
+    "shed": [
+     [
+      "garage",
+      0.3
+     ],
+     [
+      "barn",
+      0.26
+     ],
+     [
+      "shed",
+      0.24
+     ],
+     [
+      "warehouse",
+      0.2
+     ]
+    ],
+    "shed_large": [
+     [
+      "warehouse",
+      0.44
+     ],
+     [
+      "barn",
+      0.3
+     ],
+     [
+      "industrial",
+      0.26
+     ]
+    ]
+   },
+   "storeys": {
+    "house": [
+     [
+      2,
+      0.74
+     ],
+     [
+      3,
+      0.14
+     ],
+     [
+      1,
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      3,
+      0.54
+     ],
+     [
+      4,
+      0.3
+     ],
+     [
+      5,
+      0.16
+     ]
+    ],
+    "shed": [
+     [
+      1,
+      1
+     ]
+    ]
+   },
+   "wall": {
+    "house": [
+     [
+      "render",
+      0.36
+     ],
+     [
+      "granite",
+      0.26
+     ],
+     [
+      "stone",
+      0.18
+     ],
+     [
+      "plaster",
+      0.12
+     ],
+     [
+      "red_brick",
+      0.08
+     ]
+    ],
+    "block": [
+     [
+      "render",
+      0.44
+     ],
+     [
+      "granite",
+      0.3
+     ],
+     [
+      "concrete",
+      0.26
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.56
+     ],
+     [
+      "stone",
+      0.2
+     ],
+     [
+      "concrete",
+      0.16
+     ],
+     [
+      "wood",
+      0.08
+     ]
+    ]
+   },
+   "roofShape": {
+    "house": [
+     [
+      "gabled",
+      0.7
+     ],
+     [
+      "hipped",
+      0.24
+     ],
+     [
+      "flat",
+      0.06
+     ]
+    ],
+    "block": [
+     [
+      "gabled",
+      0.42
+     ],
+     [
+      "hipped",
+      0.34
+     ],
+     [
+      "flat",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "gabled",
+      0.78
+     ],
+     [
+      "flat",
+      0.22
+     ]
+    ]
+   },
+   "roofMat": {
+    "house": [
+     [
+      "slate",
+      0.66
+     ],
+     [
+      "tile",
+      0.22
+     ],
+     [
+      "clay",
+      0.12
+     ]
+    ],
+    "block": [
+     [
+      "slate",
+      0.46
+     ],
+     [
+      "bitumen",
+      0.3
+     ],
+     [
+      "tile",
+      0.24
+     ]
+    ],
+    "shed": [
+     [
+      "metal",
+      0.74
+     ],
+     [
+      "eternit",
+      0.26
+     ]
+    ]
+   }
+  }
+ },
+ "areas": [
+  {
+   "matches": [
+    "AB"
+   ],
+   "place": "Aberdeen and Aberdeenshire",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "AL"
+   ],
+   "place": "St Albans and mid Hertfordshire",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "B"
+   ],
+   "place": "Birmingham",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "BA"
+   ],
+   "place": "Bath and north-east Somerset",
+   "archetype": "limestone-country"
+  },
+  {
+   "matches": [
+    "BB"
+   ],
+   "place": "Blackburn and east Lancashire",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "BD"
+   ],
+   "place": "Bradford and the Aire valley",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "BH"
+   ],
+   "place": "Bournemouth, Poole and east Dorset",
+   "archetype": "seaside-victorian"
+  },
+  {
+   "matches": [
+    "BL"
+   ],
+   "place": "Bolton",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "BN"
+   ],
+   "place": "Brighton, Hove and the Sussex coast",
+   "archetype": "seaside-victorian"
+  },
+  {
+   "matches": [
+    "BR"
+   ],
+   "place": "Bromley and south-east London",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "BS"
+   ],
+   "place": "Bristol",
+   "archetype": "seaside-victorian"
+  },
+  {
+   "matches": [
+    "BT"
+   ],
+   "place": "Northern Ireland",
+   "archetype": "northern-ireland"
+  },
+  {
+   "matches": [
+    "CA"
+   ],
+   "place": "Carlisle and Cumbria",
+   "archetype": "northern-stone"
+  },
+  {
+   "matches": [
+    "CB"
+   ],
+   "place": "Cambridge and the fens",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "CF"
+   ],
+   "place": "Cardiff and the south Wales coast",
+   "archetype": "welsh-valleys"
+  },
+  {
+   "matches": [
+    "CH"
+   ],
+   "place": "Chester, Wirral and north-east Wales",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "CM"
+   ],
+   "place": "Chelmsford and mid Essex",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "CO"
+   ],
+   "place": "Colchester and north Essex",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "CR"
+   ],
+   "place": "Croydon",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "CT"
+   ],
+   "place": "Canterbury and east Kent",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "CV"
+   ],
+   "place": "Coventry and Warwickshire",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "CW"
+   ],
+   "place": "Crewe and south Cheshire",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "DA"
+   ],
+   "place": "Dartford and north-west Kent",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "DD"
+   ],
+   "place": "Dundee and Angus",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "DE"
+   ],
+   "place": "Derby and Derbyshire",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "DG"
+   ],
+   "place": "Dumfries and Galloway",
+   "archetype": "scottish-rural"
+  },
+  {
+   "matches": [
+    "DH"
+   ],
+   "place": "Durham",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "DL"
+   ],
+   "place": "Darlington and the northern dales",
+   "archetype": "northern-stone"
+  },
+  {
+   "matches": [
+    "DN"
+   ],
+   "place": "Doncaster and north Lincolnshire",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "DT"
+   ],
+   "place": "Dorchester and west Dorset",
+   "archetype": "west-country"
+  },
+  {
+   "matches": [
+    "DY"
+   ],
+   "place": "Dudley and the Black Country",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "E"
+   ],
+   "place": "East London",
+   "archetype": "london-inner"
+  },
+  {
+   "matches": [
+    "EC"
+   ],
+   "place": "the City of London",
+   "archetype": "london-inner"
+  },
+  {
+   "matches": [
+    "EH"
+   ],
+   "place": "Edinburgh and the Lothians",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "EN"
+   ],
+   "place": "Enfield and south Hertfordshire",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "EX"
+   ],
+   "place": "Exeter and east Devon",
+   "archetype": "west-country"
+  },
+  {
+   "matches": [
+    "FK"
+   ],
+   "place": "Falkirk and Stirling",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "FY"
+   ],
+   "place": "Blackpool and the Fylde",
+   "archetype": "seaside-victorian"
+  },
+  {
+   "matches": [
+    "G"
+   ],
+   "place": "Glasgow",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "GL"
+   ],
+   "place": "Gloucester and the Cotswolds",
+   "archetype": "limestone-country"
+  },
+  {
+   "matches": [
+    "GU"
+   ],
+   "place": "Guildford and west Surrey",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "GY"
+   ],
+   "place": "Guernsey",
+   "archetype": "island"
+  },
+  {
+   "matches": [
+    "HA"
+   ],
+   "place": "Harrow and north-west London",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "HD"
+   ],
+   "place": "Huddersfield",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "HG"
+   ],
+   "place": "Harrogate and the Yorkshire dales",
+   "archetype": "northern-stone"
+  },
+  {
+   "matches": [
+    "HP"
+   ],
+   "place": "Hemel Hempstead and the Chilterns",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "HR"
+   ],
+   "place": "Hereford and the Marches",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "HS"
+   ],
+   "place": "the Outer Hebrides",
+   "archetype": "scottish-rural"
+  },
+  {
+   "matches": [
+    "HU"
+   ],
+   "place": "Hull and Holderness",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "HX"
+   ],
+   "place": "Halifax and Calderdale",
+   "archetype": "northern-stone"
+  },
+  {
+   "matches": [
+    "IG"
+   ],
+   "place": "Ilford and east London",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "IM"
+   ],
+   "place": "the Isle of Man",
+   "archetype": "island"
+  },
+  {
+   "matches": [
+    "IP"
+   ],
+   "place": "Ipswich and Suffolk",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "IV"
+   ],
+   "place": "Inverness and the Highlands",
+   "archetype": "scottish-rural"
+  },
+  {
+   "matches": [
+    "JE"
+   ],
+   "place": "Jersey",
+   "archetype": "island"
+  },
+  {
+   "matches": [
+    "KA"
+   ],
+   "place": "Kilmarnock and Ayrshire",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "KT"
+   ],
+   "place": "Kingston and north Surrey",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "KW"
+   ],
+   "place": "Kirkwall, Caithness and Orkney",
+   "archetype": "scottish-rural"
+  },
+  {
+   "matches": [
+    "KY"
+   ],
+   "place": "Kirkcaldy and Fife",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "L"
+   ],
+   "place": "Liverpool and Merseyside",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "LA"
+   ],
+   "place": "Lancaster, Furness and the Lakes",
+   "archetype": "northern-stone"
+  },
+  {
+   "matches": [
+    "LD"
+   ],
+   "place": "Llandrindod Wells and mid Wales",
+   "archetype": "welsh-valleys"
+  },
+  {
+   "matches": [
+    "LE"
+   ],
+   "place": "Leicester and Leicestershire",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "LL"
+   ],
+   "place": "Llandudno and north Wales",
+   "archetype": "welsh-valleys"
+  },
+  {
+   "matches": [
+    "LN"
+   ],
+   "place": "Lincoln and Lincolnshire",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "LS"
+   ],
+   "place": "Leeds",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "LU"
+   ],
+   "place": "Luton and south Bedfordshire",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "M"
+   ],
+   "place": "Manchester",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "ME"
+   ],
+   "place": "Medway and mid Kent",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "MK"
+   ],
+   "place": "Milton Keynes and north Buckinghamshire",
+   "archetype": "new-town"
+  },
+  {
+   "matches": [
+    "ML"
+   ],
+   "place": "Motherwell and Lanarkshire",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "N"
+   ],
+   "place": "North London",
+   "archetype": "london-inner"
+  },
+  {
+   "matches": [
+    "NE"
+   ],
+   "place": "Newcastle and Tyneside",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "NG"
+   ],
+   "place": "Nottingham and Nottinghamshire",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "NN"
+   ],
+   "place": "Northampton and Northamptonshire",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "NP"
+   ],
+   "place": "Newport and the Gwent valleys",
+   "archetype": "welsh-valleys"
+  },
+  {
+   "matches": [
+    "NR"
+   ],
+   "place": "Norwich and Norfolk",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "NW"
+   ],
+   "place": "North-west London",
+   "archetype": "london-inner"
+  },
+  {
+   "matches": [
+    "OL"
+   ],
+   "place": "Oldham and Rochdale",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "OX"
+   ],
+   "place": "Oxford and Oxfordshire",
+   "archetype": "limestone-country"
+  },
+  {
+   "matches": [
+    "PA"
+   ],
+   "place": "Paisley, Renfrewshire and Argyll",
+   "archetype": "scottish-urban"
+  },
+  {
+   "matches": [
+    "PE"
+   ],
+   "place": "Peterborough and the fens",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "PH"
+   ],
+   "place": "Perth and highland Perthshire",
+   "archetype": "scottish-rural"
+  },
+  {
+   "matches": [
+    "PL"
+   ],
+   "place": "Plymouth and south-west Devon",
+   "archetype": "west-country"
+  },
+  {
+   "matches": [
+    "PO"
+   ],
+   "place": "Portsmouth and the Solent",
+   "archetype": "seaside-victorian"
+  },
+  {
+   "matches": [
+    "PR"
+   ],
+   "place": "Preston and central Lancashire",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "RG"
+   ],
+   "place": "Reading and the Thames valley",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "RH"
+   ],
+   "place": "Redhill, Crawley and east Surrey",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "RM"
+   ],
+   "place": "Romford and east London",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "S"
+   ],
+   "place": "Sheffield and Rotherham",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "SA"
+   ],
+   "place": "Swansea and west Wales",
+   "archetype": "welsh-valleys"
+  },
+  {
+   "matches": [
+    "SE"
+   ],
+   "place": "South-east London",
+   "archetype": "london-inner"
+  },
+  {
+   "matches": [
+    "SG"
+   ],
+   "place": "Stevenage and north Hertfordshire",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "SK"
+   ],
+   "place": "Stockport and north Derbyshire",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "SL"
+   ],
+   "place": "Slough, Windsor and east Berkshire",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "SM"
+   ],
+   "place": "Sutton",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "SN"
+   ],
+   "place": "Swindon and north Wiltshire",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "SO"
+   ],
+   "place": "Southampton and central Hampshire",
+   "archetype": "seaside-victorian"
+  },
+  {
+   "matches": [
+    "SP"
+   ],
+   "place": "Salisbury and south Wiltshire",
+   "archetype": "limestone-country"
+  },
+  {
+   "matches": [
+    "SR"
+   ],
+   "place": "Sunderland and east Durham",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "SS"
+   ],
+   "place": "Southend and south Essex",
+   "archetype": "seaside-victorian"
+  },
+  {
+   "matches": [
+    "ST"
+   ],
+   "place": "Stoke-on-Trent and Staffordshire",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "SW"
+   ],
+   "place": "South-west London",
+   "archetype": "london-inner"
+  },
+  {
+   "matches": [
+    "SY"
+   ],
+   "place": "Shrewsbury and Shropshire",
+   "archetype": "east-anglian"
+  },
+  {
+   "matches": [
+    "TA"
+   ],
+   "place": "Taunton and Somerset",
+   "archetype": "west-country"
+  },
+  {
+   "matches": [
+    "TD"
+   ],
+   "place": "Galashiels and the Scottish Borders",
+   "archetype": "scottish-rural"
+  },
+  {
+   "matches": [
+    "TF"
+   ],
+   "place": "Telford",
+   "archetype": "new-town"
+  },
+  {
+   "matches": [
+    "TN"
+   ],
+   "place": "Tonbridge and the Weald",
+   "archetype": "home-counties"
+  },
+  {
+   "matches": [
+    "TQ"
+   ],
+   "place": "Torquay and south Devon",
+   "archetype": "west-country"
+  },
+  {
+   "matches": [
+    "TR"
+   ],
+   "place": "Truro and Cornwall",
+   "archetype": "west-country"
+  },
+  {
+   "matches": [
+    "TS"
+   ],
+   "place": "Teesside and Cleveland",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "TW"
+   ],
+   "place": "Twickenham and west London",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "UB"
+   ],
+   "place": "Southall and west London",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "W"
+   ],
+   "place": "West London",
+   "archetype": "london-inner"
+  },
+  {
+   "matches": [
+    "WA"
+   ],
+   "place": "Warrington and south Lancashire",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "WC"
+   ],
+   "place": "central London",
+   "archetype": "london-inner"
+  },
+  {
+   "matches": [
+    "WD"
+   ],
+   "place": "Watford and south-west Hertfordshire",
+   "archetype": "london-outer"
+  },
+  {
+   "matches": [
+    "WF"
+   ],
+   "place": "Wakefield and west Yorkshire",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "WN"
+   ],
+   "place": "Wigan",
+   "archetype": "northern-industrial"
+  },
+  {
+   "matches": [
+    "WR"
+   ],
+   "place": "Worcester and Worcestershire",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "WS"
+   ],
+   "place": "Walsall and the Black Country",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "WV"
+   ],
+   "place": "Wolverhampton",
+   "archetype": "midlands-suburban"
+  },
+  {
+   "matches": [
+    "YO"
+   ],
+   "place": "York and the Vale of York",
+   "archetype": "northern-stone"
+  },
+  {
+   "matches": [
+    "ZE"
+   ],
+   "place": "Shetland",
+   "archetype": "scottish-rural"
+  }
+ ]
+}

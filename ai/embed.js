@@ -11,23 +11,93 @@ const root = path.join(__dirname, '..');
 const HTML = path.join(root, 'index.html');
 const OPEN = '/* AI-PROFILES-START */', CLOSE = '/* AI-PROFILES-END */';
 
-const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.json')).sort();
-const profiles = files.map(f => JSON.parse(fs.readFileSync(path.join(__dirname, f), 'utf8')));
-for (const p of profiles) {
-  for (const k of ['id', 'postcode', 'matches', 'place', 'stock', 'type', 'storeys', 'wall', 'roofShape', 'roofMat'])
-    if (p[k] === undefined) throw new Error(p.id + ': missing "' + k + '"');
+/* What the renderer will actually accept, read out of index.html rather than
+   copied here, so a profile cannot quietly name a material the sim has never
+   heard of and fall back to grey. The first draft of the area profiles asked
+   for "asbestos" roofs; the sim knows eternit. */
+const htmlSrc = fs.readFileSync(HTML, 'utf8');
+function keysOf(name) {
+  const m = new RegExp('var ' + name + ' = \\{([\\s\\S]*?)\\};').exec(htmlSrc);
+  if (!m) throw new Error('cannot find ' + name + ' in index.html');
+  return new Set([...m[1].matchAll(/(?:^|[,{\s])([A-Za-z_][A-Za-z0-9_]*)\s*:/g)].map(x => x[1]));
 }
-const block = OPEN + '\nvar AI_PROFILES = ' + JSON.stringify(profiles, null, 1) + ';\n' + CLOSE;
+const WALL_OK = keysOf('WALL_MAT');
+const ROOF_OK = keysOf('ROOF_MAT');
+const SHAPE_OK = new Set(['hipped', 'gabled', 'pyramidal', 'cone', 'dome', 'onion', 'skillion', 'flat']);
+const TYPE_OK = new Set(['house', 'detached', 'semidetached_house', 'terrace', 'bungalow', 'apartments',
+  'residential', 'commercial', 'retail', 'office', 'industrial', 'warehouse', 'factory', 'barn',
+  'shed', 'garage', 'hotel', 'school', 'church']);
 
-const html = fs.readFileSync(HTML, 'utf8');
+function checkList(list, ok, what, where) {
+  for (const [v] of list || [])
+    if (!ok.has(String(v))) throw new Error(where + ': ' + what + ' "' + v + '" is not one the sim knows');
+}
+function checkProfile(p) {
+  for (const k of ['id', 'postcode', 'matches', 'place', 'stock', 'type', 'storeys', 'wall', 'roofShape', 'roofMat'])
+    if (p[k] === undefined) throw new Error((p.id || '?') + ': missing "' + k + '"');
+  for (const cls of ['house', 'block', 'shed']) {
+    checkList(p.type[cls], TYPE_OK, 'building type', p.id);
+    checkList(p.wall[cls], WALL_OK, 'wall material', p.id);
+    checkList(p.roofShape[cls], SHAPE_OK, 'roof shape', p.id);
+    checkList(p.roofMat[cls], ROOF_OK, 'roof material', p.id);
+  }
+  checkList(p.type.shed_large, TYPE_OK, 'building type', p.id);
+}
+
+/* A file is either one profile, or a set of archetypes plus a map of postcode
+   areas onto them. The second shape is how the whole country fits in a file
+   somebody can actually read: the weights live once per archetype, not once
+   per area. They are expanded here, so the sim itself is none the wiser. */
+const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.json')).sort();
+const profiles = [];
+const archetypes = {};
+for (const f of files) {
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname, f), 'utf8'));
+  if (d.kind === 'areas') {
+    for (const k in d.archetypes) {
+      if (archetypes[k]) throw new Error('two files define the archetype "' + k + '"');
+      archetypes[k] = d.archetypes[k];
+    }
+    for (const a of d.areas) {
+      if (!d.archetypes[a.archetype])
+        throw new Error(f + ': ' + a.matches[0] + ' wants archetype "' + a.archetype + '", which is not defined');
+      /* The archetype is NOT expanded into the page. A hundred and twenty
+         copies of the same weight tables was 325 KB of a 534 KB file, on a
+         page a phone loads off disk with no compression to save it. The sim
+         merges the archetype in once at startup instead. */
+      profiles.push(Object.assign({
+        id: 'area-' + a.matches[0].toLowerCase(),
+        postcode: a.matches[0],
+        matches: a.matches,
+        place: a.place,
+        archetype: a.archetype
+      }, a.overrides || {}));
+    }
+  } else {
+    profiles.push(d);
+  }
+}
+/* validate what the sim will actually end up with, not what is stored */
+for (const p of profiles)
+  checkProfile(p.archetype ? Object.assign({}, archetypes[p.archetype], p) : p);
+const block = OPEN + '\nvar AI_ARCHETYPES = ' + JSON.stringify(archetypes) + ';\n' +
+  'var AI_PROFILES = ' + JSON.stringify(profiles) + ';\n' +
+  /* one pass at startup, so everything downstream sees a whole profile */
+  'for(var _i=0;_i<AI_PROFILES.length;_i++){\n' +
+  '  var _p = AI_PROFILES[_i], _a = _p.archetype && AI_ARCHETYPES[_p.archetype];\n' +
+  '  if(_a) for(var _k in _a) if(_p[_k] === undefined) _p[_k] = _a[_k];\n' +
+  '}\n' + CLOSE;
+
+const html = htmlSrc;
 const a = html.indexOf(OPEN), b = html.indexOf(CLOSE);
 if (a < 0 || b < 0) throw new Error('markers not found in index.html');
 const next = html.slice(0, a) + block + html.slice(b + CLOSE.length);
 
 if (process.argv.includes('--check')) {
   if (next !== html) { console.error('index.html is out of date — run: node ai/embed.js'); process.exit(1); }
-  console.log('embedded profiles are in sync (' + files.join(', ') + ')');
+  console.log('embedded profiles are in sync (' + profiles.length + ' from ' + files.join(', ') + ')');
 } else {
   fs.writeFileSync(HTML, next);
-  console.log('embedded ' + files.length + ' profile(s): ' + files.join(', '));
+  console.log('embedded ' + profiles.length + ' profiles and ' + Object.keys(archetypes).length +
+    ' archetypes from ' + files.length + ' file(s): ' + files.join(', '));
 }

@@ -88,3 +88,38 @@ made every roof clay terracotta, and offered `garage` as a plausible type for a
    worth wiring into CI.
 
 Weights within a list need not sum to 1; they are normalised.
+
+## The whole country, by postcode area
+
+`uk-areas.json` carries a profile for every UK postcode area — 124 of them,
+which is as close as the postcode system gets to "cities and counties". `M`
+is Manchester, `EH` is Edinburgh, `TR` is Cornwall, `BT` is Northern Ireland.
+
+It is stored as **archetypes plus a map**, not as 124 separate weight tables:
+sixteen characters of British building stock — northern industrial, Scottish
+urban, limestone country, London inner, and so on — and a line per area saying
+which one it takes. That is not laziness. The difference between Bolton and
+Bradford is not something a language model actually knows; the difference
+between Bolton and Bath is. Writing it the other way round would have dressed
+a guess up as local knowledge.
+
+`ai/embed.js` keeps the archetypes separate in the page too, and the sim merges
+them once at startup. Expanded, they were 325 KB of a 534 KB file; stored once,
+they are 38 KB. The sim is a single file people open off a phone, and there is
+no compression on a `file://` page to hide it.
+
+**Longest match wins**, which the area profiles make essential rather than
+merely tidy: a postcode area can be one letter or two, so `BA1 2XX` begins with
+`B` exactly as surely as it begins with `BA`. It also means a profile for one
+village sits on top of the one for its whole area without either knowing about
+the other — `KT23 3HP` still gets the Bookham profile, `KT1 1AA` gets Kingston.
+
+## What embed.js checks
+
+Every material, roof shape and building type in a profile is checked against
+what the renderer will actually accept, read out of `index.html` rather than
+copied into the checker. This is not theoretical: it immediately found that
+the Bookham profile had been asking for `asbestos` roofs since the day it was
+written. The sim has never known that word, so a quarter of its sheds had been
+falling back to plain grey. They are `eternit` now, which is what a fibre
+cement roof is.
