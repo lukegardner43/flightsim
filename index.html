@@ -3487,29 +3487,255 @@ function initScene(){
     renderer.setSize(innerWidth, innerHeight);
   });
 }
+/* ============================================================
+   6.9  THE AIRCRAFT
+   A BAE Hawk T1 in Red Arrows colours, built from its real dimensions:
+   11.85 m long, 9.39 m span, 3.98 m tall. Everything here is generated —
+   there is no model file to fetch, which is what keeps this page a single
+   file you can open straight off a disk.
+
+   The wings are not boxes. Each flying surface is a symmetric NACA section
+   swept, tapered and given dihedral, so it has a rounded leading edge, a
+   sharp trailing edge and a tip that reads as a wing from any angle. That is
+   most of the difference between "an aeroplane" and "a cylinder with planks".
+   ============================================================ */
+
+/* NACA 00xx half-thickness at chord fraction u, as a fraction of chord */
+function nacaT(u, ratio){
+  return 5*ratio*(0.2969*Math.sqrt(u) - 0.1260*u - 0.3516*u*u +
+                  0.2843*u*u*u - 0.1015*u*u*u*u);
+}
+/* A flying surface. span is tip to tip; it is built about x = 0 and mirrored,
+   so one call gives a whole wing or tailplane. Set vertical for a fin. */
+function foil(o){
+  var NS = 10, NC = 16, verts = [], idx = [], i, j;
+  var half = o.span/2, sw = Math.tan((o.sweep || 0)*Math.PI/180);
+  var dih = Math.tan((o.dihedral || 0)*Math.PI/180);
+  var sides = o.vertical ? [1] : [-1, 1];
+  for(var sgn = 0; sgn < sides.length; sgn++){
+    var sg = sides[sgn], base = verts.length/3;
+    for(i=0;i<=NS;i++){
+      var s = i/NS;
+      var span = s*half;
+      var chord = o.root + (o.tip - o.root)*s;
+      var le = o.z + span*sw;                       /* leading edge sweeps aft */
+      /* the tip is rounded off rather than cut square */
+      var round = 1 - Math.pow(s, 8);
+      for(j=0;j<=NC;j++){
+        var u = j/NC;
+        var t = nacaT(u, o.thick || 0.10)*chord*round;
+        var z = le + u*chord;
+        if(o.vertical){
+          verts.push(t, span, z);                    /* a fin is the same shape */
+          verts.push(-t, span, z);                   /* stood on its root */
+        }else{
+          var y = o.y + span*dih;
+          verts.push(sg*span, y + t, z);
+          verts.push(sg*span, y - t, z);
+        }
+      }
+    }
+    for(i=0;i<NS;i++) for(j=0;j<NC;j++){
+      var a0 = base + (i*(NC+1) + j)*2, b0 = base + (i*(NC+1) + j + 1)*2;
+      var c0 = base + ((i+1)*(NC+1) + j)*2, d0 = base + ((i+1)*(NC+1) + j + 1)*2;
+      if(sg > 0){
+        idx.push(a0, c0, b0,  b0, c0, d0);           /* upper */
+        idx.push(a0+1, b0+1, c0+1,  b0+1, d0+1, c0+1);
+      }else{
+        idx.push(a0, b0, c0,  b0, d0, c0);
+        idx.push(a0+1, c0+1, b0+1,  b0+1, c0+1, d0+1);
+      }
+    }
+  }
+  var g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+/* The RAF roundel, drawn once and used on both wings. */
+function roundelTexture(){
+  var c = document.createElement("canvas");
+  c.width = c.height = 64;
+  var x = c.getContext("2d"), r = 31;
+  x.clearRect(0, 0, 64, 64);
+  var rings = [[r, "#0b3d91"], [r*0.62, "#f4f2ec"], [r*0.30, "#c8102e"]];
+  for(var i=0;i<rings.length;i++){
+    x.beginPath(); x.arc(32, 32, rings[i][0], 0, 6.2832);
+    x.fillStyle = rings[i][1]; x.fill();
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.minFilter = t.magFilter = THREE.LinearFilter;
+  return t;
+}
+var smoke = null;
 function buildAircraft(){
   plane = new THREE.Group();
-  var body = new THREE.MeshLambertMaterial({color:0xe8e4dc});
-  var trim = new THREE.MeshLambertMaterial({color:0xC22A6B});
-  var dark = new THREE.MeshLambertMaterial({color:0x2b3341});
-  var fus = new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.34,7.2,10), body);
-  fus.rotation.x = Math.PI/2; plane.add(fus);
-  var nose = new THREE.Mesh(new THREE.ConeGeometry(0.62,1.5,10), trim);
-  nose.rotation.x = -Math.PI/2; nose.position.z = -4.3; plane.add(nose);
-  var canopy = new THREE.Mesh(new THREE.SphereGeometry(0.55,10,8), dark);
-  canopy.scale.set(1,0.75,1.9); canopy.position.set(0,0.42,-0.7); plane.add(canopy);
-  var wing = new THREE.Mesh(new THREE.BoxGeometry(11.5,0.18,1.7), body);
-  wing.position.set(0,0.28,-0.4); plane.add(wing);
-  var tipL = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,1.4), trim);
-  tipL.position.set(-5.8,0.4,-0.4); plane.add(tipL);
-  var tipR = tipL.clone(); tipR.position.x = 5.8; plane.add(tipR);
-  var tail = new THREE.Mesh(new THREE.BoxGeometry(4.2,0.15,1.1), body);
-  tail.position.set(0,0.2,3.2); plane.add(tail);
-  var fin = new THREE.Mesh(new THREE.BoxGeometry(0.14,1.5,1.2), trim);
-  fin.position.set(0,0.9,3.3); plane.add(fin);
-  propeller = new THREE.Mesh(new THREE.BoxGeometry(4.4,0.14,0.08), dark);
-  propeller.position.z = -5.1; plane.add(propeller);
+
+  /* Gloss, not matt. A specular highlight running along a red fuselage as it
+     rolls is most of what makes it read as a painted aeroplane rather than a
+     shape. */
+  var RED   = new THREE.MeshPhongMaterial({color:0xd8121f, shininess:78, specular:0x6b6b6b});
+  var WHITE = new THREE.MeshPhongMaterial({color:0xf1efe8, shininess:70, specular:0x606060});
+  var BLUE  = new THREE.MeshPhongMaterial({color:0x0b3d91, shininess:70, specular:0x505050});
+  var GLASS = new THREE.MeshPhongMaterial({color:0x1d2a38, shininess:150, specular:0xbfd4e6,
+                                           transparent:true, opacity:0.62});
+  var DARK  = new THREE.MeshPhongMaterial({color:0x22262b, shininess:30, specular:0x303030});
+  var STEEL = new THREE.MeshPhongMaterial({color:0x6d7176, shininess:120, specular:0x9aa0a6});
+
+  /* ---- fuselage: a body of revolution, nose at -z ---- */
+  var prof = [[0.02,-6.20],[0.17,-5.90],[0.31,-5.50],[0.45,-4.90],[0.56,-4.10],
+              [0.64,-3.10],[0.70,-1.80],[0.72,-0.20],[0.71,1.40],[0.66,2.80],
+              [0.58,3.90],[0.49,4.80],[0.43,5.35],[0.42,5.55]];
+  var pts = prof.map(function(p){ return new THREE.Vector2(p[0], p[1]); });
+  var fus = new THREE.Mesh(new THREE.LatheGeometry(pts, 24), RED);
+  fus.rotation.x = Math.PI/2;
+  plane.add(fus);
+
+  /* ---- wings ---- */
+  var wing = new THREE.Mesh(foil({span:9.39, root:2.55, tip:1.05, sweep:24,
+                                  dihedral:-2, thick:0.105, y:-0.26, z:-0.55}), RED);
+  plane.add(wing);
+  /* white tips, which is what the eye picks up when it banks away */
+  [-1, 1].forEach(function(sg){
+    var tip = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.12, 1.15), WHITE);
+    tip.position.set(sg*4.63, -0.42, 1.40);
+    tip.rotation.y = sg*0.05;
+    plane.add(tip);
+  });
+
+  /* ---- tailplane, with the Hawk's pronounced anhedral ---- */
+  plane.add(new THREE.Mesh(foil({span:4.40, root:1.45, tip:0.72, sweep:30,
+                                 dihedral:-9, thick:0.09, y:0.10, z:4.05}), RED));
+
+  /* ---- fin ---- */
+  var fin = new THREE.Mesh(foil({span:3.80, root:2.45, tip:1.05, sweep:42,
+                                 thick:0.09, vertical:true, y:0, z:2.70}), RED);
+  plane.add(fin);
+  /* The flash, laid ON the fin rather than floating beside it: the fin's
+     leading edge runs from (0, 2.70) at the root to (1.90, 4.41) at the tip,
+     which is 42 degrees off vertical, so the stripe is rotated to match. */
+  var leAng = Math.atan2(1.71, 1.90);
+  var stripe = new THREE.Mesh(new THREE.BoxGeometry(0.20, 2.52, 0.20), WHITE);
+  stripe.position.set(0, 0.95, 3.52); stripe.rotation.x = leAng; plane.add(stripe);
+  var cap = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.16, 1.02), BLUE);
+  cap.position.set(0, 1.88, 4.92); plane.add(cap);
+
+  /* ---- canopy: two seats under one blown hood, with a frame ---- */
+  var hood = new THREE.Mesh(new THREE.SphereGeometry(0.60, 18, 12,
+                              0, Math.PI*2, 0, Math.PI*0.55), GLASS);
+  hood.scale.set(0.92, 0.86, 2.65);
+  hood.position.set(0, 0.52, -2.05);
+  plane.add(hood);
+  var rib = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.035, 6, 16, Math.PI), WHITE);
+  rib.rotation.y = Math.PI/2; rib.position.set(0, 0.52, -2.05); rib.scale.set(1, 0.92, 1);
+  plane.add(rib);
+  var sill = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.07, 3.15), WHITE);
+  sill.position.set(0, 0.52, -2.05); plane.add(sill);
+
+  /* ---- side intakes ---- */
+  [-1, 1].forEach(function(sg){
+    var duct = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.62, 1.85), RED);
+    duct.position.set(sg*0.74, 0.10, -0.35);
+    duct.rotation.y = sg*0.045;
+    plane.add(duct);
+    var mouth = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.50, 0.10), DARK);
+    mouth.position.set(sg*0.76, 0.10, -1.26);
+    plane.add(mouth);
+  });
+
+  /* ---- jet pipe, and the fan you can see down it ---- */
+  var pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.40, 0.55, 20, 1, true), DARK);
+  pipe.rotation.x = Math.PI/2; pipe.position.z = 5.62; plane.add(pipe);
+  propeller = new THREE.Mesh(new THREE.CircleGeometry(0.38, 14), STEEL);
+  propeller.position.z = 5.50; propeller.rotation.y = Math.PI;
+  plane.add(propeller);
+
+  /* ---- nose probe ---- */
+  var probe = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.02, 1.05, 6), WHITE);
+  probe.rotation.x = Math.PI/2; probe.position.z = -6.60; plane.add(probe);
+
+  /* ---- roundels, sitting just proud of the wing skin ---- */
+  var rt = roundelTexture();
+  var rmat = new THREE.MeshBasicMaterial({map:rt, transparent:true, depthWrite:false,
+    polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  [-1, 1].forEach(function(sg){
+    var d = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 1.05), rmat);
+    d.rotation.x = -Math.PI/2;
+    d.position.set(sg*2.35, -0.24 + 0.09, 0.55);
+    plane.add(d);
+  });
+
+  /* ---- the smoke ---- */
+  smoke = makeSmoke();
+  scene.add(smoke.mesh);
+
   scene.add(plane);
+}
+
+/* A ribbon of smoke that tapers away behind the aircraft. Kept as a fixed
+   ring of points rewritten each frame rather than anything that allocates,
+   because this runs sixty times a second next to twenty thousand buildings. */
+function makeSmoke(){
+  var N = 90;
+  var pos = new Float32Array(N*2*3), col = new Float32Array(N*2*3), idx = [];
+  var g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  for(var i=0;i<N-1;i++){
+    var a = i*2;
+    idx.push(a, a+1, a+2,  a+1, a+3, a+2);
+  }
+  g.setIndex(idx);
+  var m = new THREE.MeshBasicMaterial({vertexColors:true, transparent:true, opacity:0.5,
+    depthWrite:false, side:THREE.DoubleSide});
+  var mesh = new THREE.Mesh(g, m);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 5;
+  return {mesh:mesh, g:g, pos:pos, col:col, N:N, trail:[], last:null};
+}
+function updateSmoke(dt){
+  if(!smoke || !plane) return;
+  var p = plane.position;
+  /* one puff every few metres, not every frame, so the trail is the same
+     length whatever the frame rate is doing */
+  if(!smoke.last || smoke.last.distanceToSquared(p) > 36){
+    smoke.last = p.clone();
+    smoke.trail.unshift({p:p.clone(), age:0});
+    if(smoke.trail.length > smoke.N) smoke.trail.length = smoke.N;
+  }
+  var i, t, wide;
+  if(!smoke.v){ smoke.v = {dir:new THREE.Vector3(), view:new THREE.Vector3(),
+                           side:new THREE.Vector3()}; }
+  var dir = smoke.v.dir, view = smoke.v.view, side = smoke.v.side;
+  var cam = camera ? camera.position : null;
+  for(i=0;i<smoke.trail.length;i++) smoke.trail[i].age += dt;
+  for(i=0;i<smoke.N;i++){
+    t = smoke.trail[Math.min(i, smoke.trail.length-1)];
+    if(!t) break;
+    var f = i/(smoke.N-1);
+    wide = 0.45 + f*6.5;                         /* spreads as it drifts */
+    /* Across the trail AND across the line of sight, or the ribbon lies flat
+       and reads as a white stripe painted on the fields. */
+    var nx = smoke.trail[Math.min(i + 1, smoke.trail.length - 1)];
+    dir.subVectors(nx.p, t.p);
+    if(dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+    if(cam){
+      view.subVectors(t.p, cam);
+      side.crossVectors(dir, view);
+      if(side.lengthSq() < 1e-8) side.set(1, 0, 0);
+      side.normalize().multiplyScalar(wide);
+    }else side.set(wide, 0, 0);
+    var k = i*6, drift = t.age*0.9;              /* and sinks a little */
+    smoke.pos[k]   = t.p.x - side.x; smoke.pos[k+1] = t.p.y - drift; smoke.pos[k+2] = t.p.z - side.z;
+    smoke.pos[k+3] = t.p.x + side.x; smoke.pos[k+4] = t.p.y - drift; smoke.pos[k+5] = t.p.z + side.z;
+    var v = Math.max(0, 1 - f)*0.95 + 0.05;      /* thins out down the trail */
+    smoke.col[k] = smoke.col[k+3] = v;
+    smoke.col[k+1] = smoke.col[k+4] = v;
+    smoke.col[k+2] = smoke.col[k+5] = v;
+  }
+  smoke.g.attributes.position.needsUpdate = true;
+  smoke.g.attributes.color.needsUpdate = true;
 }
 
 /* ============================================================
@@ -4229,6 +4455,7 @@ function physics(dt){
   vel.y -= Math.max(0, 1 - st.speed/44)*32;
   plane.position.addScaledVector(vel, dt);
   if(propeller) propeller.rotation.z += dt*(6 + st.throttle*70);
+  updateSmoke(dt);
 
   var gnd = terrainY(plane.position.x, plane.position.z);
   if(plane.position.y < gnd + 3.5){
