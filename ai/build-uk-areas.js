@@ -36,8 +36,8 @@ A['london-inner'] = {
   },
   storeys: { house: [[3, 0.44], [2, 0.30], [4, 0.20], [5, 0.06]],
              block: [[5, 0.30], [4, 0.28], [6, 0.18], [3, 0.14], [8, 0.10]], shed: [[1, 1]] },
-  wall: { house: [['brick', 0.50], ['red_brick', 0.22], ['render', 0.14], ['plaster', 0.08], ['stone', 0.06]],
-          block: [['brick', 0.44], ['concrete', 0.24], ['render', 0.18], ['glass', 0.14]],
+  wall: { house: [['stock_brick', 0.40], ['brick', 0.22], ['render', 0.14], ['red_brick', 0.12], ['plaster', 0.06], ['stone', 0.06]],
+          block: [['stock_brick', 0.32], ['brick', 0.22], ['concrete', 0.22], ['render', 0.14], ['glass', 0.10]],
           shed: [['metal', 0.50], ['brick', 0.24], ['concrete', 0.20], ['wood', 0.06]] },
   roofShape: { house: [['gabled', 0.50], ['hipped', 0.22], ['flat', 0.20], ['pyramidal', 0.08]],
                block: [['flat', 0.62], ['hipped', 0.24], ['gabled', 0.14]], shed: [['flat', 0.55], ['gabled', 0.45]] },
@@ -85,7 +85,7 @@ A['home-counties'] = {
              block: [[3, 0.55], [4, 0.35], [2, 0.10]], shed: [[1, 1]] },
   wall: { house: [['red_brick', 0.40], ['brick', 0.17], ['render', 0.15], ['plaster', 0.09], ['timber_framing', 0.07], ['stone', 0.05], ['concrete', 0.04], ['wood', 0.03]],
           block: [['brick', 0.50], ['render', 0.30], ['concrete', 0.20]],
-          shed: [['metal', 0.55], ['concrete', 0.20], ['brick', 0.15], ['wood', 0.10]] },
+          shed: [['brick', 0.34], ['metal', 0.30], ['concrete', 0.18], ['wood', 0.18]] },
   roofShape: { house: [['hipped', 0.46], ['gabled', 0.44], ['pyramidal', 0.07], ['flat', 0.03]],
                block: [['hipped', 0.45], ['flat', 0.40], ['gabled', 0.15]], shed: [['gabled', 0.80], ['flat', 0.20]] },
   roofMat: { house: [['tile', 0.52], ['slate', 0.34], ['clay', 0.14]],
@@ -152,8 +152,8 @@ A['scottish-rural'] = {
   },
   storeys: { house: [[2, 0.50], [1, 0.42], [3, 0.08]],
              block: [[3, 0.56], [2, 0.28], [4, 0.16]], shed: [[1, 1]] },
-  wall: { house: [['render', 0.42], ['stone', 0.18], ['plaster', 0.16], ['granite', 0.10], ['red_brick', 0.08], ['wood', 0.06]],
-          block: [['render', 0.46], ['concrete', 0.28], ['stone', 0.26]],
+  wall: { house: [['harling', 0.42], ['stone', 0.18], ['plaster', 0.16], ['granite', 0.10], ['red_brick', 0.08], ['wood', 0.06]],
+          block: [['harling', 0.46], ['concrete', 0.28], ['stone', 0.26]],
           shed: [['metal', 0.58], ['wood', 0.18], ['concrete', 0.16], ['stone', 0.08]] },
   roofShape: { house: [['gabled', 0.78], ['hipped', 0.18], ['flat', 0.04]],
                block: [['gabled', 0.56], ['hipped', 0.28], ['flat', 0.16]], shed: [['gabled', 0.82], ['flat', 0.18]] },
@@ -175,7 +175,7 @@ A['welsh-valleys'] = {
   },
   storeys: { house: [[2, 0.86], [3, 0.09], [1, 0.05]],
              block: [[3, 0.52], [4, 0.30], [2, 0.18]], shed: [[1, 1]] },
-  wall: { house: [['render', 0.34], ['stone', 0.22], ['red_brick', 0.20], ['plaster', 0.12], ['brick', 0.12]],
+  wall: { house: [['pebbledash', 0.34], ['stone', 0.22], ['red_brick', 0.20], ['render', 0.12], ['brick', 0.12]],
           block: [['render', 0.44], ['red_brick', 0.30], ['concrete', 0.26]],
           shed: [['metal', 0.56], ['concrete', 0.20], ['brick', 0.16], ['stone', 0.08]] },
   roofShape: { house: [['gabled', 0.80], ['hipped', 0.16], ['flat', 0.04]],
@@ -200,7 +200,7 @@ A['limestone-country'] = {
              block: [[3, 0.58], [4, 0.26], [2, 0.16]], shed: [[1, 1]] },
   wall: { house: [['limestone', 0.44], ['sandstone', 0.16], ['stone', 0.14], ['red_brick', 0.14], ['render', 0.12]],
           block: [['limestone', 0.40], ['render', 0.32], ['concrete', 0.28]],
-          shed: [['metal', 0.48], ['stone', 0.22], ['concrete', 0.18], ['wood', 0.12]] },
+          shed: [['stone', 0.38], ['metal', 0.34], ['concrete', 0.16], ['wood', 0.12]] },
   roofShape: { house: [['gabled', 0.70], ['hipped', 0.24], ['flat', 0.06]],
                block: [['gabled', 0.44], ['hipped', 0.32], ['flat', 0.24]], shed: [['gabled', 0.80], ['flat', 0.20]] },
   roofMat: { house: [['stone', 0.30], ['clay', 0.30], ['slate', 0.26], ['tile', 0.14]],
@@ -244,8 +244,8 @@ A['seaside-victorian'] = {
   },
   storeys: { house: [[2, 0.50], [3, 0.34], [4, 0.12], [1, 0.04]],
              block: [[4, 0.36], [5, 0.24], [3, 0.24], [6, 0.16]], shed: [[1, 1]] },
-  wall: { house: [['render', 0.38], ['red_brick', 0.20], ['plaster', 0.18], ['brick', 0.14], ['stone', 0.10]],
-          block: [['render', 0.40], ['brick', 0.28], ['concrete', 0.20], ['glass', 0.12]],
+  wall: { house: [['stucco', 0.38], ['red_brick', 0.20], ['plaster', 0.18], ['brick', 0.14], ['stone', 0.10]],
+          block: [['stucco', 0.40], ['brick', 0.28], ['concrete', 0.20], ['glass', 0.12]],
           shed: [['metal', 0.54], ['brick', 0.22], ['concrete', 0.18], ['wood', 0.06]] },
   roofShape: { house: [['hipped', 0.44], ['gabled', 0.42], ['flat', 0.14]],
                block: [['flat', 0.50], ['hipped', 0.30], ['gabled', 0.20]], shed: [['gabled', 0.70], ['flat', 0.30]] },
@@ -292,7 +292,7 @@ A['west-country'] = {
              block: [[3, 0.56], [4, 0.26], [2, 0.18]], shed: [[1, 1]] },
   wall: { house: [['render', 0.38], ['stone', 0.22], ['red_brick', 0.16], ['plaster', 0.14], ['granite', 0.06], ['wood', 0.04]],
           block: [['render', 0.46], ['concrete', 0.28], ['stone', 0.26]],
-          shed: [['metal', 0.52], ['stone', 0.18], ['concrete', 0.18], ['wood', 0.12]] },
+          shed: [['stone', 0.38], ['metal', 0.34], ['concrete', 0.16], ['wood', 0.12]] },
   roofShape: { house: [['gabled', 0.72], ['hipped', 0.22], ['flat', 0.06]],
                block: [['gabled', 0.44], ['hipped', 0.32], ['flat', 0.24]], shed: [['gabled', 0.78], ['flat', 0.22]] },
   roofMat: { house: [['slate', 0.58], ['tile', 0.24], ['clay', 0.12], ['thatch', 0.06]],
@@ -315,7 +315,7 @@ A['northern-stone'] = {
              block: [[3, 0.58], [4, 0.26], [2, 0.16]], shed: [[1, 1]] },
   wall: { house: [['sandstone', 0.34], ['stone', 0.26], ['limestone', 0.16], ['red_brick', 0.14], ['render', 0.10]],
           block: [['sandstone', 0.38], ['render', 0.32], ['concrete', 0.30]],
-          shed: [['metal', 0.48], ['stone', 0.24], ['concrete', 0.18], ['wood', 0.10]] },
+          shed: [['stone', 0.40], ['metal', 0.34], ['concrete', 0.16], ['wood', 0.10]] },
   roofShape: { house: [['gabled', 0.76], ['hipped', 0.18], ['flat', 0.06]],
                block: [['gabled', 0.46], ['hipped', 0.30], ['flat', 0.24]], shed: [['gabled', 0.82], ['flat', 0.18]] },
   roofMat: { house: [['slate', 0.62], ['stone', 0.16], ['tile', 0.14], ['clay', 0.08]],
@@ -382,9 +382,9 @@ A['island'] = {
   },
   storeys: { house: [[2, 0.74], [3, 0.14], [1, 0.12]],
              block: [[3, 0.54], [4, 0.30], [5, 0.16]], shed: [[1, 1]] },
-  wall: { house: [['render', 0.36], ['granite', 0.26], ['stone', 0.18], ['plaster', 0.12], ['red_brick', 0.08]],
+  wall: { house: [['granite', 0.34], ['render', 0.32], ['stone', 0.18], ['plaster', 0.10], ['red_brick', 0.06]],
           block: [['render', 0.44], ['granite', 0.30], ['concrete', 0.26]],
-          shed: [['metal', 0.56], ['stone', 0.20], ['concrete', 0.16], ['wood', 0.08]] },
+          shed: [['stone', 0.38], ['metal', 0.36], ['concrete', 0.16], ['wood', 0.10]] },
   roofShape: { house: [['gabled', 0.70], ['hipped', 0.24], ['flat', 0.06]],
                block: [['gabled', 0.42], ['hipped', 0.34], ['flat', 0.24]], shed: [['gabled', 0.78], ['flat', 0.22]] },
   roofMat: { house: [['slate', 0.66], ['tile', 0.22], ['clay', 0.12]],
@@ -418,113 +418,113 @@ TEX['london-inner'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[7, 5.0], clerestory:true, door:'wide' },
   house:   { bond:'stock', win:'sash12', bays:2, rows:3, tile:[6.4, 10],  string:true, eaves:true },
   block:   { bond:'stock', win:'sash6',  bays:3, rows:4, tile:[11, 13],   string:true },
-  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[13, 11],  trim:'stone', quoins:true, string:true, eaves:true },
-  masonry: { bond:'ashlar', win:'lancet', bays:1, rows:1, tile:[8, 9],    trim:'stone', quoins:true }
+  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[13, 11],  trim:'stone', quoins:true, string:true, eaves:true, mat:'limestone' },
+  masonry: { bond:'ashlar', win:'lancet', bays:1, rows:1, tile:[8, 9],    trim:'stone', quoins:true, mat:'limestone' }
 };
 TEX['london-outer'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[6.5, 4.4], clerestory:true, door:true },
   house:   { bond:'brick', win:'bay', bays:2, rows:2, tile:[8, 6.2] },
   block:   { bond:'brick', win:'casement', bays:3, rows:3, tile:[12, 9.6] },
-  grand:   { bond:'brick', win:'sash12', bays:3, rows:2, tile:[14, 8.6], trim:'stone', quoins:true, eaves:true },
-  masonry: { bond:'stock', win:'lancet', bays:1, rows:1, tile:[8, 9], trim:'stone' }
+  grand:   { bond:'brick', win:'sash12', bays:3, rows:2, tile:[14, 8.6], trim:'stone', quoins:true, eaves:true, mat:'red_brick' },
+  masonry: { bond:'stock', win:'lancet', bays:1, rows:1, tile:[8, 9], trim:'stone', mat:'stock_brick' }
 };
 TEX['home-counties'] = {
   shed:    { bond:'brick', win:'none', bays:2, rows:1, tile:[5.5, 3.6], door:true },
   house:   { bond:'brick', win:'casement', bays:2, rows:2, tile:[9, 6.4], tilehang:true },
-  block:   { bond:'render', win:'casement', bays:3, rows:3, tile:[12, 9.6] },
-  grand:   { bond:'brick', win:'sash12', bays:3, rows:2, tile:[15, 8.8], trim:'stone', quoins:true, eaves:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9], trim:'stone', quoins:true }
+  block:   { bond:'brick', win:'casement', bays:3, rows:3, tile:[12, 9.6] },
+  grand:   { bond:'brick', win:'sash12', bays:3, rows:2, tile:[15, 8.8], trim:'stone', quoins:true, eaves:true, mat:'red_brick' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9], trim:'stone', quoins:true, mat:'flint' }
 };
 TEX['northern-industrial'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[8, 5.4], clerestory:true, door:'wide' },
   house:   { bond:'brick', win:'sash2', bays:2, rows:2, tile:[5.2, 6.0] },
   block:   { bond:'brick', win:'casement', bays:4, rows:4, tile:[15, 12] },
-  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[13, 11], trim:'stone', string:true, eaves:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9.5], trim:'stone', quoins:true }
+  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[13, 11], trim:'stone', string:true, eaves:true, mat:'sandstone' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9.5], trim:'stone', quoins:true, mat:'sandstone' }
 };
 TEX['scottish-urban'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[7.5, 5.2], clerestory:true, door:'wide' },
   house:   { bond:'ashlar', win:'tenement', bays:2, rows:3, tile:[7, 10.5], trim:'stone', string:true },
   block:   { bond:'ashlar', win:'tenement', bays:3, rows:4, tile:[11, 14],  trim:'stone', string:true, eaves:true },
-  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[13, 11.5],  trim:'stone', quoins:true, string:true, eaves:true },
-  masonry: { bond:'ashlar', win:'lancet', bays:1, rows:1, tile:[8, 10], trim:'stone', quoins:true }
+  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[13, 11.5],  trim:'stone', quoins:true, string:true, eaves:true, mat:'sandstone' },
+  masonry: { bond:'ashlar', win:'lancet', bays:1, rows:1, tile:[8, 10], trim:'stone', quoins:true, mat:'sandstone' }
 };
 TEX['scottish-rural'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[9, 5.6], door:'wide', plinth:true },
   house:   { bond:'harl', win:'sash6', bays:2, rows:2, tile:[6, 6.2] },
   block:   { bond:'harl', win:'casement', bays:3, rows:3, tile:[11, 9.4] },
-  grand:   { bond:'rubble', win:'sash6', bays:3, rows:3, tile:[13, 11], trim:'stone', quoins:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[7.5, 9.5], trim:'stone', quoins:true }
+  grand:   { bond:'rubble', win:'sash6', bays:3, rows:3, tile:[13, 11], trim:'stone', quoins:true, mat:'granite' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[7.5, 9.5], trim:'stone', quoins:true, mat:'granite' }
 };
 TEX['welsh-valleys'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[7, 4.8], clerestory:true, door:true },
   house:   { bond:'pebbledash', win:'sash2', bays:2, rows:2, tile:[5, 6.0] },
   block:   { bond:'render', win:'casement', bays:3, rows:3, tile:[11, 9.4] },
-  grand:   { bond:'rubble', win:'sash6', bays:3, rows:2, tile:[13, 8.6], trim:'stone', quoins:true },
-  masonry: { bond:'rubble', win:'lancet', bays:2, rows:1, tile:[10, 8.5], trim:'stone' }
+  grand:   { bond:'rubble', win:'sash6', bays:3, rows:2, tile:[13, 8.6], trim:'stone', quoins:true, mat:'stone' },
+  masonry: { bond:'rubble', win:'lancet', bays:2, rows:1, tile:[10, 8.5], trim:'stone', mat:'stone' }
 };
 TEX['limestone-country'] = {
   shed:    { bond:'rubble', win:'none', bays:2, rows:1, tile:[8, 5.0], door:'wide', plinth:true },
   house:   { bond:'ashlar', win:'sash6', bays:2, rows:2, tile:[7, 7.0], trim:'stone', quoins:true },
   block:   { bond:'ashlar', win:'sash6', bays:3, rows:3, tile:[12, 11], trim:'stone', string:true },
-  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[14, 11.5], trim:'stone', quoins:true, string:true, eaves:true },
-  masonry: { bond:'ashlar', win:'lancet', bays:1, rows:1, tile:[8, 10], trim:'stone', quoins:true }
+  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[14, 11.5], trim:'stone', quoins:true, string:true, eaves:true, mat:'limestone' },
+  masonry: { bond:'ashlar', win:'lancet', bays:1, rows:1, tile:[8, 10], trim:'stone', quoins:true, mat:'limestone' }
 };
 TEX['east-anglian'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[10, 6.0], door:'wide', plinth:true },
-  house:   { bond:'flint', win:'casement', bays:2, rows:2, tile:[6.4, 6.2], quoins:true },
-  block:   { bond:'render', win:'sash6', bays:3, rows:3, tile:[11, 10] },
-  grand:   { bond:'brick', win:'sash12', bays:3, rows:2, tile:[14, 8.8], trim:'stone', quoins:true, eaves:true },
-  masonry: { bond:'flint', win:'lancet', bays:1, rows:1, tile:[8, 10], trim:'stone', quoins:true }
+  house:   { bond:'brick', win:'casement', bays:2, rows:2, tile:[6.4, 6.2], quoins:true },
+  block:   { bond:'brick', win:'sash6', bays:3, rows:3, tile:[11, 10] },
+  grand:   { bond:'brick', win:'sash12', bays:3, rows:2, tile:[14, 8.8], trim:'stone', quoins:true, eaves:true, mat:'red_brick' },
+  masonry: { bond:'flint', win:'lancet', bays:1, rows:1, tile:[8, 10], trim:'stone', quoins:true, mat:'flint' }
 };
 TEX['seaside-victorian'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[6.5, 4.4], clerestory:true, door:true },
   house:   { bond:'render', win:'bay', bays:2, rows:3, tile:[6.6, 9.6], trim:'stone', string:true, eaves:true },
   block:   { bond:'render', win:'sash6', bays:3, rows:4, tile:[11, 13], string:true, eaves:true },
-  grand:   { bond:'render', win:'sash12', bays:3, rows:3, tile:[13, 11], trim:'stone', quoins:true, string:true, eaves:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9.5], trim:'stone' }
+  grand:   { bond:'render', win:'sash12', bays:3, rows:3, tile:[13, 11], trim:'stone', quoins:true, string:true, eaves:true, mat:'stucco' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9.5], trim:'stone', mat:'flint' }
 };
 TEX['midlands-suburban'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[9, 6.0], clerestory:true, door:'wide' },
   house:   { bond:'brick', win:'casement', bays:2, rows:2, tile:[7.6, 6.2] },
   block:   { bond:'brick', win:'strip', bays:2, rows:4, tile:[13, 12] },
-  grand:   { bond:'brick', win:'sash12', bays:3, rows:2, tile:[14, 8.8], trim:'stone', quoins:true, eaves:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9.5], trim:'stone', quoins:true }
+  grand:   { bond:'brick', win:'sash12', bays:3, rows:2, tile:[14, 8.8], trim:'stone', quoins:true, eaves:true, mat:'red_brick' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9.5], trim:'stone', quoins:true, mat:'red_sandstone' }
 };
 TEX['west-country'] = {
   shed:    { bond:'rubble', win:'none', bays:2, rows:1, tile:[8, 5.0], door:'wide', plinth:true },
   house:   { bond:'render', win:'casement', bays:2, rows:2, tile:[6.4, 6.0] },
   block:   { bond:'render', win:'casement', bays:3, rows:3, tile:[11, 9.4] },
-  grand:   { bond:'ashlar', win:'sash6', bays:3, rows:2, tile:[13, 8.6], trim:'stone', quoins:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[7.5, 9.5], trim:'stone', quoins:true }
+  grand:   { bond:'ashlar', win:'sash6', bays:3, rows:2, tile:[13, 8.6], trim:'stone', quoins:true, mat:'limestone' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[7.5, 9.5], trim:'stone', quoins:true, mat:'stone' }
 };
 TEX['northern-stone'] = {
   shed:    { bond:'rubble', win:'none', bays:2, rows:1, tile:[7.5, 4.8], door:'wide', plinth:true },
   house:   { bond:'rubble', win:'casement', bays:2, rows:2, tile:[6.6, 6.4], quoins:true },
   block:   { bond:'rubble', win:'sash6', bays:3, rows:3, tile:[11, 10], trim:'stone' },
-  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[13, 11], trim:'stone', quoins:true, string:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 10], trim:'stone', quoins:true }
+  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:3, tile:[13, 11], trim:'stone', quoins:true, string:true, mat:'sandstone' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 10], trim:'stone', quoins:true, mat:'sandstone' }
 };
 TEX['new-town'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[12, 7.5], clerestory:true, door:'wide' },
   house:   { bond:'brick', win:'strip', bays:1, rows:2, tile:[6.2, 6.0] },
-  block:   { bond:'render', win:'strip', bays:2, rows:5, tile:[14, 15] },
-  grand:   { bond:'render', win:'picture', bays:2, rows:2, tile:[13, 8.4] },
-  masonry: { bond:'render', win:'lancet', bays:2, rows:1, tile:[10, 8.5] }
+  block:   { bond:'brick', win:'strip', bays:2, rows:5, tile:[14, 15] },
+  grand:   { bond:'render', win:'picture', bays:2, rows:2, tile:[13, 8.4], mat:'render' },
+  masonry: { bond:'render', win:'lancet', bays:2, rows:1, tile:[10, 8.5], mat:'render' }
 };
 TEX['northern-ireland'] = {
   shed:    { bond:'steel', win:'none', bays:2, rows:1, tile:[8.5, 5.4], door:'wide', plinth:true },
-  house:   { bond:'pebbledash', win:'casement', bays:2, rows:2, tile:[7, 6.2] },
+  house:   { bond:'brick', win:'casement', bays:2, rows:2, tile:[7, 6.2] },
   block:   { bond:'brick', win:'casement', bays:3, rows:3, tile:[12, 9.6] },
-  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:2, tile:[13, 8.8], trim:'stone', quoins:true, eaves:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9.5], trim:'stone', quoins:true }
+  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:2, tile:[13, 8.8], trim:'stone', quoins:true, eaves:true, mat:'sandstone' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[8, 9.5], trim:'stone', quoins:true, mat:'stone' }
 };
 TEX['island'] = {
   shed:    { bond:'rubble', win:'none', bays:2, rows:1, tile:[7, 4.6], door:'wide', plinth:true },
   house:   { bond:'rubble', win:'sash6', bays:2, rows:2, tile:[6, 6.4], quoins:true },
   block:   { bond:'render', win:'sash6', bays:3, rows:3, tile:[11, 10] },
-  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:2, tile:[13, 8.8], trim:'stone', quoins:true },
-  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[7.5, 9.5], trim:'stone', quoins:true }
+  grand:   { bond:'ashlar', win:'sash12', bays:3, rows:2, tile:[13, 8.8], trim:'stone', quoins:true, mat:'granite' },
+  masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[7.5, 9.5], trim:'stone', quoins:true, mat:'granite' }
 };
 
 /* ---- and what the roofs are made of ----

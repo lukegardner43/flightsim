@@ -64,6 +64,28 @@ function checkRoof(p) {
 /* The wall spec is drawn, not looked up, so a typo here does not fall back to
    grey — it falls back to a generic brick wall that looks deliberate. Hence
    the vocabulary check, against the tables in index.html. */
+/* The bond a region draws and the material it is tinted with have to be the
+   same thing. Nothing enforced that, so east Anglia drew knapped flint and
+   painted it brick red, and London drew stock brick in Accrington red. */
+const BOND_FAMILY = {
+  brick:      ['brick', 'bricks', 'brick_block', 'red_brick', 'engineering_brick', 'tile', 'tile_hanging'],
+  stock:      ['stock_brick', 'yellow_brick', 'buff_brick'],
+  ashlar:     ['limestone', 'sandstone', 'red_sandstone', 'granite', 'stone', 'marble'],
+  rubble:     ['stone', 'limestone', 'sandstone', 'red_sandstone', 'granite', 'flint', 'cobble', 'slate'],
+  flint:      ['flint'],
+  pebbledash: ['pebbledash', 'roughcast', 'render', 'plaster'],
+  harl:       ['harling', 'roughcast', 'render', 'plaster'],
+  render:     ['render', 'plaster', 'stucco', 'cob', 'roughcast'],
+  timber:     ['timber_framing', 'wood'],
+  steel:      ['metal', 'steel', 'concrete', 'cement_block', 'breeze_block']
+};
+function checkBond(where, bond, mats) {
+  const fam = BOND_FAMILY[bond];
+  if (!fam) throw new Error(where + ': no material family for bond "' + bond + '"');
+  if (!mats.some(m => fam.includes(m)))
+    throw new Error(where + ': drawn as "' + bond + '" but tinted ' + mats.join('/') +
+      ' — the bond and the material have to be the same thing');
+}
 function checkTexture(p) {
   const t = p.texture;
   if (t === undefined) return;                       /* optional: no spec, national texture */
@@ -83,6 +105,17 @@ function checkTexture(p) {
       throw new Error(where + ': trim can only be "stone"');
     if (sp.door !== undefined && sp.door !== true && sp.door !== 'wide')
       throw new Error(where + ': door can only be true or "wide"');
+    /* house, block and shed are tinted from the wall weights, so the bond has
+       to match what those weights mostly say. grand and masonry have no
+       weights and name their material outright. */
+    if (p.wall && p.wall[cls]) {
+      const top = [...p.wall[cls]].sort((a, b) => b[1] - a[1]).slice(0, 1).map(x => String(x[0]));
+      checkBond(where, sp.bond, top);
+    } else {
+      if (!sp.mat) throw new Error(where + ': has no wall weights, so it must name a "mat"');
+      if (!WALL_OK.has(String(sp.mat))) throw new Error(where + ': mat "' + sp.mat + '" is not one the sim knows');
+      checkBond(where, sp.bond, [String(sp.mat)]);
+    }
   }
 }
 

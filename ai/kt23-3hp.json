@@ -186,20 +186,20 @@
   ],
   "shed": [
    [
+    "brick",
+    0.34
+   ],
+   [
     "metal",
-    0.55
+    0.3
    ],
    [
     "concrete",
-    0.2
-   ],
-   [
-    "brick",
-    0.15
+    0.18
    ],
    [
     "wood",
-    0.1
+    0.18
    ]
   ]
  },
@@ -300,7 +300,7 @@
    "tilehang": true
   },
   "block": {
-   "bond": "render",
+   "bond": "brick",
    "win": "casement",
    "bays": 3,
    "rows": 3,
@@ -331,7 +331,8 @@
    ],
    "trim": "stone",
    "quoins": true,
-   "eaves": true
+   "eaves": true,
+   "mat": "red_brick"
   },
   "masonry": {
    "bond": "rubble",
@@ -343,7 +344,8 @@
     9
    ],
    "trim": "stone",
-   "quoins": true
+   "quoins": true,
+   "mat": "sandstone"
   }
  },
  "roof": {

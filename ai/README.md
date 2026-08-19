@@ -148,6 +148,7 @@ All five classes the sim draws are described — `house`, `block`, `shed`,
 | `trim` | `"stone"` for dressed surrounds |
 | `string`, `quoins`, `eaves`, `tilehang` | the regional giveaways |
 | `clerestory`, `door` (`true` or `"wide"`), `plinth` | what a working building has instead of windows |
+| `mat` | the material the bond is cut from — required for `grand` and `masonry`, which have no wall weights to take a colour from |
 
 Sheds are the awkward class: metal is the commonest wall material for it in
 every region (48–68%), so steel is usually the right bond and a national
@@ -224,6 +225,57 @@ The graduation on a stone slate roof repeats with the texture rather than
 running once from eaves to ridge; over a 3.8 m tile on a typical rafter that
 reads as varied course depth, which is the intent, but it is not a true single
 taper.
+
+## Colour, and making it agree with the material
+
+Three things were wrong with the colours, and they compounded.
+
+**The palette was generic.** A London stock brick is a dirty yellow, not red.
+A Cotswold stone slate roof is buff, not the neutral grey a generic "stone"
+gives you. Welsh slate is blue-purple; Westmorland is green. The tables in
+`index.html` (`WALL_MAT`, `ROOF_MAT`) are British values now, with the aliases
+OSM actually uses — and with the materials that were simply missing, which is
+how a flint church came out brick red: `flint` was not in the table at all, so
+it fell through to a class average.
+
+**One variation spread was applied to every material.** Every inferred colour
+got the same ±0.13 saturation and ±0.11 lightness scatter, which let a brick
+terrace contain a grey house and a fluorescent one, and gave a slate roof the
+same wander as brick when slate barely varies at all. `MAT_VARY` now gives
+each material its own `[hue, saturation, lightness, bias]`: brick spreads
+wide, one quarry's limestone barely moves, painted render wanders in *hue*
+because it is painted, and slate stays slate. The bias is what stops an even
+spread producing the bone-white roof that exists nowhere.
+
+**The bond and the material disagreed.** This was the real one. The texture
+work gave each region a bond to draw — knapped flint in East Anglia, stock
+brick in London — while the colour still came from the wall weights, which
+said `red_brick`. So the sim drew flint and painted it brick red. `embed.js`
+now refuses to embed a profile whose bond is not in the same family as the
+material that class mostly is:
+
+```
+Error: area-nr texture.house: drawn as "flint" but tinted red_brick
+       — the bond and the material have to be the same thing
+```
+
+Six profiles failed that check on the first run, and fixing them was mostly a
+matter of admitting which side was wrong. East Anglian *houses* are brick and
+render; flint is a church and boundary-wall material, so the bond moved and
+the churches kept the flint. Inner London really is stock brick, so the
+weights moved. In stone country the `shed` class is barns and outbuildings
+first, so stone leads sheet metal there rather than trailing it.
+
+**Roofs take their colour from the unit too.** The region names the unit it
+lays roofs in, and that is a claim about colour as much as pattern — calling a
+Cotswold roof and a Caernarfon one both "slate" throws away the thing you can
+actually see. Where the material was *inferred*, the base colour is pulled
+62% of the way toward the unit's own colour. Where OSM stated it, OSM keeps it.
+
+**Grand buildings and churches had no weights at all**, so they took a
+national palette and a granite kirk in Aberdeen came out the same grey as a
+flint church in Norfolk. Their texture spec now carries a `mat` naming the
+stone it is cut from, which the checker holds to the same bond/material rule.
 
 ## What embed.js checks
 

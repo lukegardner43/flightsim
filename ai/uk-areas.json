@@ -142,11 +142,11 @@
    "wall": {
     "house": [
      [
-      "brick",
-      0.5
+      "stock_brick",
+      0.4
      ],
      [
-      "red_brick",
+      "brick",
       0.22
      ],
      [
@@ -154,8 +154,12 @@
       0.14
      ],
      [
+      "red_brick",
+      0.12
+     ],
+     [
       "plaster",
-      0.08
+      0.06
      ],
      [
       "stone",
@@ -164,20 +168,24 @@
     ],
     "block": [
      [
+      "stock_brick",
+      0.32
+     ],
+     [
       "brick",
-      0.44
+      0.22
      ],
      [
       "concrete",
-      0.24
+      0.22
      ],
      [
       "render",
-      0.18
+      0.14
      ],
      [
       "glass",
-      0.14
+      0.1
      ]
     ],
     "shed": [
@@ -347,7 +355,8 @@
      "trim": "stone",
      "quoins": true,
      "string": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "limestone"
     },
     "masonry": {
      "bond": "ashlar",
@@ -359,7 +368,8 @@
       9
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "limestone"
     }
    }
   },
@@ -673,7 +683,8 @@
      ],
      "trim": "stone",
      "quoins": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "red_brick"
     },
     "masonry": {
      "bond": "stock",
@@ -684,7 +695,8 @@
       8,
       9
      ],
-     "trim": "stone"
+     "trim": "stone",
+     "mat": "stock_brick"
     }
    }
   },
@@ -861,20 +873,20 @@
     ],
     "shed": [
      [
+      "brick",
+      0.34
+     ],
+     [
       "metal",
-      0.55
+      0.3
      ],
      [
       "concrete",
-      0.2
-     ],
-     [
-      "brick",
-      0.15
+      0.18
      ],
      [
       "wood",
-      0.1
+      0.18
      ]
     ]
    },
@@ -990,7 +1002,7 @@
      "tilehang": true
     },
     "block": {
-     "bond": "render",
+     "bond": "brick",
      "win": "casement",
      "bays": 3,
      "rows": 3,
@@ -1010,7 +1022,8 @@
      ],
      "trim": "stone",
      "quoins": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "red_brick"
     },
     "masonry": {
      "bond": "rubble",
@@ -1022,7 +1035,8 @@
       9
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "flint"
     }
    }
   },
@@ -1340,7 +1354,8 @@
      ],
      "trim": "stone",
      "string": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "sandstone"
     },
     "masonry": {
      "bond": "rubble",
@@ -1352,7 +1367,8 @@
       9.5
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "sandstone"
     }
    }
   },
@@ -1668,7 +1684,8 @@
      "trim": "stone",
      "quoins": true,
      "string": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "sandstone"
     },
     "masonry": {
      "bond": "ashlar",
@@ -1680,7 +1697,8 @@
       10
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "sandstone"
     }
    }
   },
@@ -1797,7 +1815,7 @@
    "wall": {
     "house": [
      [
-      "render",
+      "harling",
       0.42
      ],
      [
@@ -1823,7 +1841,7 @@
     ],
     "block": [
      [
-      "render",
+      "harling",
       0.46
      ],
      [
@@ -1985,7 +2003,8 @@
       11
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "granite"
     },
     "masonry": {
      "bond": "rubble",
@@ -1997,7 +2016,8 @@
       9.5
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "granite"
     }
    }
   },
@@ -2114,7 +2134,7 @@
    "wall": {
     "house": [
      [
-      "render",
+      "pebbledash",
       0.34
      ],
      [
@@ -2126,7 +2146,7 @@
       0.2
      ],
      [
-      "plaster",
+      "render",
       0.12
      ],
      [
@@ -2294,7 +2314,8 @@
       8.6
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "stone"
     },
     "masonry": {
      "bond": "rubble",
@@ -2305,7 +2326,8 @@
       10,
       8.5
      ],
-     "trim": "stone"
+     "trim": "stone",
+     "mat": "stone"
     }
    }
   },
@@ -2462,16 +2484,16 @@
     ],
     "shed": [
      [
-      "metal",
-      0.48
+      "stone",
+      0.38
      ],
      [
-      "stone",
-      0.22
+      "metal",
+      0.34
      ],
      [
       "concrete",
-      0.18
+      0.16
      ],
      [
       "wood",
@@ -2620,7 +2642,8 @@
      "trim": "stone",
      "quoins": true,
      "string": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "limestone"
     },
     "masonry": {
      "bond": "ashlar",
@@ -2632,7 +2655,8 @@
       10
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "limestone"
     }
    }
   },
@@ -2920,7 +2944,7 @@
      "plinth": true
     },
     "house": {
-     "bond": "flint",
+     "bond": "brick",
      "win": "casement",
      "bays": 2,
      "rows": 2,
@@ -2931,7 +2955,7 @@
      "quoins": true
     },
     "block": {
-     "bond": "render",
+     "bond": "brick",
      "win": "sash6",
      "bays": 3,
      "rows": 3,
@@ -2951,7 +2975,8 @@
      ],
      "trim": "stone",
      "quoins": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "red_brick"
     },
     "masonry": {
      "bond": "flint",
@@ -2963,7 +2988,8 @@
       10
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "flint"
     }
    }
   },
@@ -3096,7 +3122,7 @@
    "wall": {
     "house": [
      [
-      "render",
+      "stucco",
       0.38
      ],
      [
@@ -3118,7 +3144,7 @@
     ],
     "block": [
      [
-      "render",
+      "stucco",
       0.4
      ],
      [
@@ -3287,7 +3313,8 @@
      "trim": "stone",
      "quoins": true,
      "string": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "stucco"
     },
     "masonry": {
      "bond": "rubble",
@@ -3298,7 +3325,8 @@
       8,
       9.5
      ],
-     "trim": "stone"
+     "trim": "stone",
+     "mat": "flint"
     }
    }
   },
@@ -3608,7 +3636,8 @@
      ],
      "trim": "stone",
      "quoins": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "red_brick"
     },
     "masonry": {
      "bond": "rubble",
@@ -3620,7 +3649,8 @@
       9.5
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "red_sandstone"
     }
    }
   },
@@ -3781,16 +3811,16 @@
     ],
     "shed": [
      [
-      "metal",
-      0.52
+      "stone",
+      0.38
      ],
      [
-      "stone",
-      0.18
+      "metal",
+      0.34
      ],
      [
       "concrete",
-      0.18
+      0.16
      ],
      [
       "wood",
@@ -3929,7 +3959,8 @@
       8.6
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "limestone"
     },
     "masonry": {
      "bond": "rubble",
@@ -3941,7 +3972,8 @@
       9.5
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "stone"
     }
    }
   },
@@ -4098,16 +4130,16 @@
     ],
     "shed": [
      [
-      "metal",
-      0.48
+      "stone",
+      0.4
      ],
      [
-      "stone",
-      0.24
+      "metal",
+      0.34
      ],
      [
       "concrete",
-      0.18
+      0.16
      ],
      [
       "wood",
@@ -4253,7 +4285,8 @@
      ],
      "trim": "stone",
      "quoins": true,
-     "string": true
+     "string": true,
+     "mat": "sandstone"
     },
     "masonry": {
      "bond": "rubble",
@@ -4265,7 +4298,8 @@
       10
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "sandstone"
     }
    }
   },
@@ -4552,7 +4586,7 @@
      ]
     },
     "block": {
-     "bond": "render",
+     "bond": "brick",
      "win": "strip",
      "bays": 2,
      "rows": 5,
@@ -4569,7 +4603,8 @@
      "tile": [
       13,
       8.4
-     ]
+     ],
+     "mat": "render"
     },
     "masonry": {
      "bond": "render",
@@ -4579,7 +4614,8 @@
      "tile": [
       10,
       8.5
-     ]
+     ],
+     "mat": "render"
     }
    }
   },
@@ -4847,7 +4883,7 @@
      "plinth": true
     },
     "house": {
-     "bond": "pebbledash",
+     "bond": "brick",
      "win": "casement",
      "bays": 2,
      "rows": 2,
@@ -4877,7 +4913,8 @@
      ],
      "trim": "stone",
      "quoins": true,
-     "eaves": true
+     "eaves": true,
+     "mat": "sandstone"
     },
     "masonry": {
      "bond": "rubble",
@@ -4889,7 +4926,8 @@
       9.5
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "stone"
     }
    }
   },
@@ -5006,12 +5044,12 @@
    "wall": {
     "house": [
      [
-      "render",
-      0.36
+      "granite",
+      0.34
      ],
      [
-      "granite",
-      0.26
+      "render",
+      0.32
      ],
      [
       "stone",
@@ -5019,11 +5057,11 @@
      ],
      [
       "plaster",
-      0.12
+      0.1
      ],
      [
       "red_brick",
-      0.08
+      0.06
      ]
     ],
     "block": [
@@ -5042,12 +5080,12 @@
     ],
     "shed": [
      [
-      "metal",
-      0.56
+      "stone",
+      0.38
      ],
      [
-      "stone",
-      0.2
+      "metal",
+      0.36
      ],
      [
       "concrete",
@@ -5055,7 +5093,7 @@
      ],
      [
       "wood",
-      0.08
+      0.1
      ]
     ]
    },
@@ -5187,7 +5225,8 @@
       8.8
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "granite"
     },
     "masonry": {
      "bond": "rubble",
@@ -5199,7 +5238,8 @@
       9.5
      ],
      "trim": "stone",
-     "quoins": true
+     "quoins": true,
+     "mat": "granite"
     }
    }
   }
