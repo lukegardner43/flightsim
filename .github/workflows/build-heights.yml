@@ -142,9 +142,15 @@ jobs:
           echo "::notice::Services found. Re-run with probe_only false to measure."
           exit 0
 
-      # One warp each, to exactly the tile, exactly 1 m, as raw float32. The
-      # geometry is then implied by the tile id and make-heights.js does not
-      # have to parse a header to find out where it is.
+      # Fetched in 2 km chunks, not one 10 km gulp.
+      #
+      # GDAL asks a WCS for one block at a time and gives each request thirty
+      # seconds. Over a link doing well under a megabyte a second that runs
+      # out mid-block — the first attempt died at 40% of the tile having
+      # received 22 MB on one request. So: smaller blocks, a much longer
+      # timeout, GDAL's own retries, and the warp cut into twenty-five pieces
+      # so a stall costs one piece rather than the whole tile. Each piece is
+      # retried on its own before the job gives up.
       - name: Fetch and normalise to the tile
         if: inputs.probe_only != 'true'
         env:
@@ -158,36 +164,69 @@ jobs:
           N0: ${{ steps.ext.outputs.n0 }}
           E1: ${{ steps.ext.outputs.e1 }}
           N1: ${{ steps.ext.outputs.n1 }}
+          GDAL_HTTP_TIMEOUT: '600'
+          GDAL_HTTP_CONNECTTIMEOUT: '30'
+          GDAL_HTTP_MAX_RETRY: '5'
+          GDAL_HTTP_RETRY_DELAY: '5'
+          CPL_VSIL_CURL_USE_HEAD: 'NO'
+          GDAL_CACHEMAX: '1024'
         run: |
           set -euo pipefail
-          fetch() {   # $1 dsm|dtm   $2 direct url   $3 slug   $4 coverage
-            local src
+          CHUNK=2000
+          chunked() {   # $1 dsm|dtm   $2 source dataset
+            local out="$1" src="$2" n=0 ok
+            rm -rf "$out.parts"; mkdir -p "$out.parts"
+            local e n0
+            for (( e=E0; e<E1; e+=CHUNK )); do
+              for (( n0=N0; n0<N1; n0+=CHUNK )); do
+                n=$((n+1))
+                local f
+                f=$(printf '%s.parts/%03d.tif' "$out" "$n")
+                ok=0
+                for try in 1 2 3; do
+                  if gdalwarp -q -overwrite -t_srs EPSG:27700 \
+                       -te "$e" "$n0" "$((e+CHUNK))" "$((n0+CHUNK))" -tr 1 1 -r bilinear \
+                       -ot Float32 -dstnodata -9999 -co COMPRESS=DEFLATE \
+                       "$src" "$f"; then ok=1; break; fi
+                  echo "  $out chunk $n attempt $try failed; retrying"
+                  sleep 10
+                done
+                [ "$ok" = "1" ] || { echo "::error::$out chunk $n failed three times"; exit 1; }
+              done
+              echo "  $out: column at E=$e done ($n chunks)"
+            done
+            gdalbuildvrt -q "$out.mosaic.vrt" "$out.parts"/*.tif
+            gdalwarp -q -overwrite -te "$E0" "$N0" "$E1" "$N1" -tr 1 1 \
+              -ot Float32 -dstnodata -9999 -of ENVI "$out.mosaic.vrt" "$out.img"
+            rm -rf "$out.parts" "$out.mosaic.vrt"
+            ls -la "$out.img"
+          }
+          prepare() {  # $1 dsm|dtm  $2 direct url  $3 slug  $4 coverage
             if [ -n "$2" ]; then
               curl -fsSL --retry 3 --retry-delay 5 -o "$1.raw" "$2"
               if file "$1.raw" | grep -qi zip; then
-                mkdir -p "$1.d"
-                unzip -qo "$1.raw" -d "$1.d"
-                rm "$1.raw"
+                mkdir -p "$1.d"; unzip -qo "$1.raw" -d "$1.d"; rm "$1.raw"
                 find "$1.d" \( -iname '*.tif' -o -iname '*.tiff' -o -iname '*.asc' \) > "$1.list"
               else
                 echo "$1.raw" > "$1.list"
               fi
-              wc -l < "$1.list"
-              gdalbuildvrt -q -input_file_list "$1.list" "$1.vrt"
-              src="$1.vrt"
+              gdalbuildvrt -q -input_file_list "$1.list" "$1.vrt" 1>&2
+              echo "$1.vrt"
             else
-              node packs/wcs-service.js "$3" "$4" > "$1.xml"
-              cat "$1.xml"
-              gdalinfo "$1.xml" | head -25
-              src="$1.xml"
+              node packs/wcs-service.js "$3" "$4" "" 512 > "$1.xml"
+              echo "$1.xml"
             fi
-            gdalwarp -overwrite -t_srs EPSG:27700 \
-              -te "$E0" "$N0" "$E1" "$N1" -tr 1 1 -r bilinear \
-              -ot Float32 -dstnodata -9999 -of ENVI "$src" "$1.img"
-            ls -la "$1.img"
           }
-          fetch dsm "$DSM_URL" "$DSM_SLUG" "$DSM_COV"
-          fetch dtm "$DTM_URL" "$DTM_SLUG" "$DTM_COV"
+          for which in dsm dtm; do
+            if [ "$which" = "dsm" ]; then
+              src=$(prepare dsm "$DSM_URL" "$DSM_SLUG" "$DSM_COV")
+            else
+              src=$(prepare dtm "$DTM_URL" "$DTM_SLUG" "$DTM_COV")
+            fi
+            echo "--- $which from $src"
+            gdalinfo "$src" | head -6
+            time chunked "$which" "$src"
+          done
 
       - name: Measure
         if: inputs.probe_only != 'true'

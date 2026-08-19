@@ -12,11 +12,17 @@
    heredoc inside a YAML block scalar is a good way to break the YAML, which
    is exactly what happened.
 
-     node packs/wcs-service.js <slug> <coverage> [base] > dsm.xml
+   The block size matters more than it looks. GDAL asks the server for one
+   block at a time, and a block of 1024 squared at four bytes a sample is four
+   megabytes — which, over a link doing under a megabyte a second, walked
+   straight into GDAL's own thirty second HTTP timeout at 40% of a tile.
+
+     node packs/wcs-service.js <slug> <coverage> [base] [block] > dsm.xml
 */
 'use strict';
 const slug = process.argv[2], cov = process.argv[3];
 const base = process.argv[4] || 'https://environment.data.gov.uk/spatialdata';
+const block = +(process.argv[5] || 512);
 if (!slug || !cov) { console.error('usage: wcs-service.js <slug> <coverage> [base]'); process.exit(1); }
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 process.stdout.write(
@@ -24,6 +30,6 @@ process.stdout.write(
   '  <ServiceURL>' + esc(base + '/' + slug + '/wcs') + '</ServiceURL>\n' +
   '  <CoverageName>' + esc(cov) + '</CoverageName>\n' +
   '  <Version>2.0.1</Version>\n' +
-  '  <BlockXSize>1024</BlockXSize>\n' +
-  '  <BlockYSize>1024</BlockYSize>\n' +
+  '  <BlockXSize>' + block + '</BlockXSize>\n' +
+  '  <BlockYSize>' + block + '</BlockYSize>\n' +
   '</WCS_GDAL>\n');
