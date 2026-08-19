@@ -14,11 +14,15 @@
 
      node packs/make-heights.js --tile TQ15 --dsm dsm.img --dtm dtm.img
 
-   --dsm and --dtm are RAW Float32 grids, little-endian, exactly 10000 x
-   10000 samples, north-west corner at the tile origin, one metre pixels.
-   That is what the workflow's gdalwarp produces, and taking the geometry
-   from the tile id rather than from a header removes a whole class of
-   silent misalignment.
+   --dsm and --dtm are RAW Float32 grids, little-endian, square, one metre
+   pixels, north-west corner at the tile origin. That is what the workflow's
+   gdalwarp produces, and taking the geometry from the tile id rather than
+   from a header removes a whole class of silent misalignment.
+
+   --origin E,N and --size cover the case where only part of a tile was
+   fetched: measuring a 2 km square takes a minute where the whole tile takes
+   half an hour, which is the difference between finding out whether this is
+   worth doing and waiting to find out.
 
    Data: Environment Agency LIDAR Composite DSM/DTM 1 m, OGL v3.
 */
@@ -37,6 +41,8 @@ function arg(name, dflt) {
   return process.argv[i + 1];
 }
 const TILE = arg('tile').toUpperCase();
+/* where the raster's north-west corner is, if not the tile's own */
+const ORIGIN = arg('origin', '');
 /* which pack file to annotate — normally the tile's own, but the original
    centre-mode packs are named after their postcode */
 const PACK_ID = arg('pack', '').toLowerCase() || TILE.toLowerCase();
@@ -118,7 +124,12 @@ function packHeight(f) {
 
 function main() {
   const { file, pack } = readPack(PACK_ID);
-  const o = tileOrigin(TILE);
+  let o = tileOrigin(TILE);
+  if (ORIGIN) {
+    const v = ORIGIN.split(',').map(Number);
+    if (v.length !== 2 || v.some(isNaN)) { console.error('--origin must be E,N'); process.exit(1); }
+    o = { E: v[0], N: v[1] };
+  }
   console.log(TILE + ': ' + pack.buildings.length.toLocaleString() + ' footprints, origin ' +
               o.E + ',' + o.N);
 
@@ -142,6 +153,7 @@ function main() {
   }
 
   const q = pack.q || 1e6;
+  const prev = pack.heights && pack.heights.length === pack.buildings.length ? pack.heights : [];
   const heights = [];
   const tally = { measured: 0, thin: 0, outside: 0, none: 0 };
   const shapes = {};
@@ -156,6 +168,13 @@ function main() {
       ring.push([b.E, b.N]);
     }
     if (bad || ring.length < 3 || DRY) { heights.push(0); tally.none++; continue; }
+    /* outside the square that was fetched: leave whatever it had, so
+       measuring a second square later adds to the first rather than
+       wiping it */
+    let inside = false;
+    for (const [E, Nn] of ring)
+      if (E >= o.E && E <= o.E + N*PIX && Nn >= o.N && Nn <= o.N + N*PIX) { inside = true; break; }
+    if (!inside) { heights.push(prev[heights.length] || 0); tally.outside++; continue; }
     const f = fitRoof(ring, sample, { step: PIX });
     if (!f) { heights.push(0); tally.none++; continue; }
     if (!f.ok) { heights.push(0); if (f.n < 4) tally.thin++; else tally.none++; continue; }
@@ -176,7 +195,9 @@ function main() {
   console.log('measured ' + tally.measured.toLocaleString() + ' of ' +
               pack.buildings.length.toLocaleString() + ' (' + pctM + '%)' +
               ', too little data ' + tally.thin.toLocaleString() +
-              ', no reading ' + tally.none.toLocaleString());
+              ', no reading ' + tally.none.toLocaleString() +
+              (tally.outside ? ', ' + tally.outside.toLocaleString() + ' outside the square fetched' +
+                (prev.length ? ' (kept what they had)' : '') : ''));
   if (tally.measured) {
     console.log('mean eaves ' + (sumEaves / tally.measured).toFixed(2) + ' m');
     console.log('roof shapes ' + Object.keys(shapes).sort((a, b) => shapes[b] - shapes[a])

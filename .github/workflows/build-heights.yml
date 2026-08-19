@@ -31,6 +31,10 @@ on:
         description: 'Pack id to annotate, if not the tile itself (e.g. kt233hp)'
         required: false
         default: ''
+      square:
+        description: 'Optional E,N,size in metres to measure just part of the tile, e.g. 515000,152000,2000 — a 2 km square takes about a minute where the whole tile takes half an hour'
+        required: false
+        default: ''
       probe_only:
         description: 'Just find the services and report what they offer'
         required: false
@@ -73,6 +77,7 @@ jobs:
         id: ext
         env:
           TILE: ${{ inputs.tile }}
+          SQUARE: ${{ inputs.square }}
         run: |
           set -euo pipefail
           node -e '
@@ -80,9 +85,21 @@ jobs:
             const t = String(process.env.TILE).trim().toUpperCase();
             const o = tileOrigin(t);
             if (!o) { console.error("not a 10 km tile: " + t); process.exit(1); }
+            let e0 = o.E, n0 = o.N, size = 10000;
+            const sq = String(process.env.SQUARE || "").trim();
+            if (sq) {
+              const v = sq.split(",").map(Number);
+              if (v.length !== 3 || v.some(isNaN)) { console.error("square must be E,N,size"); process.exit(1); }
+              e0 = v[0]; n0 = v[1]; size = v[2];
+              if (size < 200 || size > 10000) { console.error("size must be 200..10000 m"); process.exit(1); }
+              if (e0 < o.E || n0 < o.N || e0 + size > o.E + 10000 || n0 + size > o.N + 10000) {
+                console.error("that square is not inside " + t); process.exit(1);
+              }
+            }
             console.log("tile=" + t);
-            console.log("e0=" + o.E); console.log("n0=" + o.N);
-            console.log("e1=" + (o.E + 10000)); console.log("n1=" + (o.N + 10000));
+            console.log("e0=" + e0); console.log("n0=" + n0);
+            console.log("e1=" + (e0 + size)); console.log("n1=" + (n0 + size));
+            console.log("size=" + size);
           ' >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
@@ -142,15 +159,19 @@ jobs:
           echo "::notice::Services found. Re-run with probe_only false to measure."
           exit 0
 
-      # Fetched in 2 km chunks, not one 10 km gulp.
+      # Fetched in 1 km squares.
       #
-      # GDAL asks a WCS for one block at a time and gives each request thirty
-      # seconds. Over a link doing well under a megabyte a second that runs
-      # out mid-block — the first attempt died at 40% of the tile having
-      # received 22 MB on one request. So: smaller blocks, a much longer
-      # timeout, GDAL's own retries, and the warp cut into twenty-five pieces
-      # so a stall costs one piece rather than the whole tile. Each piece is
-      # retried on its own before the job gives up.
+      # Two things had to be learned the hard way here. The thirty second
+      # timeout is the WCS driver's OWN, set in the service description, and
+      # it ignores GDAL_HTTP_TIMEOUT completely — setting that to 600 and
+      # watching the log still say "timed out after 30000 milliseconds" is how
+      # you find out. And the request size is the CHUNK size, not the block
+      # size: each chunk is one GetCoverage, so a 2 km chunk is a 16 MB
+      # response, which over this link is more than thirty seconds. A 1 km
+      # chunk is 4 MB and takes about eight seconds.
+      #
+      # The server also returns the odd 502 under sustained load, so each
+      # square gets five attempts with a lengthening pause between them.
       - name: Fetch and normalise to the tile
         if: inputs.probe_only != 'true'
         env:
@@ -172,9 +193,12 @@ jobs:
           GDAL_CACHEMAX: '1024'
         run: |
           set -euo pipefail
-          CHUNK=2000
+          CHUNK=1000
           chunked() {   # $1 dsm|dtm   $2 source dataset
             local out="$1" src="$2" n=0 ok
+            local across=$(( (E1-E0+CHUNK-1)/CHUNK ))
+            local TOTAL=$(( across*across ))
+            echo "  $out: $TOTAL squares of ${CHUNK} m"
             rm -rf "$out.parts"; mkdir -p "$out.parts"
             local e n0
             for (( e=E0; e<E1; e+=CHUNK )); do
@@ -183,17 +207,17 @@ jobs:
                 local f
                 f=$(printf '%s.parts/%03d.tif' "$out" "$n")
                 ok=0
-                for try in 1 2 3; do
+                for try in 1 2 3 4 5; do
                   if gdalwarp -q -overwrite -t_srs EPSG:27700 \
                        -te "$e" "$n0" "$((e+CHUNK))" "$((n0+CHUNK))" -tr 1 1 -r bilinear \
                        -ot Float32 -dstnodata -9999 -co COMPRESS=DEFLATE \
                        "$src" "$f"; then ok=1; break; fi
-                  echo "  $out chunk $n attempt $try failed; retrying"
-                  sleep 10
+                  echo "  $out square $n attempt $try failed; waiting $((try*15))s"
+                  sleep $((try*15))
                 done
-                [ "$ok" = "1" ] || { echo "::error::$out chunk $n failed three times"; exit 1; }
+                [ "$ok" = "1" ] || { echo "::error::$out square $n failed five times"; exit 1; }
               done
-              echo "  $out: column at E=$e done ($n chunks)"
+              echo "  $out: column at E=$e done ($n of $TOTAL squares)"
             done
             gdalbuildvrt -q "$out.mosaic.vrt" "$out.parts"/*.tif
             gdalwarp -q -overwrite -te "$E0" "$N0" "$E1" "$N1" -tr 1 1 \
@@ -213,7 +237,7 @@ jobs:
               gdalbuildvrt -q -input_file_list "$1.list" "$1.vrt" 1>&2
               echo "$1.vrt"
             else
-              node packs/wcs-service.js "$3" "$4" "" 512 > "$1.xml"
+              node packs/wcs-service.js "$3" "$4" "" 512 900 > "$1.xml"
               echo "$1.xml"
             fi
           }
@@ -233,9 +257,13 @@ jobs:
         env:
           TILE: ${{ inputs.tile }}
           PACK: ${{ inputs.pack }}
+          E0: ${{ steps.ext.outputs.e0 }}
+          N0: ${{ steps.ext.outputs.n0 }}
+          SIZE: ${{ steps.ext.outputs.size }}
         run: |
           set -euo pipefail
-          args=(--tile "$TILE" --dsm dsm.img --dtm dtm.img)
+          args=(--tile "$TILE" --dsm dsm.img --dtm dtm.img
+                --origin "$E0,$N0" --size "$SIZE")
           if [ -n "$PACK" ]; then args+=(--pack "$PACK"); fi
           node --max-old-space-size=6144 packs/make-heights.js "${args[@]}"
 

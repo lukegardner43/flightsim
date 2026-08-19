@@ -184,11 +184,32 @@ Scottish Remote Sensing Portal (phases 1–6, plus a national programme running
 to 2027) and Natural Resources Wales (~70%) — so those need their own
 download step. The measuring half is the same.
 
-The DEFRA download service is a session-driven web app rather than a
-documented API, so the workflow does not hard-code its shape. It tries the
-WCS endpoint and, if that does not answer, tells you to download the 5 km DSM
-and DTM tiles by hand and re-run with `dsm_url` and `dtm_url`. That is
-deliberate: a guessed URL that 404s in CI is worse than a clear instruction.
+The download is the awkward part, and three separate things had to be
+learned from failed runs rather than from documentation:
+
+1. **The DSM service was renamed.** It is
+   `lidar-composite-digital-surface-model-**last-return**-dsm-1m` now; the
+   obvious name 404s. The workflow asks each candidate rather than assuming,
+   and prints what it finds — run it with `probe_only` to see that in seconds.
+2. **The thirty second timeout is the WCS driver's own**, set in the service
+   description, and it ignores `GDAL_HTTP_TIMEOUT` completely.
+3. **The request size is the chunk size, not the block size.** Each chunk is
+   one GetCoverage, so a 2 km chunk asks for a 16 MB response — more than
+   thirty seconds over this link. 1 km chunks are 4 MB and about eight
+   seconds. The server also returns the odd 502 under sustained load, so each
+   square gets five attempts with a lengthening pause.
+
+**Measure a small square first.** The `square` input takes `E,N,size` and
+fetches only that much:
+
+```
+tile TQ15   pack kt233hp   square 511700,154400,2000
+```
+
+is the 2 km around Great Bookham — 1,724 of the tile's 20,630 footprints, about
+a minute, against roughly half an hour for the whole tile. Squares accumulate:
+footprints outside the square keep whatever reading they already had, so you
+can measure the village, look at it, and fill in the rest later.
 
 **A lidar surface cannot do bridges.** It is one height per square metre with
 no concept of "under" — a bridge comes out as solid ground where the gap
