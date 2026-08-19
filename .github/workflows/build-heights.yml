@@ -11,8 +11,12 @@ name: Measure building heights from lidar
 # and roof shape to every footprint in it, read off the Environment Agency's
 # 1 m lidar surface.
 #
+# Set probe_only to stop after finding the services and reporting them. That
+# takes seconds and is the cheap way to check the endpoints are alive before
+# committing to a download of a hundred million samples.
+#
 # England only. Scotland and Wales publish equivalent surfaces under the same
-# licence but through different portals; see packs/README.md.
+# licence through different portals; see packs/README.md.
 #
 # Data: Environment Agency LIDAR Composite DSM/DTM 1 m, Open Government
 # Licence v3. Contains public sector information.
@@ -27,8 +31,12 @@ on:
         description: 'Pack id to annotate, if not the tile itself (e.g. kt233hp)'
         required: false
         default: ''
+      probe_only:
+        description: 'Just find the services and report what they offer'
+        required: false
+        default: 'false'
       dsm_url:
-        description: 'Direct URL to a DSM GeoTIFF or zip covering the tile (leave blank to use the DEFRA WCS)'
+        description: 'Direct URL to a DSM GeoTIFF or zip covering the tile (overrides the WCS)'
         required: false
         default: ''
       dtm_url:
@@ -42,7 +50,7 @@ permissions:
 jobs:
   measure:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     defaults:
       run:
         shell: bash
@@ -50,13 +58,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install GDAL
         run: |
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq gdal-bin
+          gdalinfo --version
 
       # The tile's British National Grid extent, straight from its name, so
       # the raster and the footprints cannot disagree about where they are.
@@ -77,80 +86,122 @@ jobs:
           ' >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
-      # Two ways in. A direct URL is the reliable one: the DEFRA download
-      # service is a session-driven web app rather than a documented API, so
-      # its shape is not something to hard-code and hope. Its WCS endpoint is
-      # tried first and the job says plainly if it does not answer.
-      - name: Fetch the surface
-        env:
-          DSM_URL: ${{ inputs.dsm_url }}
-          DTM_URL: ${{ inputs.dtm_url }}
-          E0: ${{ steps.ext.outputs.e0 }}
-          N0: ${{ steps.ext.outputs.n0 }}
-          E1: ${{ steps.ext.outputs.e1 }}
-          N1: ${{ steps.ext.outputs.n1 }}
+      # DEFRA moved its lidar off Esri image services onto OGC ones and
+      # renamed the DSM dataset to say which return it is, so the slug is not
+      # something to hard-code from memory — the first attempt at this 404'd.
+      # Each candidate is asked whether it is there and what it offers, and
+      # the first that answers is used. If they all fail, the log now holds
+      # enough to fix it in one go rather than by another guess.
+      - name: Find the lidar services
+        id: wcs
         run: |
           set -uo pipefail
-          get() {   # $1 url  $2 out
-            curl -fsSL --retry 3 --retry-delay 5 -o "$2" "$1" || return 1
-            # a zip of tiles is what the portal hands you; a tif is what a WCS does
-            if file "$2" | grep -qi zip; then
-              mkdir -p "$2.d" && unzip -qo "$2" -d "$2.d" && rm "$2"
-              find "$2.d" -iname '*.tif' -o -iname '*.asc' | head -1 > /dev/null || return 1
-            fi
+          base=https://environment.data.gov.uk/spatialdata
+          DSM_SLUGS="lidar-composite-digital-surface-model-last-return-dsm-1m lidar-composite-digital-surface-model-dsm-1m lidar-composite-first-return-digital-surface-model-fz-dsm-1m"
+          DTM_SLUGS="lidar-composite-digital-terrain-model-dtm-1m lidar-composite-digital-terrain-model-last-return-dtm-1m"
+          probe() {
+            local label="$1"; shift
+            for s in "$@"; do
+              local url="$base/$s/wcs?service=WCS&version=2.0.1&request=GetCapabilities"
+              local code
+              code=$(curl -s -o "cap-$label.xml" -w '%{http_code}' --max-time 90 "$url")
+              echo "  $label  $s  ->  HTTP $code" >&2
+              if [ "$code" = "200" ]; then
+                local ids
+                ids=$(grep -o '<[a-zA-Z]*:\?CoverageId>[^<]*' "cap-$label.xml" | sed 's/.*CoverageId>//' | head -20)
+                echo "  coverages offered: $(echo "$ids" | tr '\n' ' ')" >&2
+                if [ -z "$ids" ]; then echo "  (no CoverageId in the capabilities)" >&2; continue; fi
+                printf '%s|%s' "$s" "$(echo "$ids" | head -1)"
+                return 0
+              fi
+            done
+            return 1
           }
-          WCS="https://environment.data.gov.uk/spatialdata/lidar-composite-digital-surface-model-dsm-1m/wcs"
-          ok=1
-          if [ -n "$DSM_URL" ] && [ -n "$DTM_URL" ]; then
-            get "$DSM_URL" dsm.in && get "$DTM_URL" dtm.in || ok=0
-          else
-            echo "::notice::No direct URLs given; trying the DEFRA WCS."
-            curl -fsS --max-time 60 -o dsm.in \
-              "$WCS?service=WCS&version=2.0.1&request=GetCoverage&format=image/tiff&subset=x($E0,$E1)&subset=y($N0,$N1)" || ok=0
-          fi
-          if [ "$ok" != "1" ]; then
-            echo "::error::Could not fetch the lidar surface automatically."
-            echo "::error::Download the 5 km DSM and DTM tiles for this square from"
-            echo "::error::https://environment.data.gov.uk/survey and re-run this workflow"
-            echo "::error::with dsm_url and dtm_url pointing at them."
+          dsm=$(probe dsm $DSM_SLUGS) || dsm=""
+          dtm=$(probe dtm $DTM_SLUGS) || dtm=""
+          if [ -z "$dsm" ] || [ -z "$dtm" ]; then
+            echo "::error::No lidar WCS answered — every slug above is a miss."
+            echo "::error::Download the 5 km DSM and DTM tiles for this square by hand from"
+            echo "::error::https://environment.data.gov.uk/survey and re-run with dsm_url / dtm_url."
+            echo "--- first 40 lines of the last DSM response ---"
+            head -40 cap-dsm.xml 2>/dev/null || true
             exit 1
           fi
-          ls -la
+          {
+            echo "dsm_slug=${dsm%%|*}"
+            echo "dsm_cov=${dsm##*|}"
+            echo "dtm_slug=${dtm%%|*}"
+            echo "dtm_cov=${dtm##*|}"
+          } >> "$GITHUB_OUTPUT"
+          echo "using DSM ${dsm%%|*} coverage ${dsm##*|}"
+          echo "using DTM ${dtm%%|*} coverage ${dtm##*|}"
+
+      - name: Stop here if only probing
+        if: inputs.probe_only == 'true'
+        run: |
+          echo "::notice::Services found. Re-run with probe_only false to measure."
+          exit 0
 
       # One warp each, to exactly the tile, exactly 1 m, as raw float32. The
       # geometry is then implied by the tile id and make-heights.js does not
       # have to parse a header to find out where it is.
-      - name: Normalise to the tile
+      - name: Fetch and normalise to the tile
+        if: inputs.probe_only != 'true'
         env:
+          DSM_URL: ${{ inputs.dsm_url }}
+          DTM_URL: ${{ inputs.dtm_url }}
+          DSM_SLUG: ${{ steps.wcs.outputs.dsm_slug }}
+          DSM_COV: ${{ steps.wcs.outputs.dsm_cov }}
+          DTM_SLUG: ${{ steps.wcs.outputs.dtm_slug }}
+          DTM_COV: ${{ steps.wcs.outputs.dtm_cov }}
           E0: ${{ steps.ext.outputs.e0 }}
           N0: ${{ steps.ext.outputs.n0 }}
           E1: ${{ steps.ext.outputs.e1 }}
           N1: ${{ steps.ext.outputs.n1 }}
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          dsm_src=(dsm.in dsm.in.d/**/*.tif dsm.in.d/*.tif)
-          dtm_src=(dtm.in dtm.in.d/**/*.tif dtm.in.d/*.tif)
-          gdalbuildvrt dsm.vrt "${dsm_src[@]}"
-          gdalbuildvrt dtm.vrt "${dtm_src[@]}"
-          for s in dsm dtm; do
-            gdalwarp -q -overwrite -t_srs EPSG:27700 \
+          fetch() {   # $1 dsm|dtm   $2 direct url   $3 slug   $4 coverage
+            local src
+            if [ -n "$2" ]; then
+              curl -fsSL --retry 3 --retry-delay 5 -o "$1.raw" "$2"
+              if file "$1.raw" | grep -qi zip; then
+                mkdir -p "$1.d"
+                unzip -qo "$1.raw" -d "$1.d"
+                rm "$1.raw"
+                find "$1.d" \( -iname '*.tif' -o -iname '*.tiff' -o -iname '*.asc' \) > "$1.list"
+              else
+                echo "$1.raw" > "$1.list"
+              fi
+              wc -l < "$1.list"
+              gdalbuildvrt -q -input_file_list "$1.list" "$1.vrt"
+              src="$1.vrt"
+            else
+              node packs/wcs-service.js "$3" "$4" > "$1.xml"
+              cat "$1.xml"
+              gdalinfo "$1.xml" | head -25
+              src="$1.xml"
+            fi
+            gdalwarp -overwrite -t_srs EPSG:27700 \
               -te "$E0" "$N0" "$E1" "$N1" -tr 1 1 -r bilinear \
-              -ot Float32 -dstnodata -9999 -of ENVI "$s.vrt" "$s.img"
-            ls -la "$s.img"
-          done
+              -ot Float32 -dstnodata -9999 -of ENVI "$src" "$1.img"
+            ls -la "$1.img"
+          }
+          fetch dsm "$DSM_URL" "$DSM_SLUG" "$DSM_COV"
+          fetch dtm "$DTM_URL" "$DTM_SLUG" "$DTM_COV"
 
       - name: Measure
+        if: inputs.probe_only != 'true'
         env:
           TILE: ${{ inputs.tile }}
           PACK: ${{ inputs.pack }}
         run: |
           set -euo pipefail
           args=(--tile "$TILE" --dsm dsm.img --dtm dtm.img)
-          [ -n "$PACK" ] && args+=(--pack "$PACK")
-          node packs/make-heights.js "${args[@]}"
+          if [ -n "$PACK" ]; then args+=(--pack "$PACK"); fi
+          node --max-old-space-size=6144 packs/make-heights.js "${args[@]}"
 
       - name: Commit
+        if: inputs.probe_only != 'true'
         env:
           TILE: ${{ inputs.tile }}
         run: |
