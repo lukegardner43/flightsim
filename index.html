@@ -305,6 +305,12 @@ function reportText(){
       (AI.roofs.length ? "\n         roofs   " + AI.roofs.join(", ") : "")
     : (AI.p ? "profile " + AI.p.id + " available, not used" : "no profile for this place")));
   L.push("function " + funcLine());
+  L.push("bridges  " + (BRIDGES.drawn + BRIDGES.deckOnly + BRIDGES.model === 0
+    ? "none crossed"
+    : BRIDGES.drawn + " built" +
+      (BRIDGES.deckOnly ? ", " + BRIDGES.deckOnly + " deck only (the span is carried by " +
+        "something this does not draw)" : "") +
+      (BRIDGES.model ? ", " + BRIDGES.model + " left to a landmark model" : "")));
   L.push("pack     " + (PACK.files.length
     ? PACK.files.length + " tile" + (PACK.files.length > 1 ? "s" : "") + " (" + packName() + ") " +
       packState() + ", " +
@@ -3105,6 +3111,9 @@ function onPath(p, d, out){
   out.x = a.x + (b.x-a.x)*f;
   out.z = a.z + (b.z-a.z)*f;
   out.h = Math.atan2(b.x-a.x, b.z-a.z);
+  /* On a bridge the path carries its own height: a train crossing a viaduct
+     has to be on the viaduct and not in the valley under it. */
+  out.by = (a.by !== undefined && b.by !== undefined) ? a.by + (b.by-a.by)*f : undefined;
   return out;
 }
 function vehicleGeometry(w, h, l, body, roof){
@@ -3155,7 +3164,7 @@ function homeVehicle(st, paths, px, pz, speed){
   }
   return false;
 }
-var vtmp = {x:0, z:0, h:0}, vmtx = new THREE.Matrix4(), vq = new THREE.Quaternion(),
+var vtmp = {x:0, z:0, h:0, by:undefined}, vmtx = new THREE.Matrix4(), vq = new THREE.Quaternion(),
     vpos = new THREE.Vector3(), vsc = new THREE.Vector3(1,1,1), vax = new THREE.Vector3(0,1,0);
 function updateTraffic(dt){
   if(!traffic.cars) return;
@@ -3175,7 +3184,8 @@ function updateTraffic(dt){
       if(st.d > st.p.len || st.d < 0){ st.dir *= -1; st.d = Math.max(0, Math.min(st.p.len, st.d)); }
       onPath(st.p, st.d, vtmp);
       st.x = vtmp.x; st.z = vtmp.z;
-      vpos.set(vtmp.x, terrainY(vtmp.x, vtmp.z) + S.lift, vtmp.z);
+      vpos.set(vtmp.x, (vtmp.by !== undefined ? vtmp.by : terrainY(vtmp.x, vtmp.z)) + S.lift,
+               vtmp.z);
       vq.setFromAxisAngle(vax, vtmp.h + (st.dir < 0 ? Math.PI : 0));
       vmtx.compose(vpos, vq, vsc);
       S.mesh.setMatrixAt(live++, vmtx);
@@ -3559,20 +3569,157 @@ function addBuildings(list, parts, group, cell){
   cell.tallest = tallest;
 }
 
+/* ------------------------------------------------------------------
+   BRIDGES AND VIADUCTS
+
+   Roads and railways drape on the heightfield, which is right for 99% of
+   them and wrong for the ones that matter: a viaduct sagged into the valley
+   it was built to cross, and a bridge over the Thames went through it.
+
+   A bridge is its own way in OSM, so its first and last vertices are the
+   abutments. The deck is the straight line between those two ground heights,
+   raised enough to clear whatever is underneath, and eased back down onto the
+   ground at each end. Piers drop from the soffit to the ground beneath.
+
+   What this deliberately does NOT do is guess the superstructure of a famous
+   bridge. A suspension or cable-stayed or cantilever bridge gets its deck and
+   nothing else — no invented masonry piers marching across the Forth — and
+   any bridge a landmark model claims by name is left entirely to that model.
+   ------------------------------------------------------------------ */
+var BRIDGES = {drawn:0, deckOnly:0, model:0};
+function isBridge(t){
+  return !!(t && t.bridge && t.bridge !== "no" && t.bridge !== "false");
+}
+/* A famous bridge's shape is not something to infer from a centreline. If a
+   model names it, the model owns it; this is the hook Tower Bridge, the Forth
+   Bridge and Clifton hang on. Side-effect free, unlike modelFor. */
+function modelClaims(t){
+  if(!MODELS.length || !t.name) return false;
+  var n = String(t.name).toLowerCase(), i, j;
+  for(i=0;i<MODELS.length;i++){
+    var m = MODELS[i];
+    for(j=0;j<(m.match||[]).length;j++)
+      if(n.indexOf(String(m.match[j]).toLowerCase()) >= 0) return true;
+  }
+  return false;
+}
+/* Suspension, cable-stayed and cantilever spans carry their deck on
+   something this cannot draw. They get the deck and are left alone. */
+var NO_PIERS = /^(suspension|cable-stayed|cable_stayed|cantilever|tied-arch|tied_arch|arch|truss|floating|transporter)$/;
+/* A short bridge is often two vertices. The deck has to be eased up off the
+   abutments and back down, so it needs points in between to be eased over. */
+function resample(pts, step){
+  var out = [pts[0]], i;
+  for(i=1;i<pts.length;i++){
+    var a = pts[i-1], c = pts[i];
+    var dx = c.x-a.x, dz = c.z-a.z, L = Math.sqrt(dx*dx+dz*dz);
+    var n = Math.min(24, Math.max(1, Math.round(L/step)));
+    for(var k=1;k<=n;k++) out.push({x: a.x + dx*k/n, z: a.z + dz*k/n});
+    if(out.length > 160) break;
+  }
+  return out;
+}
+function deckLine(pts, clear, minRise){
+  var n = pts.length, i;
+  if(n < 2) return null;
+  var cum = [0], total = 0;
+  for(i=1;i<n;i++){
+    var dx = pts[i].x-pts[i-1].x, dz = pts[i].z-pts[i-1].z;
+    total += Math.sqrt(dx*dx + dz*dz); cum.push(total);
+  }
+  if(total < 8 || total > 4000) return null;
+  var y0 = terrainY(pts[0].x, pts[0].z), y1 = terrainY(pts[n-1].x, pts[n-1].z);
+  if(!isFinite(y0) || !isFinite(y1)) return null;
+  var straight = [], need = -1e9;
+  for(i=0;i<n;i++){
+    straight[i] = y0 + (y1-y0)*(cum[i]/total);
+    var g = terrainY(pts[i].x, pts[i].z);
+    if(isFinite(g)) need = Math.max(need, g + clear - straight[i]);
+  }
+  var rise = Math.max(minRise, Math.min(30, need));
+  var tl = Math.min(total*0.3, 16), ys = [];
+  for(i=0;i<n;i++){
+    var d = Math.min(cum[i], total - cum[i]) / tl;
+    var e = d >= 1 ? 1 : d*d*(3 - 2*d);              /* smoothstep onto the deck */
+    ys[i] = straight[i] + rise*e;
+  }
+  ys.total = total;
+  return ys;
+}
+/* A length of deck, or of parapet: a box between two points, level in
+   section, wound so every face looks outward. */
+function deckBox(b, ax, az, cx, cz, ya, yc, half, h, off, col){
+  var dx = cx-ax, dz = cz-az, L = Math.sqrt(dx*dx+dz*dz);
+  if(L < 0.25) return;
+  var ux = dx/L, uz = dz/L, nx = -uz, nz = ux;
+  var ox = nx*(off||0), oz = nz*(off||0);
+  var p = [{x:ax+ox+nx*half, z:az+oz+nz*half}, {x:cx+ox+nx*half, z:cz+oz+nz*half},
+           {x:cx+ox-nx*half, z:cz+oz-nz*half}, {x:ax+ox-nx*half, z:az+oz-nz*half}];
+  var yt = [ya, yc, yc, ya], i, j;
+  var ref = {x:(ax+cx)/2 + ox, y:(ya+yc)/2 - h/2, z:(az+cz)/2 + oz};
+  for(i=0;i<4;i++){
+    j = (i+1)%4;
+    b.addTriOut({x:p[i].x,y:yt[i],z:p[i].z}, {x:p[j].x,y:yt[j],z:p[j].z},
+                {x:p[j].x,y:yt[j]-h,z:p[j].z}, col, ref);
+    b.addTriOut({x:p[i].x,y:yt[i],z:p[i].z}, {x:p[j].x,y:yt[j]-h,z:p[j].z},
+                {x:p[i].x,y:yt[i]-h,z:p[i].z}, col, ref);
+  }
+  b.addTriOut({x:p[0].x,y:yt[0]-h,z:p[0].z}, {x:p[1].x,y:yt[1]-h,z:p[1].z},
+              {x:p[2].x,y:yt[2]-h,z:p[2].z}, col, ref);
+  b.addTriOut({x:p[0].x,y:yt[0]-h,z:p[0].z}, {x:p[2].x,y:yt[2]-h,z:p[2].z},
+              {x:p[3].x,y:yt[3]-h,z:p[3].z}, col, ref);
+}
+var BR_CONC = new THREE.Color(0x9b9891), BR_STONE = new THREE.Color(0x8d8377),
+    BR_PARA = new THREE.Color(0xa9a69e);
+function bridgeStruct(b, pts, ys, half, t, cell, rail){
+  var i, n = pts.length;
+  var stone = rail || t.bridge === "viaduct" || t.bridge === "aqueduct" ||
+              /brick|stone|masonry/.test(t["bridge:structure"] || t.material || "");
+  var col = stone ? BR_STONE : BR_CONC;
+  var thick = rail ? 1.9 : 1.2;
+  var dh = half + (rail ? 1.1 : 0.8);              /* the deck oversails a little */
+  var piers = !NO_PIERS.test(String(t["bridge:structure"] || "").toLowerCase());
+  for(i=0;i<n-1;i++){
+    var a = pts[i], c = pts[i+1];
+    if(inSkip((a.x+c.x)/2, (a.z+c.z)/2, cell)) continue;
+    deckBox(b, a.x, a.z, c.x, c.z, ys[i], ys[i+1], dh, thick, 0, col);
+    for(var s=-1;s<=1;s+=2)                        /* parapets, both sides */
+      deckBox(b, a.x, a.z, c.x, c.z, ys[i]+1.0, ys[i+1]+1.0, 0.22, 1.0, s*(dh-0.24), BR_PARA);
+  }
+  if(!piers){ BRIDGES.deckOnly++; return; }
+  /* Piers where they are needed, at a spacing that suits the span. */
+  var space = rail ? 26 : 34, run = 0;
+  for(i=1;i<n-1;i++){
+    var dx = pts[i].x-pts[i-1].x, dz = pts[i].z-pts[i-1].z;
+    run += Math.sqrt(dx*dx + dz*dz);
+    if(run < space) continue;
+    run = 0;
+    var g = terrainY(pts[i].x, pts[i].z);
+    var soffit = ys[i] - thick;
+    if(!isFinite(g) || soffit - g < 3.5) continue;
+    if(inSkip(pts[i].x, pts[i].z, cell)) continue;
+    var pw = Math.min(4.2, Math.max(1.8, half*0.9));
+    strut(b, pts[i].x, g - 1, pts[i].z, pts[i].x, soffit, pts[i].z, pw*1.15, col, pw*0.85);
+  }
+}
 var ROAD_W = {motorway:20,trunk:15,primary:12,secondary:10,tertiary:8,residential:6,
   unclassified:6,living_street:5,service:4,pedestrian:4.5,footway:2.2,
   motorway_link:9,trunk_link:8,primary_link:7};
 function addRoads(list, group, cell){
-  var b = new Batch();
+  var b = new Batch(), sb = new Batch();
   for(var i=0;i<list.length;i++){
-    try{ oneRoad(list[i], b, cell); }catch(err){ statSkipped++; }
+    try{ oneRoad(list[i], b, sb, cell); }catch(err){ statSkipped++; }
   }
   if(b.count()) group.add(b.mesh(matFlat));
+  if(sb.count()) group.add(sb.mesh(matStruct));
 }
-function oneRoad(e, b, cell){
+function oneRoad(e, b, sb, cell){
   {
     if(!e.geometry) return;
-    var hw = (e.tags && e.tags.highway) || "residential";
+    var tg = e.tags || {};
+    /* A tunnel drawn on the surface is a road painted across a hillside. */
+    if(tg.tunnel && tg.tunnel !== "no") return;
+    var hw = tg.highway || "residential";
     var w = (ROAD_W[hw] || 6)/2;
     if(e.tags && e.tags.lanes){ var ln = parseFloat(e.tags.lanes); if(ln > 0) w = Math.max(w, ln*1.6); }
     var col = (hw === "footway" || hw === "pedestrian") ? COL.path :
@@ -3581,6 +3728,19 @@ function oneRoad(e, b, cell){
        height, with a clearance that keeps them above the terrain mesh. */
     var y = /^(motorway|trunk|primary)/.test(hw) ? 1.1 : 0.9;
     var pts = ringToPts(e.geometry);
+    var ys = null;
+    if(isBridge(tg) && pts.length > 1){
+      if(modelClaims(tg)) BRIDGES.model++;
+      else{
+        pts = resample(pts, 9);
+        ys = deckLine(pts, 4.6, 3.0);
+        if(ys){
+          bridgeStruct(sb, pts, ys, w, tg, cell, false);
+          BRIDGES.drawn++;
+          for(var k=0;k<pts.length;k++) pts[k].by = ys[k];   /* so cars ride it */
+        }
+      }
+    }
     for(var j=0;j<pts.length-1;j++){
       var a = pts[j], c = pts[j+1];
       var dx = c.x-a.x, dz = c.z-a.z, L = Math.sqrt(dx*dx+dz*dz);
@@ -3588,7 +3748,8 @@ function oneRoad(e, b, cell){
       if(inSkip((a.x+c.x)/2, (a.z+c.z)/2, cell)) continue;
       statRoadM += L;
       var nx = -dz/L*w, nz = dx/L*w;
-      var ya = terrainY(a.x, a.z) + y, yc = terrainY(c.x, c.z) + y;
+      var ya = ys ? ys[j] + 0.05 : terrainY(a.x, a.z) + y,
+          yc = ys ? ys[j+1] + 0.05 : terrainY(c.x, c.z) + y;
       b.addTri({x:a.x+nx,y:ya,z:a.z+nz},{x:c.x+nx,y:yc,z:c.z+nz},{x:c.x-nx,y:yc,z:c.z-nz}, col);
       b.addTri({x:a.x+nx,y:ya,z:a.z+nz},{x:c.x-nx,y:yc,z:c.z-nz},{x:a.x-nx,y:ya,z:a.z-nz}, col);
     }
@@ -3899,7 +4060,7 @@ var WATER_W = {river:26, canal:12, stream:4, drain:3};
    OSM maps a power line as a way whose every vertex is a tower, so one
    request gives both the route and the positions of the pylons on it.
    ------------------------------------------------------------------ */
-var matSteel, matWire;
+var matStruct, matWire;
 /* A box from a to c with a square section. Everything a pylon is made of is
    one of these, so a lattice tower is eight of them rather than a mesh. */
 var stA = new THREE.Vector3(), stB = new THREE.Vector3(), stU = new THREE.Vector3(),
@@ -4027,7 +4188,7 @@ function addPower(lines, gens, group, cell){
     if(isNaN(Ht) || Ht < 12 || Ht > 200) Ht = 78 + hash(g.id, 5)*32;
     turbine(b, gx, gz, terrainY(gx, gz), Ht, new THREE.Color(0xe8e9ea), g.id);
   }
-  if(b.count()) group.add(b.mesh(matSteel));
+  if(b.count()) group.add(b.mesh(matStruct));
   if(seg.length){
     var lg = new THREE.BufferGeometry();
     lg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(seg), 3));
@@ -4060,20 +4221,35 @@ function addWaterways(list, group, cell){
 /* Ballast, then two rails on top of it. The rails are what make a railway read
    as a railway from the air rather than as a thin grey road. */
 function addRails(list, group, cell){
-  var b = new Batch();
+  var b = new Batch(), sb = new Batch();
   for(var i=0;i<list.length;i++){
     try{
       var e = list[i], t = e.tags || {};
       var pts = ringToPts(e.geometry);
       var narrow = t.railway === "tram" || t.railway === "narrow_gauge";
       var half = narrow ? 1.7 : 2.9, gauge = narrow ? 0.5 : 0.72;
+      var ys = null;
+      if(isBridge(t) && pts.length > 1){
+        if(modelClaims(t)) BRIDGES.model++;
+        else{
+          pts = resample(pts, 9);
+          /* a railway keeps its own level: it clears more and rises less */
+          ys = deckLine(pts, 6.0, 4.0);
+          if(ys){
+            bridgeStruct(sb, pts, ys, half, t, cell, true);
+            BRIDGES.drawn++;
+            for(var k=0;k<pts.length;k++) pts[k].by = ys[k];
+          }
+        }
+      }
       for(var j=0;j<pts.length-1;j++){
         var a = pts[j], c = pts[j+1];
         var dx = c.x-a.x, dz = c.z-a.z, L = Math.sqrt(dx*dx+dz*dz);
         if(L < 0.8) continue;
         if(inSkip((a.x+c.x)/2, (a.z+c.z)/2, cell)) continue;
         var ux = dx/L, uz = dz/L, nx = -uz, nz = ux;
-        var ya = terrainY(a.x, a.z) + 0.75, yc = terrainY(c.x, c.z) + 0.75;
+        var ya = ys ? ys[j] + 0.1 : terrainY(a.x, a.z) + 0.75,
+            yc = ys ? ys[j+1] + 0.1 : terrainY(c.x, c.z) + 0.75;
         b.addTri({x:a.x+nx*half,y:ya,z:a.z+nz*half},{x:c.x+nx*half,y:yc,z:c.z+nz*half},
                  {x:c.x-nx*half,y:yc,z:c.z-nz*half}, COL.ballast);
         b.addTri({x:a.x+nx*half,y:ya,z:a.z+nz*half},{x:c.x-nx*half,y:yc,z:c.z-nz*half},
@@ -4092,6 +4268,7 @@ function addRails(list, group, cell){
     }catch(err){ statSkipped++; }
   }
   if(b.count()) group.add(b.mesh(matFlat));
+  if(sb.count()) group.add(sb.mesh(matStruct));
 }
 
 /* ---- ground imagery: coarse over the whole grid, sharp over home ---- */
@@ -4360,8 +4537,8 @@ function initScene(){
   matGrand.name = "grand"; matMason.name = "masonry";
   /* Galvanised lattice and aluminium conductor. Unlit wire, or it vanishes
      against a bright sky at the exact angle you most want to see it. */
-  matSteel = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
-  matSteel.name = "steel";
+  matStruct = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
+  matStruct.name = "structure";
   matWire  = new THREE.LineBasicMaterial({color:0x9aa0a6, transparent:true, opacity:0.55});
   matRoof = {};
   for(var rk2 in ROOF_TILE){
@@ -4804,6 +4981,7 @@ $("go").onclick = function(){
   }
   AI.on = !!(AI.p && $("aiuse").checked);
   AI.applied = AI.dressed = 0; AI.walls = []; AI.roofs = []; FUNC_SEEN = {};
+  BRIDGES = {drawn:0, deckOnly:0, model:0};
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (gridRef(LAT0, LON0) || "outside the OS grid") +
                          (AI.on ? " · AI interpretation: " + AI.p.place : "") +
@@ -5620,6 +5798,7 @@ window.__sim = {
                             chunks:PACK.chunks, chunkFail:PACK.chunkFail,
                             merged:packMerged}; },
   func: function(){ return FUNC_SEEN; },
+  bridges: function(){ return BRIDGES; },
   ai: function(){ return {on:AI.on, id:AI.p ? AI.p.id : null,
                           applied:AI.applied, dressed:AI.dressed,
                           walls:AI.walls, roofs:AI.roofs,
