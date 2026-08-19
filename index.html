@@ -304,6 +304,7 @@ function reportText(){
       (AI.walls.length ? "\n         walls   " + AI.walls.join(", ") : "") +
       (AI.roofs.length ? "\n         roofs   " + AI.roofs.join(", ") : "")
     : (AI.p ? "profile " + AI.p.id + " available, not used" : "no profile for this place")));
+  L.push("function " + funcLine());
   L.push("pack     " + (PACK.files.length
     ? PACK.files.length + " tile" + (PACK.files.length > 1 ? "s" : "") + " (" + packName() + ") " +
       packState() + ", " +
@@ -1039,6 +1040,18 @@ for(var _i=0;_i<AI_PROFILES.length;_i++){
   if(_a) for(var _k in _a) if(_p[_k] === undefined) _p[_k] = _a[_k];
 }
 /* AI-PROFILES-END */
+/* What the function tags turned into, for the report: this is the one part of
+   the pipeline where it is worth seeing that a village really did contain a
+   pub, a church, a village hall and a filling station rather than four
+   anonymous blocks. */
+var FUNC_SEEN = {};
+function funcLine(){
+  var k = Object.keys(FUNC_SEEN);
+  if(!k.length) return "nothing tagged by function";
+  k.sort(function(a, b){ return FUNC_SEEN[b] - FUNC_SEEN[a] || (a < b ? -1 : 1); });
+  return k.slice(0, 18).map(function(n){ return n + " " + FUNC_SEEN[n]; }).join(", ") +
+         (k.length > 18 ? " (+" + (k.length - 18) + " more)" : "");
+}
 var AI = {on:false, p:null, applied:0, dressed:0, walls:[], roofs:[]};
 /* One texture per class per FLIGHT, not per building: the profile is chosen
    before initScene runs, so the whole scene can be built on the region's own
@@ -1092,7 +1105,15 @@ function aiDress(t, seed, area, depth){
   if(!p) return false;
   var b = t.building || "", cls, touched = false;
   if(b && b !== "yes"){
-    cls = SHED_RE.test(b) ? "shed" : (HOUSE_RE.test(b) ? "house" : "block");
+    /* Same order as buildClass, or the two disagree: a church came out of
+       here holding the BLOCK weights and got dressed in concrete and glass,
+       then drawn on the masonry texture. grand and masonry carry no weights
+       at all — the texture spec names their stone instead. */
+    cls = SHED_RE.test(b)  ? "shed"
+        : GRAND.test(b)    ? "grand"
+        : HOUSE_RE.test(b) ? "house"
+        : ECCLES.test(b)   ? "masonry"
+        : MASONRY.test(b)  ? "house" : "block";
   }else if(depth && depth <= 12.5){
     /* Depth settles it before area gets a vote. Area alone called seven of
        this village's terraces warehouses and would have dressed a couple of
@@ -1117,7 +1138,7 @@ function aiDress(t, seed, area, depth){
        measurement in the report */
     t["ai:levels"] = String(wpick(p.storeys[cls], seed, 93)); touched = true;
   }
-  if(!t["building:material"] && !t["building:colour"] && p.wall[cls]){
+  if(!t["building:material"] && !t["building:colour"] && p.wall && p.wall[cls]){
     t["ai:wallmat"] = wpick(p.wall[cls], seed, 94); touched = true;
   }
   if(!t["roof:shape"] && p.roofShape[cls]){
@@ -1144,7 +1165,16 @@ var TYPE_H = {
   /* landmark classes, reached through HIST_TYPE / MM_TYPE below */
   castle:18, manor:12, mansion:14, palace:20, abbey:22, hist_tower:17, museum:16,
   windmill:12, watermill:9, lighthouse:26, ruins:5, monument:9, grandstand:14,
-  water_tower:22, mast:34, chimney:32, silo:16
+  water_tower:22, mast:34, chimney:32, silo:16,
+  /* reached through the function tags: what a village and a town are made of
+     besides houses. Eaves height, not ridge — roofPlan adds the roof. */
+  restaurant:8, cafe:6.6, fast_food:5.4, shop:7.6, market:6.5,
+  post_office:7.6, bank:9.5, department_store:18, mall:13,
+  village_hall:6.4, community_centre:7.6, library:10, townhall:15, courthouse:16,
+  police:11, fire_station:9, ambulance_station:6.2, kindergarten:5.4,
+  doctors:6.6, clinic:8.5, theatre:16, cinema:12, arts_centre:12,
+  bus_station:7, fuel:5.2, pavilion:4.6, swimming_pool:9, guest_house:10,
+  substation:4.6, works:6.5, depot:8, workshop:6, mosque:14
 };
 /* An OSM landmark often carries no building tag at all — historic=castle,
    man_made=windmill — and everything downstream (height, roof, colour, whether
@@ -1164,10 +1194,92 @@ var MM_TYPE = {
   chimney:"chimney", kiln:"chimney", obelisk:"monument",
   silo:"silo", storage_tank:"silo", gasometer:"silo"
 };
+/* ---- what a building is FOR ----
+
+   OSM says what a building is used for far more often than it says what it
+   is. A village pub is building=yes + amenity=pub. A parish church is very
+   often building=yes + amenity=place_of_worship. A village hall, a surgery,
+   a fire station, a filling station and a primary school are all building=yes
+   and nothing else. Everything downstream — height, class, roof shape, which
+   wall texture it gets — keys off the building tag, so until now every one of
+   those was a house or an office block chosen by footprint size.
+
+   The function is folded into the building tag here, exactly the way
+   historic= and man_made= already were. Nothing else in the pipeline has to
+   know it happened. */
+var AMENITY_TYPE = {
+  pub:"pub", bar:"pub", nightclub:"pub", biergarten:"pub",
+  restaurant:"restaurant", cafe:"cafe", fast_food:"fast_food", food_court:"fast_food",
+  post_office:"post_office", post_depot:"depot", bank:"bank", bureau_de_change:"bank",
+  library:"library", townhall:"townhall", courthouse:"courthouse",
+  police:"police", fire_station:"fire_station", ambulance_station:"ambulance_station",
+  prison:"civic", embassy:"civic", public_building:"civic",
+  community_centre:"community_centre", social_centre:"community_centre",
+  social_facility:"community_centre", village_hall:"village_hall",
+  place_of_worship:"church", monastery:"abbey",
+  crematorium:"chapel", funeral_hall:"chapel", mortuary:"chapel",
+  school:"school", music_school:"school", language_school:"school",
+  kindergarten:"kindergarten", childcare:"kindergarten",
+  college:"college", university:"university", research_institute:"college",
+  hospital:"hospital", clinic:"clinic", doctors:"doctors", dentist:"doctors",
+  pharmacy:"doctors", veterinary:"doctors", nursing_home:"residential",
+  theatre:"theatre", cinema:"cinema", arts_centre:"arts_centre", casino:"cinema",
+  conference_centre:"civic", exhibition_centre:"civic",
+  bus_station:"bus_station", ferry_terminal:"train_station",
+  fuel:"fuel", car_wash:"garage", car_rental:"garage",
+  parking:"parking", parking_garage:"parking",
+  marketplace:"market", driving_school:"shop",
+  recycling:"depot", waste_transfer_station:"depot",
+  taxi:"kiosk", shelter:"kiosk", toilets:"kiosk", bicycle_parking:"kiosk",
+  charging_station:"kiosk"
+};
+var SHOP_TYPE = {
+  supermarket:"supermarket", department_store:"department_store", mall:"mall",
+  wholesale:"warehouse", trade:"retail", hardware:"retail", doityourself:"retail",
+  furniture:"retail", car:"retail", garden_centre:"retail",
+  car_repair:"garage", car_parts:"garage", tyres:"garage",
+  kiosk:"kiosk", newsagent:"shop", convenience:"shop"
+};
+var LEISURE_TYPE = {
+  sports_centre:"sports_hall", sports_hall:"sports_hall", fitness_centre:"sports_hall",
+  ice_rink:"sports_hall", bowling_alley:"sports_hall",
+  swimming_pool:"swimming_pool", sports_pavilion:"pavilion", pavilion:"pavilion",
+  stadium:"stadium", grandstand:"grandstand", horse_riding:"stable",
+  club:"community_centre", social_club:"community_centre"
+};
+var TOURISM_TYPE = {
+  museum:"museum", gallery:"museum", aquarium:"museum",
+  hotel:"hotel", motel:"hotel", guest_house:"guest_house", hostel:"guest_house",
+  attraction:"civic", theme_park:"civic", information:"kiosk"
+};
+var WORKS_TYPE = {
+  works:"factory", wastewater_plant:"works", water_works:"works",
+  pumping_station:"works", waterworks:"works", telephone_exchange:"works"
+};
+var POWER_TYPE = {
+  substation:"substation", transformer:"substation", plant:"factory",
+  generator:"substation", portal:"substation"
+};
+/* Methodist, Baptist and Congregational chapels are a different building from
+   an Anglican parish church, and Britain has thousands of them. */
+var CHAPEL_DEN = /^(methodist|baptist|congregational|presbyterian|united_reformed|quaker|unitarian|evangelical|pentecostal|salvation_army)$/;
 function classify(t){
   if(t.building && t.building !== "yes") return null;      /* already specific */
-  return HIST_TYPE[t.historic] || MM_TYPE[t.man_made] ||
-         (t.tourism === "museum" ? "museum" : null);
+  var c = HIST_TYPE[t.historic] || MM_TYPE[t.man_made] || WORKS_TYPE[t.man_made] ||
+          AMENITY_TYPE[t.amenity] || LEISURE_TYPE[t.leisure] ||
+          TOURISM_TYPE[t.tourism] || POWER_TYPE[t.power];
+  if(!c && t.shop) c = SHOP_TYPE[t.shop] || "shop";        /* any other shop is a unit */
+  if(!c && t.office) c = "office";
+  if(!c && t.healthcare) c = t.healthcare === "hospital" ? "hospital" : "doctors";
+  if(!c && t.emergency === "ambulance_station") c = "ambulance_station";
+  if(!c && t.craft) c = "workshop";
+  if(c === "church"){
+    /* the tag says place_of_worship; which kind is a separate question */
+    if(t.religion && t.religion !== "christian")
+      c = t.religion === "muslim" ? "mosque" : (t.religion === "jewish" ? "synagogue" : "temple");
+    else if(CHAPEL_DEN.test(String(t.denomination || "").toLowerCase())) c = "chapel";
+  }
+  return c || null;
 }
 function parseLen(v){
   if(!v) return NaN;
@@ -1477,14 +1589,16 @@ var COL = {
 /* Three kinds of thing get built, and they are not made of the same stuff.
    Rendering a warehouse with an office curtain wall and a parapet turns it
    into a block of flats, which is what every big shed in the world was. */
-var SHED_RE  = /^(industrial|warehouse|factory|manufacture|works|depot|distribution|storage|shed|hangar|barn|farm_auxiliary|greenhouse|silo|garage|garages|carport|service|construction)$/;
-var HOUSE_RE = /^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|cabin|hut|static_caravan|manor|mansion|farm|residential)$/;
-var MASONRY  = /^(barn|stable|pub)$/;
+var SHED_RE  = /^(industrial|warehouse|factory|manufacture|works|depot|distribution|storage|shed|hangar|barn|farm_auxiliary|greenhouse|silo|garage|garages|carport|service|construction|supermarket|mall|substation|swimming_pool|sports_hall|bus_station|fuel|workshop)$/;
+var HOUSE_RE = /^(house|detached|semidetached_house|semi|terrace|terraced_house|bungalow|cabin|hut|static_caravan|manor|mansion|farm|residential|guest_house|kindergarten|doctors|pavilion|ambulance_station)$/;
+/* Domestic enough for the house texture, but built of what the region builds
+   civic things of: a village hall and a cricket pavilion are not a semi. */
+var MASONRY  = /^(barn|stable|pub|village_hall|post_office|shop|cafe|restaurant)$/;
 /* Flint and stone with tall narrow openings — a parish church, not a house
    with a spire and not an office with a tower. */
 var ECCLES   = /^(church|chapel|cathedral|monastery|windmill|watermill|hist_tower|ruins|monument)$/;
 /* big, formal, and glazed with sashes rather than shopfronts or curtain wall */
-var GRAND    = /^(manor|mansion|palace|abbey|castle|civic|government|museum|hotel|university|college)$/;
+var GRAND    = /^(manor|mansion|palace|abbey|castle|civic|government|museum|hotel|university|college|library|townhall|courthouse|theatre|arts_centre|department_store)$/;
 function buildClass(t, area, h, house, depth){
   var b = t.building || "";
   if(SHED_RE.test(b)) return "shed";
@@ -3052,7 +3166,10 @@ function buildCell(data, cell){
     /* Give a landmark the building tag OSM never gave it, before anything
        downstream asks what shape or height it should be. */
     var cls = classify(t);
-    if(cls) t.building = cls;                   /* idempotent: classify bows out after */
+    if(cls){
+      t.building = cls;                         /* idempotent: classify bows out after */
+      FUNC_SEEN[cls] = (FUNC_SEEN[cls] || 0) + 1;
+    }
     if(t["building:part"]) pt.push(e);          /* a modelled volume wins over its outline */
     else if(isStructure(t)){
       /* A named landmark we have a model for is replaced by its parts. The
@@ -3164,7 +3281,7 @@ function volumeOf(t, area, dist, seed, box){
 }
 /* Buildings that get a pitched roof however big their footprint is, and the
    handful that end in a point. */
-var PITCHED = /^(manor|mansion|palace|abbey|castle|civic|museum|hotel|church|chapel|cathedral|barn|stable|farm|farm_auxiliary|watermill|ruins|school|civic|museum|grandstand|train_station|hotel|pub|house|terrace|bungalow)$/;
+var PITCHED = /^(manor|mansion|palace|abbey|castle|civic|museum|hotel|church|chapel|cathedral|mosque|barn|stable|farm|farm_auxiliary|watermill|ruins|school|grandstand|train_station|pub|house|terrace|bungalow|village_hall|pavilion|post_office|bank|shop|restaurant|cafe|guest_house|kindergarten|doctors|clinic|library|townhall|courthouse|theatre|arts_centre|community_centre|police|fire_station|ambulance_station|workshop)$/;
 var TOWERY  = /^(windmill|lighthouse|hist_tower|mast|chimney|silo|water_tower)$/;
 var ROOF_ALIAS = {
   "half-hipped":"hipped", gambrel:"hipped", mansard:"hipped", round:"dome",
@@ -4485,7 +4602,7 @@ $("go").onclick = function(){
     try{ localStorage.setItem("tf.overpass", ov); }catch(e2){}
   }
   AI.on = !!(AI.p && $("aiuse").checked);
-  AI.applied = AI.dressed = 0; AI.walls = []; AI.roofs = [];
+  AI.applied = AI.dressed = 0; AI.walls = []; AI.roofs = []; FUNC_SEEN = {};
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (gridRef(LAT0, LON0) || "outside the OS grid") +
                          (AI.on ? " · AI interpretation: " + AI.p.place : "") +
@@ -5301,6 +5418,7 @@ window.__sim = {
                             wanted:PACK.wanted, drawn:PACK.drawn, dup:PACK.dup,
                             chunks:PACK.chunks, chunkFail:PACK.chunkFail,
                             merged:packMerged}; },
+  func: function(){ return FUNC_SEEN; },
   ai: function(){ return {on:AI.on, id:AI.p ? AI.p.id : null,
                           applied:AI.applied, dressed:AI.dressed,
                           walls:AI.walls, roofs:AI.roofs,
