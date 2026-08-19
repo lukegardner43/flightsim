@@ -305,12 +305,13 @@ function reportText(){
       (AI.roofs.length ? "\n         roofs   " + AI.roofs.join(", ") : "")
     : (AI.p ? "profile " + AI.p.id + " available, not used" : "no profile for this place")));
   L.push("function " + funcLine());
-  L.push("bridges  " + (BRIDGES.drawn + BRIDGES.deckOnly + BRIDGES.model === 0
+  L.push("bridges  " + (BRIDGES.drawn + BRIDGES.deckOnly + BRIDGES.model + BRIDGES.named === 0
     ? "none crossed"
     : BRIDGES.drawn + " built" +
       (BRIDGES.deckOnly ? ", " + BRIDGES.deckOnly + " deck only (the span is carried by " +
         "something this does not draw)" : "") +
-      (BRIDGES.model ? ", " + BRIDGES.model + " left to a landmark model" : "")));
+      (BRIDGES.model ? ", " + BRIDGES.model + " left to a landmark model" : "") +
+      (BRIDGES.named ? ", " + BRIDGES.named + " named on the horizon" : "")));
   L.push("pack     " + (PACK.files.length
     ? PACK.files.length + " tile" + (PACK.files.length > 1 ? "s" : "") + " (" + packName() + ") " +
       packState() + ", " +
@@ -2015,8 +2016,13 @@ function queryNotable(bb){
 var LM_HISTORIC = "^(castle|manor|house|palace|church|chapel|monastery|abbey|priory|" +
   "fort|city_gate|gatehouse|tower|windmill|watermill|lighthouse|ruins|building|" +
   "farm|stable|memorial|monument|aqueduct|mansion)$";
+/* bridge is in here so the landmark request finds Tower Bridge, the Forth
+   Bridge and Clifton at all — but unlike everything else in this list it is
+   NOT a structure to extrude. A man_made=bridge outline covers the whole
+   crossing including its approaches; extruded it is a slab over the river.
+   It is used for the name, and as the outline a model can be built on. */
 var LM_MANMADE = "^(lighthouse|windmill|watermill|water_tower|tower|chimney|obelisk|" +
-  "communications_tower|silo|storage_tank|gasometer|kiln)$";
+  "communications_tower|silo|storage_tank|gasometer|kiln|bridge)$";
 var LM_BUILDING = "^(castle|cathedral|church|chapel|monastery|mosque|temple|synagogue|" +
   "palace|manor|windmill|watermill|lighthouse|tower|stadium|grandstand|train_station|" +
   "museum|hospital|university|college|civic|government|hangar)$";
@@ -2039,6 +2045,7 @@ function queryLandmarks(bb){
 }
 /* A closed way can be a structure without ever saying building=. */
 function isStructure(t){
+  if(t.man_made === "bridge") return false;      /* an outline, not a solid */
   if(t.building) return true;
   if(t.historic && new RegExp(LM_HISTORIC).test(t.historic)) return true;
   if(t.man_made && new RegExp(LM_MANMADE).test(t.man_made)) return true;
@@ -3203,7 +3210,7 @@ function inSkip(x, z, cell){
 function buildCell(data, cell){
   var els = data.elements || [];
   var bl = [], pt = [], rd = [], ar = [], tr = [], wl = [], wa = [], ra = [],
-      pw = [], gn = [], i;
+      pw = [], gn = [], br = [], i;
   for(i=0;i<els.length;i++){
     var e = els[i], t = e.tags || {};
     if(e.type === "node"){
@@ -3213,6 +3220,26 @@ function buildCell(data, cell){
     }
     if(t.power === "line" || t.power === "minor_line"){ pw.push(e); continue; }
     if(t.power === "generator"){ gn.push(e); continue; }
+    if(t.man_made === "bridge"){
+      /* The one place a bridge can be a landmark. If a model claims it by
+         name, this outline is what the model stands on — the same path the
+         Bookham houses take. Otherwise it is only a name on the horizon,
+         and the deck under it is the procedural one. */
+      var mdb = modelFor(t, e);
+      if(mdb){
+        try{
+          var mpb = modelParts(e, mdb);
+          for(var mj=0;mj<mpb.length;mj++) pt.push(mpb[mj]);
+          if(mpb.length){
+            t["ai:modelled"] = "1";
+            var mkb = (e.type === "relation" ? "r" : "w") + e.id;
+            if(!modelSeen[mdb.id]){ modelSeen[mdb.id] = mkb; MODEL_HITS.push(mdb.name); }
+          }
+        }catch(err){ statSkipped++; }
+      }
+      br.push(e);
+      continue;
+    }
     /* Give a landmark the building tag OSM never gave it, before anything
        downstream asks what shape or height it should be. */
     var cls = classify(t);
@@ -3258,6 +3285,7 @@ function buildCell(data, cell){
   addRails(ra, g, cell);
   addBuildings(bl, pt, g, cell);
   addPower(pw, gn, g, cell);
+  addBridgeLabels(br, cell);
   if(Q.trees > 0) addTrees(tr, wl, g, cell);
   world.add(g);
   cell.group = g;
@@ -3586,7 +3614,7 @@ function addBuildings(list, parts, group, cell){
    nothing else — no invented masonry piers marching across the Forth — and
    any bridge a landmark model claims by name is left entirely to that model.
    ------------------------------------------------------------------ */
-var BRIDGES = {drawn:0, deckOnly:0, model:0};
+var BRIDGES = {drawn:0, deckOnly:0, model:0, named:0};
 function isBridge(t){
   return !!(t && t.bridge && t.bridge !== "no" && t.bridge !== "false");
 }
@@ -3884,6 +3912,28 @@ function dropLabel(s){
   if(s.material.map) s.material.map.dispose();
   s.material.dispose();
   labels.splice(labels.indexOf(s), 1);
+}
+/* A named crossing is a landmark in exactly the way a church is, and got no
+   label at all because labels were only ever added from addBuildings and a
+   bridge is not a building. Named once per flight: the same bridge comes back
+   in several rings, and Tower Bridge written three times over the Thames is
+   worse than not writing it. */
+var bridgeNamed = {};
+function addBridgeLabels(list, cell){
+  for(var i=0;i<list.length;i++){
+    var e = list[i], t = e.tags || {};
+    if(!t.name || bridgeNamed[t.name]) continue;
+    var pts = ringToPts(e.geometry || []);
+    if(pts.length < 2) continue;
+    var c = centroid(pts);
+    if(inSkip(c.x, c.z, cell)) continue;
+    if(Math.abs(c.x) > 6200 || Math.abs(c.z) > 6200) continue;
+    bridgeNamed[t.name] = 1;
+    var area = Math.abs(signedArea(pts));
+    /* it sits above its own deck, not on the water */
+    addLabel(t.name, c.x, c.z, terrainY(c.x, c.z) + 14, labelScore(t, Math.max(area, 3000)));
+    BRIDGES.named++;
+  }
 }
 function addLabel(name, x, z, top, score){
   if(!scene) return;
@@ -4981,7 +5031,7 @@ $("go").onclick = function(){
   }
   AI.on = !!(AI.p && $("aiuse").checked);
   AI.applied = AI.dressed = 0; AI.walls = []; AI.roofs = []; FUNC_SEEN = {};
-  BRIDGES = {drawn:0, deckOnly:0, model:0};
+  BRIDGES = {drawn:0, deckOnly:0, model:0, named:0}; bridgeNamed = {};
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (gridRef(LAT0, LON0) || "outside the OS grid") +
                          (AI.on ? " · AI interpretation: " + AI.p.place : "") +
