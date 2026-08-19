@@ -177,12 +177,61 @@ or brick, big windows or small, two storeys or four — not any particular
 number. The `tile` figures are considered estimates and are the thing most
 worth correcting.
 
+## Regional roofs
+
+From a thousand feet a roof is most of what you see of a building, and until
+now every one of them was a flat slab of colour. Roofs are now drawn in five
+fabrics — **slate, tile, thatch, metal and flat** — chosen per building from
+`roof:material`, then `ai:roofmat`, then the same defaults the colour already
+used. That happens with or without a profile; the pattern of a slate roof is
+not a regional claim.
+
+What *is* regional is the **unit**, and each profile says so:
+
+```json
+"roof": { "slate": "stone", "tile": "roman" }
+```
+
+| fabric | units |
+|---|---|
+| `slate` | `welsh` (small, dark, dead regular), `westmorland`, `stone` (graduated — big at the eaves, small at the ridge, and you can see that taper) |
+| `tile` | `plain`, `pantile` (an S in section, reads as corduroy), `roman` (broad pan, one standing roll), `concrete` (wide, shallow, very regular) |
+| `metal` | `corrugated`, `standing` |
+| `thatch`, `flat` | one each — combed straw, and felt with chippings and rooflights |
+
+Only `slate` and `tile` are set per region in `uk-areas.json`. Thatch, sheet
+metal and flat felt look the same in Cornwall as in Caithness, so they are
+left national — saying otherwise would be inventing a distinction to fill a
+column.
+
+Two mechanics worth knowing, because both were the hard part:
+
+**Roofs had no UVs at all.** They arrive as a triangle soup of every pitch
+there is — flat lids, 35° gables, a cone, the near-vertical flank of a spire.
+Projecting straight down (`u=x, v=z`) is the obvious answer and it smears a
+spire into streaks, because a vertical face has no plan area to project onto.
+So each triangle takes its frame from its own normal: **u along the eaves, v
+up the slope**, both in metres. Courses then lie parallel to the gutter on
+every pitch, adjacent faces of one roof line up because the frame depends only
+on the normal, and a flat lid falls out of the same formula as the plan
+projection it should be.
+
+**Five fabrics means five batches**, the same way walls already split by
+building class. That costs up to four extra draw calls per cell — on the test
+scene, 280 meshes became 322 — rather than a material switch per building.
+
+The graduation on a stone slate roof repeats with the texture rather than
+running once from eaves to ridge; over a 3.8 m tile on a typical rafter that
+reads as varied course depth, which is the intent, but it is not a true single
+taper.
+
 ## What embed.js checks
 
-Every material, roof shape and building type in a profile — and every `bond`
-and `win` in a `texture` block — is checked against what the renderer will
-actually accept, read out of `index.html` rather than copied into the checker
-(`WALL_MAT`, `ROOF_MAT`, `WALL_BOND`, `WALL_WIN`). This is not theoretical: it immediately found that
+Every material, roof shape and building type in a profile — every `bond` and
+`win` in a `texture` block, and every unit in a `roof` block — is checked
+against what the renderer will actually accept, read out of `index.html`
+rather than copied into the checker (`WALL_MAT`, `ROOF_MAT`, `WALL_BOND`,
+`WALL_WIN`, `ROOF_UNIT`). This is not theoretical: it immediately found that
 the Bookham profile had been asking for `asbestos` roofs since the day it was
 written. The sim has never known that word, so a quarter of its sheds had been
 falling back to plain grey. They are `eternit` now, which is what a fibre

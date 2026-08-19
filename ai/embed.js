@@ -26,6 +26,8 @@ const ROOF_OK = keysOf('ROOF_MAT');
 const BOND_OK = keysOf('WALL_BOND');
 const WIN_OK = keysOf('WALL_WIN');
 const TEXCLS_OK = new Set(['house', 'block', 'shed', 'grand', 'masonry']);
+const UNIT_OK = keysOf('ROOF_UNIT');
+const ROOFKIND_OK = new Set(['slate', 'tile', 'thatch', 'metal', 'flat']);
 const SHAPE_OK = new Set(['hipped', 'gabled', 'pyramidal', 'cone', 'dome', 'onion', 'skillion', 'flat']);
 const TYPE_OK = new Set(['house', 'detached', 'semidetached_house', 'terrace', 'bungalow', 'apartments',
   'residential', 'commercial', 'retail', 'office', 'industrial', 'warehouse', 'factory', 'barn',
@@ -46,6 +48,18 @@ function checkProfile(p) {
   }
   checkList(p.type.shed_large, TYPE_OK, 'building type', p.id);
   checkTexture(p);
+  checkRoof(p);
+}
+/* Same idea as the wall spec: naming a unit the renderer does not draw gives
+   you a silently generic roof, not an error. */
+function checkRoof(p) {
+  const r = p.roof;
+  if (r === undefined) return;                       /* optional: national roofs */
+  for (const kind in r) {
+    const where = p.id + ' roof.' + kind;
+    if (!ROOFKIND_OK.has(kind)) throw new Error(where + ': not a roof fabric the sim draws');
+    if (!UNIT_OK.has(String(r[kind]))) throw new Error(where + ': unit "' + r[kind] + '" is not one the sim draws');
+  }
 }
 /* The wall spec is drawn, not looked up, so a typo here does not fall back to
    grey — it falls back to a generic brick wall that looks deliberate. Hence

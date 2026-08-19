@@ -295,6 +295,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "plain"
+   },
    "texture": {
     "shed": {
      "bond": "steel",
@@ -620,6 +624,10 @@
       0.26
      ]
     ]
+   },
+   "roof": {
+    "slate": "welsh",
+    "tile": "plain"
    },
    "texture": {
     "shed": {
@@ -954,6 +962,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "plain"
+   },
    "texture": {
     "shed": {
      "bond": "brick",
@@ -1280,6 +1292,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "pantile"
+   },
    "texture": {
     "shed": {
      "bond": "steel",
@@ -1597,6 +1613,10 @@
       0.28
      ]
     ]
+   },
+   "roof": {
+    "slate": "welsh",
+    "tile": "pantile"
    },
    "texture": {
     "shed": {
@@ -1918,6 +1938,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "plain"
+   },
    "texture": {
     "shed": {
      "bond": "steel",
@@ -2222,6 +2246,10 @@
       0.26
      ]
     ]
+   },
+   "roof": {
+    "slate": "welsh",
+    "tile": "plain"
    },
    "texture": {
     "shed": {
@@ -2538,6 +2566,10 @@
       0.14
      ]
     ]
+   },
+   "roof": {
+    "slate": "stone",
+    "tile": "roman"
    },
    "texture": {
     "shed": {
@@ -2870,6 +2902,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "pantile"
+   },
    "texture": {
     "shed": {
      "bond": "steel",
@@ -3197,6 +3233,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "plain"
+   },
    "texture": {
     "shed": {
      "bond": "steel",
@@ -3520,6 +3560,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "concrete"
+   },
    "texture": {
     "shed": {
      "bond": "steel",
@@ -3838,6 +3882,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "roman"
+   },
    "texture": {
     "shed": {
      "bond": "rubble",
@@ -4155,6 +4203,10 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "westmorland",
+    "tile": "pantile"
+   },
    "texture": {
     "shed": {
      "bond": "rubble",
@@ -4471,6 +4523,11 @@
      ]
     ]
    },
+   "roof": {
+    "slate": "welsh",
+    "tile": "concrete",
+    "metal": "standing"
+   },
    "texture": {
     "shed": {
      "bond": "steel",
@@ -4771,6 +4828,10 @@
       0.24
      ]
     ]
+   },
+   "roof": {
+    "slate": "welsh",
+    "tile": "concrete"
    },
    "texture": {
     "shed": {
@@ -5077,6 +5138,10 @@
       0.26
      ]
     ]
+   },
+   "roof": {
+    "slate": "welsh",
+    "tile": "plain"
    },
    "texture": {
     "shed": {

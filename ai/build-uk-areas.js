@@ -527,6 +527,41 @@ TEX['island'] = {
   masonry: { bond:'rubble', win:'lancet', bays:1, rows:1, tile:[7.5, 9.5], trim:'stone', quoins:true }
 };
 
+/* ---- and what the roofs are made of ----
+
+   The weights say "slate" or "tile"; this says WHICH. Welsh slate is small,
+   dark and dead regular; a Westmorland or Cotswold stone slate roof is
+   graduated, big at the eaves and small at the ridge, and you can see that
+   taper from the air. A pantile is an S in section and reads as corduroy; a
+   plain clay tile does not; a concrete interlocking tile is wide and flat.
+
+   Only these two vary by region. Thatch, sheet metal and flat felt look the
+   same in Cornwall as in Caithness, so they are left national.
+*/
+const ROOF = {};
+ROOF['london-inner'] = { slate:'welsh', tile:'plain' };
+ROOF['london-outer'] = { slate:'welsh', tile:'plain' };
+ROOF['home-counties'] = { slate:'welsh', tile:'plain' };
+ROOF['northern-industrial'] = { slate:'welsh', tile:'pantile' };
+ROOF['scottish-urban'] = { slate:'welsh', tile:'pantile' };
+ROOF['scottish-rural'] = { slate:'welsh', tile:'plain' };
+ROOF['welsh-valleys'] = { slate:'welsh', tile:'plain' };
+ROOF['limestone-country'] = { slate:'stone', tile:'roman' };
+ROOF['east-anglian'] = { slate:'welsh', tile:'pantile' };
+ROOF['seaside-victorian'] = { slate:'welsh', tile:'plain' };
+ROOF['midlands-suburban'] = { slate:'welsh', tile:'concrete' };
+ROOF['west-country'] = { slate:'welsh', tile:'roman' };
+ROOF['northern-stone'] = { slate:'westmorland', tile:'pantile' };
+ROOF['new-town'] = { slate:'welsh', tile:'concrete', metal:'standing' };
+ROOF['northern-ireland'] = { slate:'welsh', tile:'concrete' };
+ROOF['island'] = { slate:'welsh', tile:'plain' };
+
+for (const k in ROOF) {
+  if (!A[k]) throw new Error('roof spec for unknown archetype "' + k + '"');
+  A[k].roof = ROOF[k];
+}
+for (const k in A) if (!A[k].roof) throw new Error('archetype "' + k + '" has no roof spec');
+
 for (const k in TEX) {
   if (!A[k]) throw new Error('texture spec for unknown archetype "' + k + '"');
   A[k].texture = TEX[k];

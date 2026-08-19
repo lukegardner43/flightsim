@@ -346,6 +346,10 @@
    "quoins": true
   }
  },
+ "roof": {
+  "slate": "welsh",
+  "tile": "plain"
+ },
  "expect": {
   "densityPerKm2": 380,
   "treeCover": "high \u2014 mature garden trees throughout, ancient woodland on the commons",
