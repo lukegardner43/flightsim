@@ -3568,6 +3568,91 @@ function roundelTexture(){
   t.minFilter = t.magFilter = THREE.LinearFilter;
   return t;
 }
+/* ---- the imported airframe ----
+   A glTF converted to javascript by plane/glb-to-js.js, for the same reason
+   the building packs are javascript: this page has to keep working opened
+   straight off a disk, where a script may be loaded but a file may not be
+   read. It also means no GLTFLoader — decoding is the forty lines below.
+
+   The generated aircraft is built first and flown immediately; if the model
+   turns up it replaces it. So the sim never waits on it and never breaks if
+   it is missing. */
+var PLANE_DATA = null, planeSwapped = false;
+window.TF_PLANE = function(d){
+  PLANE_DATA = d;
+  if(plane && !planeSwapped){ try{ swapInPlane(); }catch(err){ report("Aircraft model", err); } }
+};
+function loadPlaneModel(){
+  var el = document.createElement("script");
+  el.src = "plane/hawk.js";
+  el.onerror = function(){};                    /* the generated one stays */
+  document.head.appendChild(el);
+}
+function b64bytes(s){
+  var bin = atob(s), n = bin.length, a = new Uint8Array(n), i;
+  for(i=0;i<n;i++) a[i] = bin.charCodeAt(i);
+  return a;
+}
+function planeGeometry(g, bb){
+  var raw = b64bytes(g.p), P = new Uint16Array(raw.buffer, 0, g.n*3);
+  var pos = new Float32Array(g.n*3), i, c;
+  var ex = [bb[3]-bb[0], bb[4]-bb[1], bb[5]-bb[2]];
+  for(i=0;i<g.n*3;i++){ c = i % 3; pos[i] = bb[c] + P[i]/65535*ex[c]; }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  /* normals and colours ride as normalised integers — three unpacks those on
+     the GPU, so they never become floats on the CPU at all */
+  geo.setAttribute("normal", new THREE.BufferAttribute(
+    new Int8Array(b64bytes(g.q).buffer, 0, g.n*3), 3, true));
+  geo.setAttribute("color", new THREE.BufferAttribute(
+    new Uint8Array(b64bytes(g.c).buffer, 0, g.n*3), 3, true));
+  var ib = b64bytes(g.i);
+  geo.setIndex(new THREE.BufferAttribute(
+    g.wide ? new Uint32Array(ib.buffer) : new Uint16Array(ib.buffer), 1));
+  return geo;
+}
+function swapInPlane(){
+  var d = PLANE_DATA;
+  if(!d || !plane) return;
+  planeSwapped = true;
+  for(var i = plane.children.length - 1; i >= 0; i--) plane.remove(plane.children[i]);
+
+  var body = new THREE.MeshPhongMaterial({vertexColors:true, shininess:82,
+                                          specular:0x707070});
+  var glass = new THREE.MeshPhongMaterial({vertexColors:true, shininess:170,
+    specular:0xc4d8ea, transparent:true, opacity:0.60});
+  var k, made = 0;
+  for(k in d.groups){
+    var m = new THREE.Mesh(planeGeometry(d.groups[k], d.bbox),
+                           k === "glass" ? glass : body);
+    m.renderOrder = k === "glass" ? 2 : 0;
+    plane.add(m);
+    made++;
+  }
+  /* the fan down the jet pipe, which is what the loop has always spun */
+  propeller = new THREE.Mesh(new THREE.CircleGeometry(0.34, 14),
+    new THREE.MeshPhongMaterial({color:0x8a9096, shininess:120, specular:0x9aa0a6}));
+  propeller.position.z = d.bbox[5] - 0.12;
+  propeller.rotation.y = Math.PI;
+  plane.add(propeller);
+  addRoundels(d);
+  flash("Aircraft", "Hawk T1 loaded, " + made + " parts");
+}
+/* Roundels are not in the model, and an RAF aeroplane without them looks
+   wrong. Placed off the model's own bounding box rather than guessed. */
+function addRoundels(d){
+  if(!d.roundel || !d.roundel.length) return;
+  var span = d.bbox[3] - d.bbox[0], r = span*0.072;
+  var mat = new THREE.MeshBasicMaterial({map:roundelTexture(), transparent:true,
+    depthWrite:false, polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3});
+  d.roundel.forEach(function(p){
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(r*2, r*2), mat);
+    m.rotation.x = -Math.PI/2;
+    m.position.set(p[0], p[1], p[2]);
+    m.renderOrder = 1;
+    plane.add(m);
+  });
+}
 var smoke = null;
 function buildAircraft(){
   plane = new THREE.Group();
@@ -3696,7 +3781,12 @@ function makeSmoke(){
 }
 function updateSmoke(dt){
   if(!smoke || !plane) return;
-  var p = plane.position;
+  /* Emitted behind the tail, not at the origin. Laid down at the aircraft's
+     own position the first segments sit on top of the wings, and a white
+     ribbon with no depth write reads as two white patches painted on them. */
+  if(!smoke.back) smoke.back = new THREE.Vector3();
+  smoke.back.set(0, 0, 8).applyQuaternion(plane.quaternion).add(plane.position);
+  var p = smoke.back;
   /* one puff every few metres, not every frame, so the trail is the same
      length whatever the frame rate is doing */
   if(!smoke.last || smoke.last.distanceToSquared(p) > 36){
@@ -3788,6 +3878,7 @@ $("go").onclick = function(){
   var pk = packsFor(LAT0, LON0);
   if(pk.length){ loadPacks(pk); armPackTimer(); }
   loadModels();
+  loadPlaneModel();
   var ov = customOverpass();
   if(ov){
     if(OVERPASS.indexOf(ov) >= 0) OVERPASS.splice(OVERPASS.indexOf(ov), 1);
