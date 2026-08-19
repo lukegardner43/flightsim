@@ -23,6 +23,9 @@ function keysOf(name) {
 }
 const WALL_OK = keysOf('WALL_MAT');
 const ROOF_OK = keysOf('ROOF_MAT');
+const BOND_OK = keysOf('WALL_BOND');
+const WIN_OK = keysOf('WALL_WIN');
+const TEXCLS_OK = new Set(['house', 'block', 'shed', 'grand', 'masonry']);
 const SHAPE_OK = new Set(['hipped', 'gabled', 'pyramidal', 'cone', 'dome', 'onion', 'skillion', 'flat']);
 const TYPE_OK = new Set(['house', 'detached', 'semidetached_house', 'terrace', 'bungalow', 'apartments',
   'residential', 'commercial', 'retail', 'office', 'industrial', 'warehouse', 'factory', 'barn',
@@ -42,6 +45,29 @@ function checkProfile(p) {
     checkList(p.roofMat[cls], ROOF_OK, 'roof material', p.id);
   }
   checkList(p.type.shed_large, TYPE_OK, 'building type', p.id);
+  checkTexture(p);
+}
+/* The wall spec is drawn, not looked up, so a typo here does not fall back to
+   grey — it falls back to a generic brick wall that looks deliberate. Hence
+   the vocabulary check, against the tables in index.html. */
+function checkTexture(p) {
+  const t = p.texture;
+  if (t === undefined) return;                       /* optional: no spec, national texture */
+  for (const cls in t) {
+    const where = p.id + ' texture.' + cls;
+    if (!TEXCLS_OK.has(cls)) throw new Error(where + ': not a class of building the sim draws');
+    const sp = t[cls];
+    if (!sp || typeof sp !== 'object') throw new Error(where + ': not a spec');
+    if (!BOND_OK.has(String(sp.bond))) throw new Error(where + ': bond "' + sp.bond + '" is not one the sim draws');
+    if (!WIN_OK.has(String(sp.win))) throw new Error(where + ': window "' + sp.win + '" is not one the sim draws');
+    if (!Array.isArray(sp.tile) || sp.tile.length !== 2 || !sp.tile.every(n => n > 0.5 && n < 60))
+      throw new Error(where + ': tile must be [metres across, metres down], each 0.5-60');
+    for (const k of ['bays', 'rows'])
+      if (sp[k] !== undefined && !(Number.isInteger(sp[k]) && sp[k] >= 1 && sp[k] <= 8))
+        throw new Error(where + ': ' + k + ' must be a whole number 1-8');
+    if (sp.trim !== undefined && sp.trim !== 'stone')
+      throw new Error(where + ': trim can only be "stone"');
+  }
 }
 
 /* A file is either one profile, or a set of archetypes plus a map of postcode

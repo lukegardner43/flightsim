@@ -9,12 +9,12 @@
  "produced_on": "2026-08-17",
  "method": "Written from the model's training knowledge of the area. No live lookup, no aerial imagery, no OSM query, no site visit.",
  "confidence": {
-  "area_character": "medium — KT23 is a well-known Surrey commuter village and its general building stock is the kind of thing a language model does hold",
-  "proportions": "low to medium — the weights below are a considered estimate, not a survey. The first draft made every roof clay terracotta; interwar and post-war Surrey is mostly brown and grey concrete tile, which is the sort of thing this file exists to be corrected on.",
-  "street_level": "low — nothing here is specific to the HP sector, and should not be read as such",
+  "area_character": "medium \u2014 KT23 is a well-known Surrey commuter village and its general building stock is the kind of thing a language model does hold",
+  "proportions": "low to medium \u2014 the weights below are a considered estimate, not a survey. The first draft made every roof clay terracotta; interwar and post-war Surrey is mostly brown and grey concrete tile, which is the sort of thing this file exists to be corrected on.",
+  "street_level": "low \u2014 nothing here is specific to the HP sector, and should not be read as such",
   "landmarks": "medium-high for the named ones; they are notable enough to be recalled rather than inferred"
  },
- "character": "Great and Little Bookham: a Surrey commuter village between Leatherhead and Effingham, on the Mole Valley line. Predominantly interwar and post-war low-density suburban housing — detached and semi-detached, two storeys, generous plots with mature trees, laid out on cul-de-sacs and crescents off a few through-roads. A short older core around the church with some genuinely old fabric. Red and brown brick dominates, with render, pebbledash and tile-hanging common on 1930s stock. Roofs are overwhelmingly pitched, plain concrete or clay tile, a good share hipped rather than gabled. Very little that is tall: almost nothing above three storeys. Bookham Common to the north-west and Polesden Lacey's estate to the south are both National Trust, and the surrounding land is farmland, woodland and paddock rather than open moor.",
+ "character": "Great and Little Bookham: a Surrey commuter village between Leatherhead and Effingham, on the Mole Valley line. Predominantly interwar and post-war low-density suburban housing \u2014 detached and semi-detached, two storeys, generous plots with mature trees, laid out on cul-de-sacs and crescents off a few through-roads. A short older core around the church with some genuinely old fabric. Red and brown brick dominates, with render, pebbledash and tile-hanging common on 1930s stock. Roofs are overwhelmingly pitched, plain concrete or clay tile, a good share hipped rather than gabled. Very little that is tall: almost nothing above three storeys. Bookham Common to the north-west and Polesden Lacey's estate to the south are both National Trust, and the surrounding land is farmland, woodland and paddock rather than open moor.",
  "shedArea": 900,
  "stock": {
   "house": 0.82,
@@ -287,9 +287,57 @@
    ]
   ]
  },
+ "texture": {
+  "house": {
+   "bond": "brick",
+   "win": "casement",
+   "bays": 2,
+   "rows": 2,
+   "tile": [
+    9,
+    6.4
+   ],
+   "tilehang": true
+  },
+  "block": {
+   "bond": "render",
+   "win": "casement",
+   "bays": 3,
+   "rows": 3,
+   "tile": [
+    12,
+    9.6
+   ]
+  },
+  "grand": {
+   "bond": "brick",
+   "win": "sash12",
+   "bays": 3,
+   "rows": 2,
+   "tile": [
+    15,
+    8.8
+   ],
+   "trim": "stone",
+   "quoins": true,
+   "eaves": true
+  },
+  "masonry": {
+   "bond": "rubble",
+   "win": "lancet",
+   "bays": 1,
+   "rows": 1,
+   "tile": [
+    8,
+    9
+   ],
+   "trim": "stone",
+   "quoins": true
+  }
+ },
  "expect": {
   "densityPerKm2": 380,
-  "treeCover": "high — mature garden trees throughout, ancient woodland on the commons",
+  "treeCover": "high \u2014 mature garden trees throughout, ancient woodland on the commons",
   "tallest_m": 14,
   "note": "If the density probe reports far outside 200-700 buildings/km2, this profile is being applied somewhere it was not written for."
  },

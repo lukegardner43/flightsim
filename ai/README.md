@@ -114,11 +114,64 @@ merely tidy: a postcode area can be one letter or two, so `BA1 2XX` begins with
 village sits on top of the one for its whole area without either knowing about
 the other — `KT23 3HP` still gets the Bookham profile, `KT1 1AA` gets Kingston.
 
+## Regional walls
+
+The weights above say what a building is *made of*. They do not say what it
+*looks like*, and those are different questions: a Glasgow tenement, a Rhondda
+terrace and a Surrey semi can all come out "stone", "render" and "brick" and
+still be drawn on the same five national textures, which is most of why every
+British town used to look the same from a thousand feet.
+
+Each profile therefore carries a `texture` block — one small spec per class of
+building:
+
+```json
+"texture": {
+  "house":   { "bond": "ashlar", "win": "tenement", "bays": 2, "rows": 3,
+               "tile": [7, 10.5], "trim": "stone", "string": true },
+  "block":   { "bond": "ashlar", "win": "tenement", "bays": 3, "rows": 4,
+               "tile": [11, 14], "trim": "stone", "string": true, "eaves": true },
+  "grand":   { "bond": "ashlar", "win": "sash12", "bays": 3, "rows": 3, "...": "" },
+  "masonry": { "bond": "ashlar", "win": "lancet", "bays": 1, "rows": 1, "...": "" }
+}
+```
+
+| field | meaning |
+|---|---|
+| `bond` | the fabric and its coursing — `brick`, `stock`, `ashlar`, `rubble`, `flint`, `pebbledash`, `harl`, `render`, `timber` |
+| `win` | the shape of the openings — `sash12`, `sash6`, `sash2`, `casement`, `bay`, `tenement`, `strip`, `picture`, `lancet` |
+| `bays` / `rows` | openings across, storeys down, in one tile |
+| `tile` | `[metres across, metres down]` the texture repeats over — this is what sets the *scale* of the wall |
+| `trim` | `"stone"` for dressed surrounds |
+| `string`, `quoins`, `eaves`, `tilehang` | the regional giveaways |
+
+`wallTexture()` in `index.html` draws it, **white on white**: the wall-material
+weights above still tint the result. Pattern here, colour there. A profile with
+no `texture` block, or a class it does not describe, keeps the national
+texture, so nothing has to be described to work.
+
+One texture per class per *flight*, not per building. The profile is chosen
+before `initScene()` runs, so the whole scene is built on the region's own
+walls with no extra materials and no extra draw calls. The report says which
+ones were used:
+
+```
+ai       profile area-g (Glasgow) - dressed 8038 of 8038 footprints OSM left undescribed
+         walls   block ashlar/tenement, house ashlar/tenement, grand ashlar/sash12, masonry ashlar/lancet
+```
+
+The same caveat applies as to everything else here. What a language model can
+honestly claim about a region is the *character* of its walls — coursed stone
+or brick, big windows or small, two storeys or four — not any particular
+number. The `tile` figures are considered estimates and are the thing most
+worth correcting.
+
 ## What embed.js checks
 
-Every material, roof shape and building type in a profile is checked against
-what the renderer will actually accept, read out of `index.html` rather than
-copied into the checker. This is not theoretical: it immediately found that
+Every material, roof shape and building type in a profile — and every `bond`
+and `win` in a `texture` block — is checked against what the renderer will
+actually accept, read out of `index.html` rather than copied into the checker
+(`WALL_MAT`, `ROOF_MAT`, `WALL_BOND`, `WALL_WIN`). This is not theoretical: it immediately found that
 the Bookham profile had been asking for `asbestos` roofs since the day it was
 written. The sim has never known that word, so a quarter of its sheds had been
 falling back to plain grey. They are `eternit` now, which is what a fibre

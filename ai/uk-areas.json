@@ -3,7 +3,7 @@
  "kind": "areas",
  "name": "UK postcode areas",
  "produced_by": "Claude Opus 5",
- "produced_on": "2026-08-18",
+ "produced_on": "2026-08-19",
  "method": "Written from the model's training knowledge of British building stock by region. No live lookup, no aerial imagery, no OSM query, no site visit. Stored as archetypes plus an area-to-archetype map rather than 121 separate weight tables, because the differences between Bolton and Bradford are not differences a language model actually knows; the differences between Bolton and Bath are.",
  "confidence": {
   "archetypes": "medium — the broad character of British regional building stock is the kind of thing a language model does hold: terrace or semi, brick or stone or render, slate or tile.",
@@ -294,6 +294,57 @@
       0.1
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "stock",
+     "win": "sash12",
+     "bays": 2,
+     "rows": 3,
+     "tile": [
+      6.4,
+      10
+     ],
+     "string": true,
+     "eaves": true
+    },
+    "block": {
+     "bond": "stock",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 4,
+     "tile": [
+      11,
+      13
+     ],
+     "string": true
+    },
+    "grand": {
+     "bond": "ashlar",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      13,
+      11
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "string": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "ashlar",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      9
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "london-outer": {
@@ -557,6 +608,52 @@
       0.26
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "brick",
+     "win": "bay",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      8,
+      6.2
+     ]
+    },
+    "block": {
+     "bond": "brick",
+     "win": "casement",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      12,
+      9.6
+     ]
+    },
+    "grand": {
+     "bond": "brick",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 2,
+     "tile": [
+      14,
+      8.6
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "stock",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      9
+     ],
+     "trim": "stone"
+    }
    }
   },
   "home-counties": {
@@ -832,6 +929,54 @@
       0.25
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "brick",
+     "win": "casement",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      9,
+      6.4
+     ],
+     "tilehang": true
+    },
+    "block": {
+     "bond": "render",
+     "win": "casement",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      12,
+      9.6
+     ]
+    },
+    "grand": {
+     "bond": "brick",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 2,
+     "tile": [
+      15,
+      8.8
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      9
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "northern-industrial": {
@@ -1099,6 +1244,53 @@
       0.1
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "brick",
+     "win": "sash2",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      5.2,
+      6
+     ]
+    },
+    "block": {
+     "bond": "brick",
+     "win": "casement",
+     "bays": 4,
+     "rows": 4,
+     "tile": [
+      15,
+      12
+     ]
+    },
+    "grand": {
+     "bond": "ashlar",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      13,
+      11
+     ],
+     "trim": "stone",
+     "string": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      9.5
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "scottish-urban": {
@@ -1358,6 +1550,59 @@
       0.28
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "ashlar",
+     "win": "tenement",
+     "bays": 2,
+     "rows": 3,
+     "tile": [
+      7,
+      10.5
+     ],
+     "trim": "stone",
+     "string": true
+    },
+    "block": {
+     "bond": "ashlar",
+     "win": "tenement",
+     "bays": 3,
+     "rows": 4,
+     "tile": [
+      11,
+      14
+     ],
+     "trim": "stone",
+     "string": true,
+     "eaves": true
+    },
+    "grand": {
+     "bond": "ashlar",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      13,
+      11.5
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "string": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "ashlar",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      10
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "scottish-rural": {
@@ -1613,6 +1858,52 @@
       0.2
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "harl",
+     "win": "sash6",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      6,
+      6.2
+     ]
+    },
+    "block": {
+     "bond": "harl",
+     "win": "casement",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      11,
+      9.4
+     ]
+    },
+    "grand": {
+     "bond": "rubble",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      13,
+      11
+     ],
+     "trim": "stone",
+     "quoins": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      7.5,
+      9.5
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "welsh-valleys": {
@@ -1860,6 +2151,51 @@
       0.26
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "pebbledash",
+     "win": "sash2",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      5,
+      6
+     ]
+    },
+    "block": {
+     "bond": "render",
+     "win": "casement",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      11,
+      9.4
+     ]
+    },
+    "grand": {
+     "bond": "rubble",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 2,
+     "tile": [
+      13,
+      8.6
+     ],
+     "trim": "stone",
+     "quoins": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      10,
+      8.5
+     ],
+     "trim": "stone"
+    }
    }
   },
   "limestone-country": {
@@ -2119,6 +2455,58 @@
       0.14
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "ashlar",
+     "win": "sash6",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      7,
+      7
+     ],
+     "trim": "stone",
+     "quoins": true
+    },
+    "block": {
+     "bond": "ashlar",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      12,
+      11
+     ],
+     "trim": "stone",
+     "string": true
+    },
+    "grand": {
+     "bond": "ashlar",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      14,
+      11.5
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "string": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "ashlar",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      10
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "east-anglian": {
@@ -2386,6 +2774,54 @@
       0.12
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "flint",
+     "win": "casement",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      6.4,
+      6.2
+     ],
+     "quoins": true
+    },
+    "block": {
+     "bond": "render",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      11,
+      10
+     ]
+    },
+    "grand": {
+     "bond": "brick",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 2,
+     "tile": [
+      14,
+      8.8
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "flint",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      10
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "seaside-victorian": {
@@ -2653,6 +3089,58 @@
       0.3
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "render",
+     "win": "bay",
+     "bays": 2,
+     "rows": 3,
+     "tile": [
+      6.6,
+      9.6
+     ],
+     "trim": "stone",
+     "string": true,
+     "eaves": true
+    },
+    "block": {
+     "bond": "render",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 4,
+     "tile": [
+      11,
+      13
+     ],
+     "string": true,
+     "eaves": true
+    },
+    "grand": {
+     "bond": "render",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      13,
+      11
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "string": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      9.5
+     ],
+     "trim": "stone"
+    }
    }
   },
   "midlands-suburban": {
@@ -2912,6 +3400,53 @@
       0.3
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "brick",
+     "win": "casement",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      7.6,
+      6.2
+     ]
+    },
+    "block": {
+     "bond": "brick",
+     "win": "strip",
+     "bays": 2,
+     "rows": 4,
+     "tile": [
+      13,
+      12
+     ]
+    },
+    "grand": {
+     "bond": "brick",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 2,
+     "tile": [
+      14,
+      8.8
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      9.5
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "west-country": {
@@ -3171,6 +3706,52 @@
       0.28
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "render",
+     "win": "casement",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      6.4,
+      6
+     ]
+    },
+    "block": {
+     "bond": "render",
+     "win": "casement",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      11,
+      9.4
+     ]
+    },
+    "grand": {
+     "bond": "ashlar",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 2,
+     "tile": [
+      13,
+      8.6
+     ],
+     "trim": "stone",
+     "quoins": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      7.5,
+      9.5
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "northern-stone": {
@@ -3430,6 +4011,55 @@
       0.14
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "rubble",
+     "win": "casement",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      6.6,
+      6.4
+     ],
+     "quoins": true
+    },
+    "block": {
+     "bond": "rubble",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      11,
+      10
+     ],
+     "trim": "stone"
+    },
+    "grand": {
+     "bond": "ashlar",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      13,
+      11
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "string": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      10
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "new-town": {
@@ -3685,6 +4315,48 @@
       0.18
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "brick",
+     "win": "strip",
+     "bays": 1,
+     "rows": 2,
+     "tile": [
+      6.2,
+      6
+     ]
+    },
+    "block": {
+     "bond": "render",
+     "win": "strip",
+     "bays": 2,
+     "rows": 5,
+     "tile": [
+      14,
+      15
+     ]
+    },
+    "grand": {
+     "bond": "render",
+     "win": "picture",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      13,
+      8.4
+     ]
+    },
+    "masonry": {
+     "bond": "render",
+     "win": "lancet",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      10,
+      8.5
+     ]
+    }
    }
   },
   "northern-ireland": {
@@ -3932,6 +4604,53 @@
       0.24
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "pebbledash",
+     "win": "casement",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      7,
+      6.2
+     ]
+    },
+    "block": {
+     "bond": "brick",
+     "win": "casement",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      12,
+      9.6
+     ]
+    },
+    "grand": {
+     "bond": "ashlar",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 2,
+     "tile": [
+      13,
+      8.8
+     ],
+     "trim": "stone",
+     "quoins": true,
+     "eaves": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      8,
+      9.5
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   },
   "island": {
@@ -4179,6 +4898,53 @@
       0.26
      ]
     ]
+   },
+   "texture": {
+    "house": {
+     "bond": "rubble",
+     "win": "sash6",
+     "bays": 2,
+     "rows": 2,
+     "tile": [
+      6,
+      6.4
+     ],
+     "quoins": true
+    },
+    "block": {
+     "bond": "render",
+     "win": "sash6",
+     "bays": 3,
+     "rows": 3,
+     "tile": [
+      11,
+      10
+     ]
+    },
+    "grand": {
+     "bond": "ashlar",
+     "win": "sash12",
+     "bays": 3,
+     "rows": 2,
+     "tile": [
+      13,
+      8.8
+     ],
+     "trim": "stone",
+     "quoins": true
+    },
+    "masonry": {
+     "bond": "rubble",
+     "win": "lancet",
+     "bays": 1,
+     "rows": 1,
+     "tile": [
+      7.5,
+      9.5
+     ],
+     "trim": "stone",
+     "quoins": true
+    }
    }
   }
  },
