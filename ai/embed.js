@@ -67,6 +67,8 @@ function checkTexture(p) {
         throw new Error(where + ': ' + k + ' must be a whole number 1-8');
     if (sp.trim !== undefined && sp.trim !== 'stone')
       throw new Error(where + ': trim can only be "stone"');
+    if (sp.door !== undefined && sp.door !== true && sp.door !== 'wide')
+      throw new Error(where + ': door can only be true or "wide"');
   }
 }
 

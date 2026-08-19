@@ -309,6 +309,17 @@
     9.6
    ]
   },
+  "shed": {
+   "bond": "brick",
+   "win": "none",
+   "bays": 2,
+   "rows": 1,
+   "tile": [
+    5.5,
+    3.6
+   ],
+   "door": true
+  },
   "grand": {
    "bond": "brick",
    "win": "sash12",

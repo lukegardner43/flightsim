@@ -136,14 +136,25 @@ building:
 }
 ```
 
+All five classes the sim draws are described — `house`, `block`, `shed`,
+`grand` and `masonry`.
+
 | field | meaning |
 |---|---|
-| `bond` | the fabric and its coursing — `brick`, `stock`, `ashlar`, `rubble`, `flint`, `pebbledash`, `harl`, `render`, `timber` |
-| `win` | the shape of the openings — `sash12`, `sash6`, `sash2`, `casement`, `bay`, `tenement`, `strip`, `picture`, `lancet` |
+| `bond` | the fabric and its coursing — `brick`, `stock`, `ashlar`, `rubble`, `flint`, `pebbledash`, `harl`, `render`, `timber`, `steel` |
+| `win` | the shape of the openings — `sash12`, `sash6`, `sash2`, `casement`, `bay`, `tenement`, `strip`, `picture`, `lancet`, `none` |
 | `bays` / `rows` | openings across, storeys down, in one tile |
 | `tile` | `[metres across, metres down]` the texture repeats over — this is what sets the *scale* of the wall |
 | `trim` | `"stone"` for dressed surrounds |
 | `string`, `quoins`, `eaves`, `tilehang` | the regional giveaways |
+| `clerestory`, `door` (`true` or `"wide"`), `plinth` | what a working building has instead of windows |
+
+Sheds are the awkward class: metal is the commonest wall material for it in
+every region (48–68%), so steel is usually the right bond and a national
+texture was not badly wrong. What does differ is **scale and purpose** — a
+Milton Keynes distribution shed repeats over 12 m and has a clerestory strip
+and roller doors; a Cotswold field barn is coursed rubble on a stone plinth
+with one big opening; a Surrey garage court is brick with a normal door.
 
 `wallTexture()` in `index.html` draws it, **white on white**: the wall-material
 weights above still tint the result. Pattern here, colour there. A profile with

@@ -296,6 +296,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      7,
+      5
+     ],
+     "clerestory": true,
+     "door": "wide"
+    },
     "house": {
      "bond": "stock",
      "win": "sash12",
@@ -610,6 +622,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      6.5,
+      4.4
+     ],
+     "clerestory": true,
+     "door": true
+    },
     "house": {
      "bond": "brick",
      "win": "bay",
@@ -931,6 +955,17 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "brick",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      5.5,
+      3.6
+     ],
+     "door": true
+    },
     "house": {
      "bond": "brick",
      "win": "casement",
@@ -1246,6 +1281,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      8,
+      5.4
+     ],
+     "clerestory": true,
+     "door": "wide"
+    },
     "house": {
      "bond": "brick",
      "win": "sash2",
@@ -1552,6 +1599,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      7.5,
+      5.2
+     ],
+     "clerestory": true,
+     "door": "wide"
+    },
     "house": {
      "bond": "ashlar",
      "win": "tenement",
@@ -1860,6 +1919,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      9,
+      5.6
+     ],
+     "door": "wide",
+     "plinth": true
+    },
     "house": {
      "bond": "harl",
      "win": "sash6",
@@ -2153,6 +2224,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      7,
+      4.8
+     ],
+     "clerestory": true,
+     "door": true
+    },
     "house": {
      "bond": "pebbledash",
      "win": "sash2",
@@ -2457,6 +2540,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "rubble",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      8,
+      5
+     ],
+     "door": "wide",
+     "plinth": true
+    },
     "house": {
      "bond": "ashlar",
      "win": "sash6",
@@ -2776,6 +2871,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      10,
+      6
+     ],
+     "door": "wide",
+     "plinth": true
+    },
     "house": {
      "bond": "flint",
      "win": "casement",
@@ -3091,6 +3198,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      6.5,
+      4.4
+     ],
+     "clerestory": true,
+     "door": true
+    },
     "house": {
      "bond": "render",
      "win": "bay",
@@ -3402,6 +3521,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      9,
+      6
+     ],
+     "clerestory": true,
+     "door": "wide"
+    },
     "house": {
      "bond": "brick",
      "win": "casement",
@@ -3708,6 +3839,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "rubble",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      8,
+      5
+     ],
+     "door": "wide",
+     "plinth": true
+    },
     "house": {
      "bond": "render",
      "win": "casement",
@@ -4013,6 +4156,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "rubble",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      7.5,
+      4.8
+     ],
+     "door": "wide",
+     "plinth": true
+    },
     "house": {
      "bond": "rubble",
      "win": "casement",
@@ -4317,6 +4472,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      12,
+      7.5
+     ],
+     "clerestory": true,
+     "door": "wide"
+    },
     "house": {
      "bond": "brick",
      "win": "strip",
@@ -4606,6 +4773,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "steel",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      8.5,
+      5.4
+     ],
+     "door": "wide",
+     "plinth": true
+    },
     "house": {
      "bond": "pebbledash",
      "win": "casement",
@@ -4900,6 +5079,18 @@
     ]
    },
    "texture": {
+    "shed": {
+     "bond": "rubble",
+     "win": "none",
+     "bays": 2,
+     "rows": 1,
+     "tile": [
+      7,
+      4.6
+     ],
+     "door": "wide",
+     "plinth": true
+    },
     "house": {
      "bond": "rubble",
      "win": "sash6",
