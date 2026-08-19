@@ -304,6 +304,11 @@ function reportText(){
       (AI.walls.length ? "\n         walls   " + AI.walls.join(", ") : "") +
       (AI.roofs.length ? "\n         roofs   " + AI.roofs.join(", ") : "")
     : (AI.p ? "profile " + AI.p.id + " available, not used" : "no profile for this place")));
+  L.push("lidar    " + (LIDAR.n
+    ? LIDAR.n.toLocaleString() + " footprints carry a measured height; " +
+      LIDAR.hit.toLocaleString() + " buildings took one" +
+      (LIDAR.hit ? " (measured, not estimated)" : "")
+    : "no pack in range carries lidar heights"));
   L.push("function " + funcLine());
   L.push("bridges  " + (BRIDGES.drawn + BRIDGES.deckOnly + BRIDGES.model + BRIDGES.named === 0
     ? "none crossed"
@@ -1842,6 +1847,102 @@ var Q, treeBudget = 0, statBuildings = 0, statRoadM = 0;
 var statModelled = 0, statMeasured = 0, statEstimated = 0;   /* the three tiers */
 var statSkipped = 0;                                         /* elements OSM gave us that we couldn't use */
 var statStreamed = 0, statTrees = 0, statLandmarks = 0, drawnIds = {};
+/* ------------------------------------------------------------------
+   LIDAR HEIGHTS
+
+   A pack can carry a measured height, roof height, ridge bearing and roof
+   shape for every footprint in it, read off the Environment Agency's 1 m
+   surface by packs/make-heights.js. One packed integer each.
+
+   Two things use it. A footprint the pack draws takes its own reading
+   directly. An OSM building takes the reading of whichever surveyed
+   footprint it stands on — matched by the OSM centroid falling inside the
+   OS ring, which is the direction that works for terraces: Ordnance Survey
+   draws a row as one polygon, so every house in it lands inside and every
+   house in it gets the height, where the other way round would measure one
+   and leave five guessed.
+
+   It fills where OSM said nothing at all, the same rule everything else
+   here follows. A building carrying height= or building:levels= keeps them.
+   ------------------------------------------------------------------ */
+var LIDAR = {ready:false, packs:-1, n:0, hit:0, cell:64, map:{}};
+function lidarUnpack(v){
+  return {eaves:(v & 1023)/10, roofH:((v >> 10) & 255)/10,
+          bearing:(v >> 18) & 255, shape:(v >> 26) & 7};
+}
+var LIDAR_SHAPE = [null, "flat", "gabled", "hipped", "pyramidal"];
+function buildLidarIndex(){
+  LIDAR.ready = true; LIDAR.n = 0; LIDAR.map = {}; LIDAR.hit = 0;
+  for(var f=0;f<PACK.files.length;f++){
+    var d = PACK.files[f].data;
+    if(!d || !d.heights || !d.heights.length) continue;
+    var q = d.q || 1e6;
+    for(var i=0;i<d.buildings.length;i++){
+      var v = d.heights[i];
+      if(!v) continue;
+      var r = d.buildings[i], lat = r[0]/q, lon = r[1]/q;
+      var la = [lat], lo = [lon];
+      for(var j=2;j<r.length;j+=2){ lat += r[j]/q; lon += r[j+1]/q; la.push(lat); lo.push(lon); }
+      var ring = [], x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, k;
+      for(k=0;k<la.length;k++){
+        var w = toWorld(lo[k], la[k]);
+        if(!isFinite(w.x) || !isFinite(w.z)){ ring = []; break; }
+        ring.push(w.x, w.z);
+        if(w.x < x0) x0 = w.x; if(w.x > x1) x1 = w.x;
+        if(w.z < z0) z0 = w.z; if(w.z > z1) z1 = w.z;
+      }
+      if(ring.length < 6) continue;
+      if(Math.abs(x0) > LIMIT + 500 || Math.abs(z0) > LIMIT + 500) continue;
+      var rec = {r:ring, b:[x0, z0, x1, z1], v:v};
+      LIDAR.n++;
+      var i0 = Math.floor(x0/LIDAR.cell), i1 = Math.floor(x1/LIDAR.cell);
+      var j0 = Math.floor(z0/LIDAR.cell), j1 = Math.floor(z1/LIDAR.cell);
+      for(var a=i0;a<=i1;a++) for(var b2=j0;b2<=j1;b2++){
+        var key = a + "," + b2;
+        (LIDAR.map[key] = LIDAR.map[key] || []).push(rec);
+      }
+    }
+  }
+  return LIDAR.n;
+}
+function ringHas(ring, x, z){                    /* even-odd, flat [x,z,...] */
+  var inside = false, n = ring.length/2;
+  for(var i=0, j=n-1; i<n; j=i++){
+    var xi = ring[i*2], zi = ring[i*2+1], xj = ring[j*2], zj = ring[j*2+1];
+    if((zi > z) !== (zj > z) && x < (xj-xi)*(z-zi)/(zj-zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function lidarAt(x, z){
+  if(!LIDAR.n) return 0;
+  var list = LIDAR.map[Math.floor(x/LIDAR.cell) + "," + Math.floor(z/LIDAR.cell)];
+  if(!list) return 0;
+  for(var i=0;i<list.length;i++){
+    var r = list[i];
+    if(x < r.b[0] || x > r.b[2] || z < r.b[1] || z > r.b[3]) continue;
+    if(ringHas(r.r, x, z)) return r.v;
+  }
+  return 0;
+}
+/* Written onto the tags, so everything downstream — the cascade, the roof
+   planner, the report's tiers — treats it as the measurement it is without
+   knowing where it came from. */
+function lidarDress(t, x, z){
+  if(t.height || t["building:height"] || t["building:levels"] || t["building:part"]) return false;
+  var v = lidarAt(x, z);
+  if(!v) return false;
+  var m = lidarUnpack(v);
+  if(!(m.eaves > 1.2)) return false;
+  t.height = String(Math.round((m.eaves + m.roofH)*10)/10);
+  if(m.roofH > 0.3) t["roof:height"] = String(Math.round(m.roofH*10)/10);
+  var sh = LIDAR_SHAPE[m.shape];
+  if(sh && !t["roof:shape"]) t["roof:shape"] = sh;
+  /* roof:direction is the bearing the SLOPE faces; the ridge runs across it */
+  if(m.bearing <= 180 && !t["roof:direction"]) t["roof:direction"] = String((m.bearing + 90) % 360);
+  t["tf:lidar"] = "1";
+  LIDAR.hit++;
+  return true;
+}
 /* Bounding boxes of every OSM building drawn, in a coarse grid, so a pack
    footprint can ask cheaply whether OSM already has this building. */
 var FOOT = {cell:48, map:{}};
@@ -3435,7 +3536,15 @@ function roofColour(t, seed, shape, cls, kind){
   return c.offsetHSL(0, (hash(seed,41)-0.5)*0.07, (hash(seed,51)-0.5)*0.07);
 }
 
+/* Packs arrive through script tags, so the index has to be built when they
+   have actually landed rather than at a fixed moment. Cheap to check. */
+function lidarSync(){
+  var n = 0;
+  for(var f=0;f<PACK.files.length;f++) if(PACK.files[f].data) n++;
+  if(n !== LIDAR.packs){ LIDAR.packs = n; buildLidarIndex(); }
+}
 function addBuildings(list, parts, group, cell){
+  lidarSync();
   var wallsH = new Batch(true), wallsB = new Batch(true), wallsS = new Batch(true),
       wallsG = new Batch(true), wallsM = new Batch(true);
   /* One batch per roof fabric, the same way walls split by building class.
@@ -3512,6 +3621,10 @@ function addBuildings(list, parts, group, cell){
        call it and how tall to guess it, so it cannot wait until afterwards */
     var box = b.pts.length < 60 ? orientedBox(b.pts, null) : null;
     var depth = box ? 2*box.hv : 0;
+    /* Lidar first: a measurement outranks an inference, and dressing a
+       building the surface has already measured would be inventing storeys
+       for a building whose height we know. */
+    if(!b.part) lidarDress(b.tags, b.c.x, b.c.z);
     if(AI.on && !b.part) aiDress(b.tags, seed, b.area, depth);
     var v = volumeOf(b.tags, b.area, b.dist, seed, box);
     if(b.part) v.tier = "modelled";
@@ -5032,6 +5145,7 @@ $("go").onclick = function(){
   AI.on = !!(AI.p && $("aiuse").checked);
   AI.applied = AI.dressed = 0; AI.walls = []; AI.roofs = []; FUNC_SEEN = {};
   BRIDGES = {drawn:0, deckOnly:0, model:0, named:0}; bridgeNamed = {};
+  LIDAR.hit = 0; LIDAR.packs = -1;
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (gridRef(LAT0, LON0) || "outside the OS grid") +
                          (AI.on ? " · AI interpretation: " + AI.p.place : "") +
@@ -5849,6 +5963,7 @@ window.__sim = {
                             merged:packMerged}; },
   func: function(){ return FUNC_SEEN; },
   bridges: function(){ return BRIDGES; },
+  lidar: function(){ return {footprints:LIDAR.n, used:LIDAR.hit}; },
   ai: function(){ return {on:AI.on, id:AI.p ? AI.p.id : null,
                           applied:AI.applied, dressed:AI.dressed,
                           walls:AI.walls, roofs:AI.roofs,

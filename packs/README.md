@@ -127,3 +127,73 @@ pack file — keep it if you share them:
 
 > Contains OS data © Crown copyright and database right. Open Government
 > Licence v3.
+
+## Measured heights, from lidar
+
+A footprint pack says where the buildings are. It can also say how tall they
+are, and what shape their roofs are, because England publishes a 1 m lidar
+surface under the same Open Government Licence — tiled on the same Ordnance
+Survey grid these packs already use.
+
+```
+Actions -> "Measure building heights from lidar" -> type a tile, e.g. TQ15
+```
+
+That adds one packed integer per footprint: eaves height in decimetres, roof
+height, ridge bearing, roof shape. About ten bytes a building.
+
+**Why it matters more than it sounds.** Without it the sim guesses every
+height from the footprint, and the AI profile guesses better but is still
+guessing — the report counts those buildings `estimated`, never `measured`.
+With it they are measured, to about ±0.5 m, and the roof shape is fitted
+rather than inferred from the proportions of the plan.
+
+**What takes a reading.** A footprint the pack draws takes its own. An OSM
+building takes the reading of whichever surveyed footprint it stands on,
+matched by the OSM centroid falling inside the OS ring. That direction is
+deliberate: Ordnance Survey draws a terrace as one polygon, so every house in
+the row lands inside it and every house gets the height. The other way round
+would measure one and leave five guessed.
+
+It only fills where OSM said nothing at all. A building carrying `height=` or
+`building:levels=` keeps them, exactly as with everything else here.
+
+### How the fit works
+
+`packs/roof-fit.js` has no I/O and no dependencies, so it can be tested
+against a surface whose answers are known — and that test earned its keep:
+
+- Over a pitched roof the heights are spread almost evenly between eaves and
+  ridge, because a roof is a ramp and every band of it has the same area. A
+  quarter of the way up the distribution is most of a metre of wall that is
+  not there.
+- An OS footprint is the wall **face**, so a metre grid over it catches a ring
+  of garden — on a small house, forty per cent of the samples. Percentiles
+  then measure the lawn: a semi came out with its eaves at zero.
+- A chimney is two or three samples. Read as the ridge it made an eight metre
+  house eleven metres tall, and left in the profile it made a gabled house
+  look hipped.
+- A pyramid is told from a hip by the plan being square, not by how much the
+  ends drop. The other way round called every hipped bungalow a pyramid.
+
+### Coverage and the awkward bits
+
+England is about 99% covered. **Scotland and Wales publish equivalent
+surfaces under the same licence but through different portals** — the
+Scottish Remote Sensing Portal (phases 1–6, plus a national programme running
+to 2027) and Natural Resources Wales (~70%) — so those need their own
+download step. The measuring half is the same.
+
+The DEFRA download service is a session-driven web app rather than a
+documented API, so the workflow does not hard-code its shape. It tries the
+WCS endpoint and, if that does not answer, tells you to download the 5 km DSM
+and DTM tiles by hand and re-run with `dsm_url` and `dtm_url`. That is
+deliberate: a guessed URL that 404s in CI is worse than a clear instruction.
+
+**A lidar surface cannot do bridges.** It is one height per square metre with
+no concept of "under" — a bridge comes out as solid ground where the gap
+should be. Bridge decks stay procedural, and bridge superstructure stays
+hand-modelled.
+
+Data: Environment Agency LIDAR Composite DSM/DTM 1 m. Contains public sector
+information licensed under the Open Government Licence v3.

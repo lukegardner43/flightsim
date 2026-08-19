@@ -1,0 +1,164 @@
+name: Measure building heights from lidar
+
+# Turns the sim's guessed building heights into measurements, for one
+# Ordnance Survey 10 km tile at a time.
+#
+#   Actions tab  ->  "Measure building heights from lidar"
+#   ->  type a tile, e.g. TQ15  ->  Run workflow
+#
+# The tile must already have a footprint pack ("Build building packs" makes
+# those). This job adds a measured eaves height, roof height, ridge bearing
+# and roof shape to every footprint in it, read off the Environment Agency's
+# 1 m lidar surface.
+#
+# England only. Scotland and Wales publish equivalent surfaces under the same
+# licence but through different portals; see packs/README.md.
+#
+# Data: Environment Agency LIDAR Composite DSM/DTM 1 m, Open Government
+# Licence v3. Contains public sector information.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tile:
+        description: 'OS 10 km tile, e.g. TQ15'
+        required: true
+      pack:
+        description: 'Pack id to annotate, if not the tile itself (e.g. kt233hp)'
+        required: false
+        default: ''
+      dsm_url:
+        description: 'Direct URL to a DSM GeoTIFF or zip covering the tile (leave blank to use the DEFRA WCS)'
+        required: false
+        default: ''
+      dtm_url:
+        description: 'Direct URL to the matching DTM'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install GDAL
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gdal-bin
+
+      # The tile's British National Grid extent, straight from its name, so
+      # the raster and the footprints cannot disagree about where they are.
+      - name: Work out the extent
+        id: ext
+        env:
+          TILE: ${{ inputs.tile }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const {tileOrigin} = require("./packs/grid-square.js");
+            const t = String(process.env.TILE).trim().toUpperCase();
+            const o = tileOrigin(t);
+            if (!o) { console.error("not a 10 km tile: " + t); process.exit(1); }
+            console.log("tile=" + t);
+            console.log("e0=" + o.E); console.log("n0=" + o.N);
+            console.log("e1=" + (o.E + 10000)); console.log("n1=" + (o.N + 10000));
+          ' >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      # Two ways in. A direct URL is the reliable one: the DEFRA download
+      # service is a session-driven web app rather than a documented API, so
+      # its shape is not something to hard-code and hope. Its WCS endpoint is
+      # tried first and the job says plainly if it does not answer.
+      - name: Fetch the surface
+        env:
+          DSM_URL: ${{ inputs.dsm_url }}
+          DTM_URL: ${{ inputs.dtm_url }}
+          E0: ${{ steps.ext.outputs.e0 }}
+          N0: ${{ steps.ext.outputs.n0 }}
+          E1: ${{ steps.ext.outputs.e1 }}
+          N1: ${{ steps.ext.outputs.n1 }}
+        run: |
+          set -uo pipefail
+          get() {   # $1 url  $2 out
+            curl -fsSL --retry 3 --retry-delay 5 -o "$2" "$1" || return 1
+            # a zip of tiles is what the portal hands you; a tif is what a WCS does
+            if file "$2" | grep -qi zip; then
+              mkdir -p "$2.d" && unzip -qo "$2" -d "$2.d" && rm "$2"
+              find "$2.d" -iname '*.tif' -o -iname '*.asc' | head -1 > /dev/null || return 1
+            fi
+          }
+          WCS="https://environment.data.gov.uk/spatialdata/lidar-composite-digital-surface-model-dsm-1m/wcs"
+          ok=1
+          if [ -n "$DSM_URL" ] && [ -n "$DTM_URL" ]; then
+            get "$DSM_URL" dsm.in && get "$DTM_URL" dtm.in || ok=0
+          else
+            echo "::notice::No direct URLs given; trying the DEFRA WCS."
+            curl -fsS --max-time 60 -o dsm.in \
+              "$WCS?service=WCS&version=2.0.1&request=GetCoverage&format=image/tiff&subset=x($E0,$E1)&subset=y($N0,$N1)" || ok=0
+          fi
+          if [ "$ok" != "1" ]; then
+            echo "::error::Could not fetch the lidar surface automatically."
+            echo "::error::Download the 5 km DSM and DTM tiles for this square from"
+            echo "::error::https://environment.data.gov.uk/survey and re-run this workflow"
+            echo "::error::with dsm_url and dtm_url pointing at them."
+            exit 1
+          fi
+          ls -la
+
+      # One warp each, to exactly the tile, exactly 1 m, as raw float32. The
+      # geometry is then implied by the tile id and make-heights.js does not
+      # have to parse a header to find out where it is.
+      - name: Normalise to the tile
+        env:
+          E0: ${{ steps.ext.outputs.e0 }}
+          N0: ${{ steps.ext.outputs.n0 }}
+          E1: ${{ steps.ext.outputs.e1 }}
+          N1: ${{ steps.ext.outputs.n1 }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dsm_src=(dsm.in dsm.in.d/**/*.tif dsm.in.d/*.tif)
+          dtm_src=(dtm.in dtm.in.d/**/*.tif dtm.in.d/*.tif)
+          gdalbuildvrt dsm.vrt "${dsm_src[@]}"
+          gdalbuildvrt dtm.vrt "${dtm_src[@]}"
+          for s in dsm dtm; do
+            gdalwarp -q -overwrite -t_srs EPSG:27700 \
+              -te "$E0" "$N0" "$E1" "$N1" -tr 1 1 -r bilinear \
+              -ot Float32 -dstnodata -9999 -of ENVI "$s.vrt" "$s.img"
+            ls -la "$s.img"
+          done
+
+      - name: Measure
+        env:
+          TILE: ${{ inputs.tile }}
+          PACK: ${{ inputs.pack }}
+        run: |
+          set -euo pipefail
+          args=(--tile "$TILE" --dsm dsm.img --dtm dtm.img)
+          [ -n "$PACK" ] && args+=(--pack "$PACK")
+          node packs/make-heights.js "${args[@]}"
+
+      - name: Commit
+        env:
+          TILE: ${{ inputs.tile }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packs/
+          if git diff --cached --quiet; then echo "::warning::nothing changed"; exit 0; fi
+          git commit -m "Measured building heights for $TILE from Environment Agency lidar" \
+                     -m "Contains public sector information licensed under the Open Government Licence v3. Built by .github/workflows/build-heights.yml."
+          git push
