@@ -128,6 +128,27 @@ pack file — keep it if you share them:
 > Contains OS data © Crown copyright and database right. Open Government
 > Licence v3.
 
+## Measured heights, from lidar — PARKED
+
+**Status: the measuring works, the downloading does not. Nothing here is
+wired into a flight, because no pack carries heights yet, so the sim is
+exactly as it was without it.**
+
+What is done and tested: `roof-fit.js` (12 synthetic roofs recovered,
+including ground bleed and a chimney), `make-heights.js` (a synthetic tile
+round-tripped end to end, 6 of 6 buildings recovered with the right shapes),
+and the sim side (a synthetic pack moved 644 buildings from `estimated` to
+`measured`).
+
+What is not done: getting the actual surface out of the Environment Agency.
+Four CI runs, three distinct causes found and fixed, still failing. The
+notes below are the map of that minefield for whoever picks this up. If it is
+not going to be finished, the honest options are to delete
+`make-heights.js`, `roof-fit.js`, `wcs-service.js`, `build-heights.yml` and
+the `lidarDress` path in `index.html`, or to leave them inert as they are.
+
+---
+
 ## Measured heights, from lidar
 
 A footprint pack says where the buildings are. It can also say how tall they
