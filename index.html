@@ -1265,9 +1265,17 @@ var POWER_TYPE = {
 var CHAPEL_DEN = /^(methodist|baptist|congregational|presbyterian|united_reformed|quaker|unitarian|evangelical|pentecostal|salvation_army)$/;
 function classify(t){
   if(t.building && t.building !== "yes") return null;      /* already specific */
-  var c = HIST_TYPE[t.historic] || MM_TYPE[t.man_made] || WORKS_TYPE[t.man_made] ||
-          AMENITY_TYPE[t.amenity] || LEISURE_TYPE[t.leisure] ||
-          TOURISM_TYPE[t.tourism] || POWER_TYPE[t.power];
+  /* historic= and man_made= mark the thing itself, so they may create a
+     building where OSM gave none — that is how a windmill or a castle ruin
+     gets drawn at all. A FUNCTION tag may not: amenity=school is usually on
+     the school grounds, leisure=stadium on the pitch, amenity=parking on the
+     tarmac. Upgrading those to buildings would extrude the whole site as a
+     ten metre slab. They only ever refine an existing building=yes. */
+  var c = HIST_TYPE[t.historic] || MM_TYPE[t.man_made];
+  if(c) return c;
+  if(!t.building) return null;
+  c = WORKS_TYPE[t.man_made] || AMENITY_TYPE[t.amenity] || LEISURE_TYPE[t.leisure] ||
+      TOURISM_TYPE[t.tourism] || POWER_TYPE[t.power];
   if(!c && t.shop) c = SHOP_TYPE[t.shop] || "shop";        /* any other shop is a unit */
   if(!c && t.office) c = "office";
   if(!c && t.healthcare) c = t.healthcare === "hospital" ? "hospital" : "doctors";
@@ -1575,6 +1583,9 @@ Batch.prototype.mesh = function(mat){
   return m;
 };
 
+/* leisure=pitch says there is a game played here; sport= says which, and the
+   surface of one is nothing like another from the air. */
+var SPORT_COL;
 var COL = {
   wallLo:new THREE.Color(0xc0b3a2), wallHi:new THREE.Color(0x8e99a6),
   brick:new THREE.Color(0xa4705c),
@@ -1583,8 +1594,18 @@ var COL = {
   ballast:new THREE.Color(0x574f47), rail:new THREE.Color(0x9aa0a6),
   water:new THREE.Color(0x2c5a76), park:new THREE.Color(0x5b7a44),
   grass:new THREE.Color(0x6d8b52), wood:new THREE.Color(0x40603a),
-  pitch:new THREE.Color(0x54804a),
+  pitch:new THREE.Color(0x54804a), cricket:new THREE.Color(0x6d9152),
+  tarmac:new THREE.Color(0x44464b), ballastGrey:new THREE.Color(0x76736c),
   trunk:new THREE.Color(0x453626), leaf:new THREE.Color(0x3d5f32)
+};
+SPORT_COL = {
+  cricket:COL.cricket, cricket_nets:COL.cricket,
+  tennis:new THREE.Color(0x2f6f6b), basketball:new THREE.Color(0x555b62),
+  netball:new THREE.Color(0x555b62), multi:new THREE.Color(0x4c5560),
+  bowls:new THREE.Color(0x74a05c), croquet:new THREE.Color(0x74a05c),
+  athletics:new THREE.Color(0x93463a), running:new THREE.Color(0x93463a),
+  skateboard:new THREE.Color(0x60636a), equestrian:new THREE.Color(0x8a7452),
+  beachvolleyball:new THREE.Color(0xc8b98d), shooting:new THREE.Color(0x6d8b52)
 };
 /* Three kinds of thing get built, and they are not made of the same stuff.
    Rendering a warehouse with an office curtain wall and a parapet turns it
@@ -1912,7 +1933,11 @@ function queryFull(bb){
     'way["waterway"~"^(river|canal|stream)$"]('+b+');' +
     'way["landuse"~"^(grass|forest|meadow|village_green|recreation_ground|cemetery|allotments)$"]('+b+');' +
     'way["natural"~"^(wood|scrub|heath)$"]('+b+');' +
-    'way["leisure"~"^(park|garden|pitch|golf_course|playground)$"]('+b+');' +
+    'way["leisure"~"^(park|garden|pitch|golf_course|playground|track)$"]('+b+');' +
+    'way["amenity"~"^(parking|grave_yard)$"]('+b+');' +
+    'way["power"="substation"]('+b+');' +
+    'way["power"~"^(line|minor_line)$"]('+b+');' +
+    'node["power"="generator"]('+b+');way["power"="generator"]('+b+');' +
     (DENSE ? "" : 'node["natural"="tree"]('+b+');') +
     ");out geom;";
 }
@@ -1932,6 +1957,9 @@ function queryMid(bb){
     'way["landuse"~"^(grass|forest|meadow|village_green|recreation_ground|cemetery)$"]('+b+');' +
     'way["natural"~"^(wood|scrub)$"]('+b+');' +
     'way["leisure"~"^(park|garden|pitch|golf_course)$"]('+b+');' +
+    'way["amenity"="parking"]('+b+');' +
+    'way["power"~"^(line|minor_line|substation)$"]('+b+');' +
+    'node["power"="generator"]('+b+');way["power"="generator"]('+b+');' +
     ");out geom;";
 }
 /* Outer ring. "Notable" means half of central London, so when it is dense the
@@ -1949,6 +1977,7 @@ function queryNotable(bb){
       'way["natural"="water"]('+b+');way["waterway"="riverbank"]('+b+');' +
       'way["waterway"="river"]('+b+');' +
       'way["leisure"~"^(park|golf_course)$"]('+b+');' +
+      'way["power"="line"]('+b+');node["power"="generator"]('+b+');' +
       ");out geom;";
   }
   return "[out:json][timeout:"+TMO+"];(" +
@@ -1963,6 +1992,10 @@ function queryNotable(bb){
     'way["natural"="wood"]('+b+');' +
     'way["landuse"~"^(forest|farmland|meadow)$"]('+b+');' +
     'way["leisure"~"^(park|golf_course|nature_reserve)$"]('+b+');' +
+    /* A line of pylons and a wind farm are visible from further away than
+       most of what is in this ring, and are most of what there is to see
+       over open country. */
+    'way["power"="line"]('+b+');node["power"="generator"]('+b+');' +
     ");out geom;";
 }
 
@@ -3159,10 +3192,17 @@ function inSkip(x, z, cell){
 }
 function buildCell(data, cell){
   var els = data.elements || [];
-  var bl = [], pt = [], rd = [], ar = [], tr = [], wl = [], wa = [], ra = [], i;
+  var bl = [], pt = [], rd = [], ar = [], tr = [], wl = [], wa = [], ra = [],
+      pw = [], gn = [], i;
   for(i=0;i<els.length;i++){
     var e = els[i], t = e.tags || {};
-    if(e.type === "node"){ if(t.natural === "tree") tr.push(e); continue; }
+    if(e.type === "node"){
+      if(t.natural === "tree") tr.push(e);
+      else if(t.power === "generator") gn.push(e);
+      continue;
+    }
+    if(t.power === "line" || t.power === "minor_line"){ pw.push(e); continue; }
+    if(t.power === "generator"){ gn.push(e); continue; }
     /* Give a landmark the building tag OSM never gave it, before anything
        downstream asks what shape or height it should be. */
     var cls = classify(t);
@@ -3195,7 +3235,8 @@ function buildCell(data, cell){
     else if(t.natural === "wood" || t.natural === "scrub" || t.landuse === "forest"){
       wl.push(e); ar.push(e);                   /* woodland is a green area AND a canopy */
     }
-    else if(t.natural === "water" || t.waterway === "riverbank" || t.landuse || t.leisure){
+    else if(t.natural === "water" || t.waterway === "riverbank" || t.landuse || t.leisure ||
+            t.amenity === "parking" || t.amenity === "grave_yard" || t.power === "substation"){
       ar.push(e);
       if(t.leisure === "park" || t.landuse === "cemetery" || t.leisure === "garden") wl.push(e);
     }
@@ -3206,6 +3247,7 @@ function buildCell(data, cell){
   addRoads(rd, g, cell);
   addRails(ra, g, cell);
   addBuildings(bl, pt, g, cell);
+  addPower(pw, gn, g, cell);
   if(Q.trees > 0) addTrees(tr, wl, g, cell);
   world.add(g);
   cell.group = g;
@@ -3582,7 +3624,16 @@ function oneArea(e, b, v, cell){
     }
     var col, y, veg = true;
     if(t.natural === "water" || t.waterway === "riverbank"){ col = COL.water; y = 0.5; veg = false; }
-    else if(t.leisure === "pitch" || t.leisure === "golf_course"){ col = COL.pitch; y = 0.6; }
+    else if(t.amenity === "parking"){ col = COL.tarmac; y = 0.62; veg = false; }
+    else if(t.power === "substation"){ col = COL.ballastGrey; y = 0.62; veg = false; }
+    else if(t.leisure === "pitch" || t.leisure === "track" || t.leisure === "golf_course"){
+      /* Not every pitch is a football pitch. A tennis court is painted, a
+         bowling green is mown to within an inch of its life, a running track
+         is red, and all of them are obvious from the air. */
+      col = SPORT_COL[String(t.sport || "").split(";")[0]] || COL.pitch;
+      y = 0.6;
+      veg = col === COL.pitch || col === COL.cricket;
+    }
     else if(t.natural === "wood" || t.landuse === "forest"){ col = COL.wood; y = 0.55; }
     else if(t.leisure === "park" || t.leisure === "garden" || t.leisure === "nature_reserve"){
       col = COL.park; y = 0.55;
@@ -3838,6 +3889,151 @@ function addTrees(nodes, woods, group, cell){
 /* Rivers and canals arrive as lines, not areas — without this the Thames is
    simply missing. Width comes from the tag when it is there. */
 var WATER_W = {river:26, canal:12, stream:4, drain:3};
+/* ------------------------------------------------------------------
+   POWER
+
+   A line of pylons walking across a valley, and a wind farm on the skyline,
+   are two of the most recognisable things about flying over Britain, and
+   neither existed here — nothing without a building tag was ever fetched.
+
+   OSM maps a power line as a way whose every vertex is a tower, so one
+   request gives both the route and the positions of the pylons on it.
+   ------------------------------------------------------------------ */
+var matSteel, matWire;
+/* A box from a to c with a square section. Everything a pylon is made of is
+   one of these, so a lattice tower is eight of them rather than a mesh. */
+var stA = new THREE.Vector3(), stB = new THREE.Vector3(), stU = new THREE.Vector3(),
+    stR = new THREE.Vector3(), stV = new THREE.Vector3();
+function strut(b, ax, ay, az, cx, cy, cz, w, col, w2){
+  stA.set(cx-ax, cy-ay, cz-az);
+  var L = stA.length(); if(L < 0.05) return;
+  stA.divideScalar(L);
+  stU.set(0, 1, 0);
+  if(Math.abs(stA.y) > 0.94) stU.set(1, 0, 0);
+  stR.crossVectors(stA, stU).normalize();
+  stV.crossVectors(stR, stA).normalize();
+  if(w2 === undefined) w2 = w;
+  var q = [], i;
+  for(i=0;i<4;i++){
+    var sx = (i === 0 || i === 3) ? 1 : -1, sy = (i < 2) ? 1 : -1;
+    q.push({x: ax + stR.x*sx*w/2 + stV.x*sy*w/2,
+            y: ay + stR.y*sx*w/2 + stV.y*sy*w/2,
+            z: az + stR.z*sx*w/2 + stV.z*sy*w/2});
+    q.push({x: cx + stR.x*sx*w2/2 + stV.x*sy*w2/2,
+            y: cy + stR.y*sx*w2/2 + stV.y*sy*w2/2,
+            z: cz + stR.z*sx*w2/2 + stV.z*sy*w2/2});
+  }
+  for(i=0;i<4;i++){
+    var j = ((i+1)%4)*2;
+    b.addTri(q[i*2], q[i*2+1], q[j+1], col);
+    b.addTri(q[i*2], q[j+1], q[j], col);
+  }
+}
+/* 400 kV lattice, or a wooden pole for a minor line. Heights are the real
+   ones: a suspension tower on the supergrid is about 46 m, an 11 kV pole 10. */
+function pylon(b, x, z, y0, big, seed, col){
+  var H = big ? 42 + hash(seed, 3)*8 : 10.5;
+  if(!big){
+    strut(b, x, y0, z, x, y0+H, z, 0.4, col);
+    strut(b, x-1.5, y0+H-1.2, z, x+1.5, y0+H-1.2, z, 0.28, col);
+    return;
+  }
+  var base = 5.2, waist = 1.5, hw = H*0.62;              /* legs meet at the waist */
+  var k, sx, sz;
+  for(k=0;k<4;k++){
+    sx = (k === 0 || k === 3) ? 1 : -1; sz = (k < 2) ? 1 : -1;
+    strut(b, x + base*sx, y0, z + base*sz, x + waist*sx, y0+hw, z + waist*sz, 0.7, col, 0.45);
+    strut(b, x + waist*sx, y0+hw, z + waist*sz, x + waist*0.7*sx, y0+H, z + waist*0.7*sz, 0.42, col, 0.3);
+    /* one X of bracing, which is most of what you see against the sky */
+    strut(b, x + base*sx, y0 + hw*0.30, z + base*sz,
+             x - base*sx*0.55, y0 + hw*0.72, z - base*sz*0.55, 0.22, col);
+  }
+  var arms = [[hw + 1.5, 11], [hw + 7.5, 9.5], [H - 3.5, 7.5]];
+  for(k=0;k<arms.length;k++){
+    strut(b, x - arms[k][1], y0 + arms[k][0], z, x, y0 + arms[k][0], z, 0.3, col, 0.55);
+    strut(b, x, y0 + arms[k][0], z, x + arms[k][1], y0 + arms[k][0], z, 0.55, col, 0.3);
+    strut(b, x - arms[k][1], y0 + arms[k][0], z, x, y0 + arms[k][0] + 2.6, z, 0.2, col);
+    strut(b, x + arms[k][1], y0 + arms[k][0], z, x, y0 + arms[k][0] + 2.6, z, 0.2, col);
+  }
+  strut(b, x, y0+H, z, x, y0+H+2.5, z, 0.25, col);        /* earth wire peak */
+  return arms;
+}
+/* Three conductors a side, hung in a catenary. Drawn as lines, because a
+   conductor is 30 mm across and any solid geometry for it is a lie that
+   costs a thousand triangles. */
+function conductors(seg, ax, ay, az, cx, cy, cz, arms){
+  var span = Math.sqrt((cx-ax)*(cx-ax) + (cz-az)*(cz-az));
+  if(span < 8 || span > 900) return;
+  var sag = Math.min(9, span*0.035), N = 6, k, i;
+  for(k=0;k<arms.length;k++){
+    for(var side=-1;side<=1;side+=2){
+      var y1 = ay + arms[k][0], y2 = cy + arms[k][0], off = arms[k][1]*side;
+      var px = ax + off, pz = az, qx = cx + off, qz = cz;
+      var prev = null;
+      for(i=0;i<=N;i++){
+        var u = i/N, dip = -4*sag*u*(1-u);
+        var p = {x: px + (qx-px)*u, y: y1 + (y2-y1)*u + dip, z: pz + (qz-pz)*u};
+        if(prev) seg.push(prev.x, prev.y, prev.z, p.x, p.y, p.z);
+        prev = p;
+      }
+    }
+  }
+}
+/* Tower, nacelle and three blades. Nothing turns: a still turbine reads
+   correctly and a spinning one at 40 frames from three kilometres does not. */
+function turbine(b, x, z, y0, H, col, seed){
+  var R = H*0.52, i;
+  var hub = y0 + H;
+  strut(b, x, y0, z, x, hub, z, H*0.055, col, H*0.030);         /* tapered tower */
+  strut(b, x, hub, z - 1.4, x, hub, z + 4.2, 2.6, col, 1.9);    /* nacelle */
+  var a0 = hash(seed, 17)*6.283;
+  for(i=0;i<3;i++){
+    var a = a0 + i*2.0944, ca = Math.cos(a), sa = Math.sin(a);
+    /* a blade is 3 m of chord at the root and a few centimetres at the tip;
+       one section for each, or it reads as scaffolding */
+    strut(b, x, hub, z - 1.6, x + ca*R*0.22, hub + sa*R*0.22, z - 1.6, 1.9, col, 1.4);
+    strut(b, x + ca*R*0.22, hub + sa*R*0.22, z - 1.6,
+             x + ca*R,      hub + sa*R,      z - 1.6, 1.4, col, 0.25);
+  }
+}
+function addPower(lines, gens, group, cell){
+  if(!lines.length && !gens.length) return;
+  var b = new Batch(), seg = [], i, j;
+  var steel = new THREE.Color(0x8d949c);
+  for(i=0;i<lines.length;i++){
+    var e = lines[i];
+    if(!e.geometry || e.geometry.length < 2) continue;
+    var big = e.tags.power === "line";
+    var pts = ringToPts(e.geometry), arms = null, prev = null;
+    for(j=0;j<pts.length;j++){
+      var p = pts[j];
+      if(Math.abs(p.x) > 6200 || Math.abs(p.z) > 6200) { prev = null; continue; }
+      if(inSkip(p.x, p.z, cell)) { prev = null; continue; }
+      var y0 = terrainY(p.x, p.z);
+      arms = pylon(b, p.x, p.z, y0, big, e.id + j, steel) || arms;
+      if(prev && big && arms) conductors(seg, prev.x, prev.y, prev.z, p.x, y0, p.z, arms);
+      prev = {x:p.x, y:y0, z:p.z};
+    }
+  }
+  for(i=0;i<gens.length;i++){
+    var g = gens[i];
+    if(g.tags["generator:source"] && g.tags["generator:source"] !== "wind") continue;
+    var gx, gz;
+    if(g.type === "node"){ var w = toWorld(+g.lon, +g.lat); gx = w.x; gz = w.z; }
+    else if(g.geometry && g.geometry.length){ var c = centroid(ringToPts(g.geometry)); gx = c.x; gz = c.z; }
+    else continue;
+    if(inSkip(gx, gz, cell)) continue;
+    var Ht = parseLen(g.tags["height"] || g.tags["generator:height"]);
+    if(isNaN(Ht) || Ht < 12 || Ht > 200) Ht = 78 + hash(g.id, 5)*32;
+    turbine(b, gx, gz, terrainY(gx, gz), Ht, new THREE.Color(0xe8e9ea), g.id);
+  }
+  if(b.count()) group.add(b.mesh(matSteel));
+  if(seg.length){
+    var lg = new THREE.BufferGeometry();
+    lg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(seg), 3));
+    group.add(new THREE.LineSegments(lg, matWire));
+  }
+}
 function addWaterways(list, group, cell){
   var b = new Batch();
   for(var i=0;i<list.length;i++){
@@ -4162,6 +4358,11 @@ function initScene(){
   matMason = new THREE.MeshLambertMaterial({vertexColors:true, map:regionTex("masonry", masonTexture)});
   matBuild.name = "block"; matHouse.name = "house"; matShed.name = "shed";
   matGrand.name = "grand"; matMason.name = "masonry";
+  /* Galvanised lattice and aluminium conductor. Unlit wire, or it vanishes
+     against a bright sky at the exact angle you most want to see it. */
+  matSteel = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide});
+  matSteel.name = "steel";
+  matWire  = new THREE.LineBasicMaterial({color:0x9aa0a6, transparent:true, opacity:0.55});
   matRoof = {};
   for(var rk2 in ROOF_TILE){
     matRoof[rk2] = new THREE.MeshLambertMaterial({vertexColors:true, side:THREE.DoubleSide,
