@@ -33,8 +33,20 @@ ai       profile kt23-3hp (Great Bookham, Mole Valley, Surrey) - dressed 1483 of
          footprints OSM left undescribed
 ```
 
-**It is off unless you ask for it.** The checkbox only appears when a profile
-exists for the place you typed.
+**It is on by default, and says so.** The alternative default is worse, not
+safer: without a profile, OSM's silence is filled by a UK-wide average baked
+into `estimateHeight()`, which is also a guess and a less informed one. What
+matters is not that the guess is opt-in but that it is *visible* — the box on
+the setup screen says what it is doing and who wrote it, one click turns it
+off, that choice is remembered, and the report always names the profile
+whether it was used or not:
+
+```
+ai       profile area-ba available, not used
+```
+
+The checkbox only appears when a profile exists for the place you typed.
+Nothing a profile writes is ever counted as a measurement, on or off.
 
 ## How `kt23-3hp.json` was produced
 

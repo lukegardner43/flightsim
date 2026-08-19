@@ -209,7 +209,7 @@
 
       <div id="aibox" style="display:none;margin:2px 0 12px">
         <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer">
-          <input type="checkbox" id="aiuse" style="margin-top:3px;flex:none">
+          <input type="checkbox" id="aiuse" checked style="margin-top:3px;flex:none">
           <span>
             <b style="display:block">Use the AI interpretation of <span id="ainame"></span></b>
             <span class="note" style="margin:2px 0 0" id="ainote"></span>
@@ -609,6 +609,13 @@ function setGo(ok){
   g.textContent = ok ? "Start engine — " + chosen.name : "Find a place first";
   offerAI(ok ? chosen.name : "");
 }
+/* On by default, because the alternative default is worse: without a profile
+   OSM's silence is filled by a UK-wide average, which is also a guess and a
+   less informed one. What matters is that the guess is visible — the box says
+   what it is doing, one click turns it off, and nothing it writes is ever
+   counted as a measurement. The choice is remembered once you make it. */
+var AI_WANT = true;
+try{ AI_WANT = localStorage.getItem("tf.ai") !== "0"; }catch(e){}
 /* The option only appears where a profile has actually been written. Offering
    it everywhere would imply the model knows every postcode, which it does not. */
 function offerAI(name){
@@ -616,13 +623,20 @@ function offerAI(name){
   AI.p = p;
   if(!p){ box.style.display = "none"; $("aiuse").checked = false; return; }
   box.style.display = "block";
+  $("aiuse").checked = AI_WANT;
   $("ainame").textContent = p.place;
-  $("ainote").textContent = "OSM rarely says what a building is made of, how many " +
-    "storeys it has or what shape its roof is. This fills those gaps with a description of " +
+  $("ainote").textContent = "On by default. OSM rarely says what a building is made of, how many " +
+    "storeys it has or what shape its roof is, and the alternative is a UK-wide average — also a " +
+    "guess, and a less informed one. This fills those gaps with a description of " +
     p.place + " written by " + (p.produced_by || "a language model") +
     " from memory — no imagery, no survey. Footprints and positions still come entirely " +
-    "from OSM: nothing is invented or moved. See ai/" + p.id + ".json.";
+    "from OSM: nothing is invented or moved, and nothing here is ever reported as measured. " +
+    "Untick to fly on OSM alone. See ai/" + p.id + ".json.";
 }
+$("aiuse").onchange = function(){
+  AI_WANT = this.checked;
+  try{ localStorage.setItem("tf.ai", AI_WANT ? "1" : "0"); }catch(e){}
+};
 
 /* quality + light */
 var opt = {quality:"med", sun:"noon"};
