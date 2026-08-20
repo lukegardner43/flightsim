@@ -123,7 +123,7 @@ function describe(c, h, us, vs, uLen, vLen) {
      up a 3.4 m pitch is most of a metre of wall that is not there. A low
      percentile rather than the minimum, because the outline is the wall face
      and the samples along it are half garden. */
-  const eaves = pct(sorted, 0.08);
+  let eaves = pct(sorted, 0.08);
   /* Not the top: a chimney is two or three samples and read as the ridge it
      made an eight metre house eleven metres tall. */
   const ridge = pct(sorted, 0.94);
@@ -172,15 +172,42 @@ function describe(c, h, us, vs, uLen, vLen) {
   } else {
     /* the ridge runs along whichever axis the profile is flatter over */
     const alongU = su <= sv;
-    const along = alongU ? pu : pv;
-    const across = alongU ? pv : pu;
-    /* a ridge that sags at both ends is hipped; one that stays up to the
-       gable ends is gabled */
-    const inner = along.slice(1, NB - 1).filter(isFinite);
-    const mid = inner.length ? Math.max.apply(null, inner) : ridge;
-    const ends = [along[0], along[NB - 1]].filter(isFinite);
-    const endDrop = ends.length ? mid - Math.min.apply(null, ends) : 0;
-    shape = endDrop > Math.max(0.5, rel * 0.30) ? 'hipped' : 'gabled';
+    /* Hip or gable. Asked of the mean height of each end of the building it
+       is asked wrongly, because a ramped edge drops that mean on a gable just
+       as a hip does — and it called nearly every semi in Bookham hipped. So
+       it is asked of the ridge itself: a narrow band down the middle of the
+       roof, sliced along its length, and the HIGHEST thing measured in each
+       slice, which the ramp in the last half metre cannot pull down. The
+       highest is safe here and nowhere else, because these samples are
+       already clipped at the ridge — a chimney can only reach a height the
+       roof already has. */
+    const cA = alongU ? vs : us, lenA = alongU ? vLen : uLen;
+    const cB = alongU ? us : vs, lenB = alongU ? uLen : vLen;
+    const keep = Math.max(1.0, lenA * 0.18);
+    const SB = 0.5;                               /* half a metre a slice */
+    const nb2 = Math.max(4, Math.round(lenB / SB)), per = lenB / nb2;
+    const line = [];
+    for (let i = 0; i < nb2; i++) line.push(-Infinity);
+    for (let i = 0; i < h.length; i++) {
+      if (Math.abs(cA[i] - lenA / 2) > keep) continue;
+      let b = Math.floor(cB[i] / lenB * nb2);
+      if (b < 0) b = 0; if (b >= nb2) b = nb2 - 1;
+      const y = Math.min(h[i], ridge);
+      if (y > line[b]) line[b] = y;
+    }
+    /* And what is asked of that line is not how far the ends drop but HOW FAR
+       IN the ridge takes to reach full height. On a gable that is the width
+       of the ramp, a metre or so; on a hip it is half the width of the
+       building, because that is how far a hip folds in. The gap between the
+       two is wide, which is what makes the answer stable. */
+    let mid = -Infinity;
+    for (const v of line) if (v > mid) mid = v;
+    const target = mid - Math.max(0.3, rel * 0.12);
+    let runA = 0, runB = 0;
+    for (let i = 0; i < nb2; i++) { if (line[i] >= target) break; runA = (i + 1) * per; }
+    for (let i = nb2 - 1; i >= 0; i--) { if (line[i] >= target) break; runB = (nb2 - i) * per; }
+    const fold = Math.max(runA, runB);
+    shape = isFinite(mid) && fold > Math.max(1.6, lenA * 0.25) ? 'hipped' : 'gabled';
     /* roof:direction is the compass bearing the SLOPE faces, so it is across
        the ridge; the ridge itself runs 90 degrees off it. */
     const rx = alongU ? box.ux : -box.uy, ry = alongU ? box.uy : box.ux;
@@ -188,11 +215,117 @@ function describe(c, h, us, vs, uLen, vLen) {
     deg = ((deg % 180) + 180) % 180;
     bearing = Math.round(deg);
   }
+  /* ---- run the roof back out to the wall ----
+
+     Real lidar does not step cleanly from garden to roof: a 1 m sample that
+     straddles a wall averages both, so the edge of every building is a ramp a
+     metre or two wide. Rejecting those by height alone cannot work — on a two
+     storey house the ramp runs from the garden all the way up to the eaves,
+     so plenty of it survives any threshold low enough to keep a bungalow, and
+     it drags the eaves down by a metre and a half. Every synthetic test
+     passed because they all used a hard step. Twelve thousand real buildings
+     did not: Bookham's houses came out with the eaves of bungalows.
+
+     Cutting the edge off geometrically only moves the error the other way,
+     because the eaves ARE the edge. So neither end is measured. The clean
+     middle of the roof is fitted as what it is — a ramp — and the line run
+     out to the wall for the eaves and in to the middle for the ridge, which
+     no percentile reaches either, an apex being one sample wide.
+
+     What the height is measured against is distance INWARD FROM THE WALL: for
+     a gable only the two walls the slope runs from, for a hip or a pyramid
+     the nearest wall of any of them, because those slope off all four. */
+  let eavesFit = null, ridgeFit = null;
+  if (shape !== 'flat') {
+    const alongU2 = su <= sv;
+    const cA = alongU2 ? vs : us;                 /* across the ridge */
+    const cB = alongU2 ? us : vs;                 /* along it */
+    /* How far in from the wall a sample sits is measured against where the
+       BUILDING is, and most of the time that is the outline: an OS footprint
+       is the wall face. But a footprint drawn round the garden as well would
+       have the line run out past the wall and into the ground, so the outline
+       is only ever believed as far as the samples that read as building reach
+       — the centre from the outline, which is where the ridge is, and the
+       width from whichever of the two is smaller. */
+    const midA = (alongU2 ? vLen : uLen) / 2, midB = (alongU2 ? uLen : vLen) / 2;
+    let ra = 0, rb = 0;
+    for (let i = 0; i < h.length; i++) {
+      const da = Math.abs(cA[i] - midA), db = Math.abs(cB[i] - midB);
+      if (da > ra) ra = da; if (db > rb) rb = db;
+    }
+    const half = Math.min(midA, ra + 0.5);
+    const lenA = half * 2, lenB = Math.min(midB, rb + 0.5) * 2;
+    const a0 = midA - half, b0 = midB - lenB / 2;
+    /* A hip is a gable with the two ends folded in, and it folds them in by
+       about half the width. So the middle of a hipped roof IS a gable section
+       and can be fitted as one; only when there is no middle left — a square
+       plan, which is to say a pyramid — is there nothing to do but take the
+       distance to the nearest wall of the four. */
+    const band = shape === 'gabled' ? 0 : half;
+    /* Everything wrong with these samples is wrong DOWNWARD — the ramp at the
+       edge, a strip of garden the floor let through, a shadow in the data —
+       so the roof at a given distance in from the wall sits near the TOP of
+       what was measured there, not the middle. Each metre of distance becomes
+       one reading, its eightieth percentile, and the line is fitted to those.
+       A mean would let one lawn tilt the whole roof; this cannot.
+
+       The first metre and a half is thrown away whatever it says, because
+       that is the width of the ramp, and no percentile fixes a reading where
+       every sample is half wall and half hedge. */
+    function fit(band, chebyshev, wMin) {
+      const bin = [];
+      for (let i = 0; i < h.length; i++) {
+        const y = h[i];
+        if (y > ridge + rel * 0.5) continue;      /* a chimney is not a roof */
+        const a = cA[i] - a0, b = cB[i] - b0;
+        if (band > 0 && (b < band || b > lenB - band)) continue;
+        let w = half - Math.abs(a - half);
+        if (chebyshev) w = Math.min(w, lenB / 2 - Math.abs(b - lenB / 2));
+        if (!(w >= wMin)) continue;
+        const k = Math.floor(w);
+        (bin[k] || (bin[k] = [])).push(y);
+      }
+      let sx = 0, sy = 0, sxx = 0, sxy = 0, nn = 0, wLo = Infinity, wHi = -Infinity;
+      for (let k = 0; k < bin.length; k++) {
+        if (!bin[k] || bin[k].length < 3) continue;
+        const w = k + 0.5, y = pct(bin[k].slice().sort((p, q) => p - q), 0.8);
+        sx += w; sy += y; sxx += w * w; sxy += w * y; nn++;
+        if (w < wLo) wLo = w; if (w > wHi) wHi = w;
+      }
+      const den = nn * sxx - sx * sx;
+      /* a fit needs run as well as points: over a hand's width of roof the
+         slope is noise, and noise extrapolated is a fantasy */
+      if (!(nn > 2 && wHi - wLo > 1.2 && Math.abs(den) > 1e-6)) return null;
+      const b = (nn * sxy - sx * sy) / den, a = (sy - b * sx) / nn;
+      if (!isFinite(a) || !isFinite(b) || !(b > 0)) return null;
+      return { a: a, b: b };
+    }
+    const wide = lenB - 2 * band > 2;
+    const f = (wide ? fit(band, false, 1.5) : null) || fit(0, band > 0, 1.5) ||
+              (wide ? fit(band, false, 0.5) : null) || fit(0, band > 0, 0.5);
+    if (f) {
+      eavesFit = f.a;                             /* the line at the wall */
+      ridgeFit = f.a + f.b * half;                /* and at the middle */
+    }
+  }
+  /* Either way: a ramped edge reads the eaves LOW, ground bleed that survived
+     the floor reads them low too, and a footprint with a wide overhang or an
+     attached porch reads them high. Never into the ground, never above the
+     ridge, and never further from the percentile than the roof is tall — a
+     fit that disagrees by more than that has found something not a roof. */
+  if (eavesFit != null && eavesFit > 0.8 && eavesFit < ridge - 0.3 &&
+      Math.abs(eavesFit - eaves) < rel) eaves = eavesFit;
   /* The apex of a pyramid is one sample wide, so every percentile misses it.
      Only for that shape is the very top believed, and only within reach of
      the 99th, so a chimney on a hip cannot become a spire. */
   let top = ridge;
-  if (shape === 'pyramidal') top = Math.min(sorted[sorted.length - 1], ridge + rel * 0.45);
+  const rel2 = ridge - eaves;
+  if (shape === 'pyramidal') top = Math.min(sorted[sorted.length - 1], ridge + rel2 * 0.45);
+  /* and the fitted line at the middle of the roof is the ridge, which the
+     percentile cannot reach for the same reason the grid never samples it:
+     an apex is a line, and a metre grid steps over it. Bounded, like the
+     pyramid, to within half again of the roof it already found. */
+  if (ridgeFit != null && ridgeFit > top) top = Math.min(ridgeFit, ridge + rel2 * 0.45);
   return {
     ok: true, n: h.length,
     eaves: eaves, ridge: top, median: med,
@@ -341,11 +474,16 @@ function fitParts(ring, sample, opt) {
        there is nothing to step back from. */
     const sLo = lo + (gi > 0 ? inset : 0);
     const sHi = hi - (gi < w.seg.length - 1 ? inset : 0);
+    /* the part is described in its OWN frame: along the split axis its
+       coordinates start at the part, not at the building, or every measure
+       taken across that axis is offset by however far along it the part sits */
     const h = [], us = [], vs = [];
     for (let i = 0; i < c.h.length; i++) {
       const t = w.coord[i];
       if (t < sLo || t > sHi) continue;
-      h.push(c.h[i]); us.push(c.us[i]); vs.push(c.vs[i]);
+      h.push(c.h[i]);
+      us.push(w.ax === 'u' ? c.us[i] - lo : c.us[i]);
+      vs.push(w.ax === 'v' ? c.vs[i] - lo : c.vs[i]);
     }
     if (h.length < 4) return null;               /* all or nothing */
     const uLen = w.ax === 'u' ? (hi - lo) : c.uLen;
