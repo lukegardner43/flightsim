@@ -176,6 +176,29 @@ against a surface whose answers are known — and that test earned its keep:
 - A pyramid is told from a hip by the plan being square, not by how much the
   ends drop. The other way round called every hipped bungalow a pyramid.
 
+### The first real square
+
+`515000,152000,2000` — two kilometres of TQ15 out in the farmland east of
+Bookham, run on 20 August 2026:
+
+```
+measured 106 of the 136 footprints in the square
+mean eaves 2.81 m, mean ridge 5.88 m
+hipped 39%, gabled 39%, flat 16%, pyramidal 7%
+```
+
+Then flown: the sim found the 106 and 105 buildings took a reading, moving
+from `estimated` to `measured` — 1,058 measured before, 1,163 after.
+
+Two things worth reading off that. The heights are low because this square is
+farm buildings and outbuildings rather than village housing, which is a fair
+description of that ground. And the roof shapes are a genuine check on the AI
+profile, which had never been tested against anything: it guessed hipped 46%,
+gabled 44%, pyramidal 7%, flat 3%. Lidar says 39 / 39 / 7 / 16. The
+hipped-and-gabled-in-equal-measure claim holds, pyramidal is exact, and flat
+is five times commoner than guessed — which is what a square full of
+outbuildings would do to it.
+
 ### Coverage and the awkward bits
 
 England is about 99% covered. **Scotland and Wales publish equivalent
