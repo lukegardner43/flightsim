@@ -307,7 +307,9 @@ function reportText(){
   L.push("lidar    " + (LIDAR.n
     ? LIDAR.n.toLocaleString() + " footprints carry a measured height; " +
       LIDAR.hit.toLocaleString() + " buildings took one" +
-      (LIDAR.hit ? " (measured, not estimated)" : "")
+      (LIDAR.hit ? " (measured, not estimated)" : "") +
+      (LIDAR.split ? "; " + LIDAR.split.toLocaleString() + " of them had more than one " +
+        "box in them and were drawn as " + LIDAR.parts.toLocaleString() + " parts" : "")
     : "no pack in range carries lidar heights"));
   L.push("function " + funcLine());
   L.push("bridges  " + (BRIDGES.drawn + BRIDGES.deckOnly + BRIDGES.model + BRIDGES.named === 0
@@ -968,7 +970,7 @@ function modelParts(e, m){
 }
 
 /* PACKS-START */
-var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20630}];
+var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20630},{"id":"tq15","tile":"TQ15","name":"TQ15","file":"tq15.js","bbox":[51.229000000000006,-0.456,51.329,-0.296],"n":634}];
 /* PACKS-END */
 /* Packs are stored per 10 km Ordnance Survey tile, so two nearby places share
    their coverage instead of each carrying an overlapping square of its own.
@@ -1865,7 +1867,7 @@ var statStreamed = 0, statTrees = 0, statLandmarks = 0, drawnIds = {};
    It fills where OSM said nothing at all, the same rule everything else
    here follows. A building carrying height= or building:levels= keeps them.
    ------------------------------------------------------------------ */
-var LIDAR = {ready:false, packs:-1, n:0, hit:0, cell:64, map:{}};
+var LIDAR = {ready:false, packs:-1, n:0, hit:0, split:0, parts:0, cell:64, map:{}};
 function lidarUnpack(v){
   return {eaves:(v & 1023)/10, roofH:((v >> 10) & 255)/10,
           bearing:(v >> 18) & 255, shape:(v >> 26) & 7};
@@ -1893,7 +1895,8 @@ function buildLidarIndex(){
       }
       if(ring.length < 6) continue;
       if(Math.abs(x0) > LIMIT + 500 || Math.abs(z0) > LIMIT + 500) continue;
-      var rec = {r:ring, b:[x0, z0, x1, z1], v:v};
+      var rec = {r:ring, b:[x0, z0, x1, z1], v:v,
+                 p:(d.parts && d.parts[i]) || null};
       LIDAR.n++;
       var i0 = Math.floor(x0/LIDAR.cell), i1 = Math.floor(x1/LIDAR.cell);
       var j0 = Math.floor(z0/LIDAR.cell), j1 = Math.floor(z1/LIDAR.cell);
@@ -1913,24 +1916,68 @@ function ringHas(ring, x, z){                    /* even-odd, flat [x,z,...] */
   }
   return inside;
 }
-function lidarAt(x, z){
-  if(!LIDAR.n) return 0;
+function lidarRecAt(x, z){
+  if(!LIDAR.n) return null;
   var list = LIDAR.map[Math.floor(x/LIDAR.cell) + "," + Math.floor(z/LIDAR.cell)];
-  if(!list) return 0;
+  if(!list) return null;
   for(var i=0;i<list.length;i++){
     var r = list[i];
     if(x < r.b[0] || x > r.b[2] || z < r.b[1] || z > r.b[3]) continue;
-    if(ringHas(r.r, x, z)) return r.v;
+    if(ringHas(r.r, x, z)) return r;
   }
-  return 0;
+  return null;
+}
+function lidarAt(x, z){ var r = lidarRecAt(x, z); return r ? r.v : 0; }
+/* ---- the massing ----
+   One height per building is a lie about most British houses, and the pack
+   can now say where the steps are: an axis, and a run of parts along it as
+   fractions of the surveyed outline's extent. Rebuilding the cut lines needs
+   only that outline, which the index already holds, so this works whether the
+   polygon being drawn is the surveyed one or the OSM building standing on it.
+   ------------------------------------------------------------------ */
+function clipHalf(pts, nx, nz, d){        /* keep the side where n.p <= d */
+  var out = [], n = pts.length, i, j;
+  for(i=0, j=n-1; i<n; j=i++){
+    var A = pts[j], B = pts[i];
+    var da = nx*A.x + nz*A.z - d, db = nx*B.x + nz*B.z - d;
+    if(da <= 0){
+      out.push(A);
+      if(db > 0){ var t = da/(da-db); out.push({x:A.x+(B.x-A.x)*t, z:A.z+(B.z-A.z)*t}); }
+    }else if(db <= 0){
+      var t2 = da/(da-db); out.push({x:A.x+(B.x-A.x)*t2, z:A.z+(B.z-A.z)*t2});
+    }
+  }
+  return out;
+}
+function lidarParts(pts, rec){
+  var pk = rec && rec.p;
+  if(!pk || pk.length < 5) return null;
+  /* the axis, and where the surveyed outline starts and ends along it */
+  var deg = pk[0]*Math.PI/180;
+  var ax = Math.sin(deg), az = Math.cos(deg);
+  var lo = Infinity, hi = -Infinity, i;
+  for(i=0;i<rec.r.length;i+=2){
+    var t = rec.r[i]*ax + rec.r[i+1]*az;
+    if(t < lo) lo = t; if(t > hi) hi = t;
+  }
+  var ext = hi - lo;
+  if(!(ext > 1)) return null;
+  var out = [];
+  for(i=1;i<pk.length;i+=2){
+    var t0 = lo + (pk[i] & 255)/255*ext, t1 = lo + ((pk[i] >> 8) & 255)/255*ext;
+    var sub = pts;
+    if((pk[i] & 255) > 0)         sub = clipHalf(sub, -ax, -az, -t0);
+    if(((pk[i] >> 8) & 255) < 255) sub = clipHalf(sub,  ax,  az,  t1);
+    if(sub.length < 3) continue;
+    if(Math.abs(signedArea(sub)) < 8) continue;   /* a sliver is not a part */
+    out.push({pts:sub, v:pk[i+1]});
+  }
+  return out.length > 1 ? out : null;
 }
 /* Written onto the tags, so everything downstream — the cascade, the roof
    planner, the report's tiers — treats it as the measurement it is without
    knowing where it came from. */
-function lidarDress(t, x, z){
-  if(t.height || t["building:height"] || t["building:levels"] || t["building:part"]) return false;
-  var v = lidarAt(x, z);
-  if(!v) return false;
+function lidarWrite(t, v){
   var m = lidarUnpack(v);
   if(!(m.eaves > 1.2)) return false;
   t.height = String(Math.round((m.eaves + m.roofH)*10)/10);
@@ -1940,6 +1987,13 @@ function lidarDress(t, x, z){
   /* roof:direction is the bearing the SLOPE faces; the ridge runs across it */
   if(m.bearing <= 180 && !t["roof:direction"]) t["roof:direction"] = String((m.bearing + 90) % 360);
   t["tf:lidar"] = "1";
+  return true;
+}
+function lidarDress(t, x, z){
+  if(t.height || t["building:height"] || t["building:levels"] || t["building:part"]) return false;
+  var v = lidarAt(x, z);
+  if(!v) return false;
+  if(!lidarWrite(t, v)) return false;
   LIDAR.hit++;
   return true;
 }
@@ -3613,7 +3667,32 @@ function addBuildings(list, parts, group, cell){
 
   var tallest = 0;
   for(var k2=0;k2<prepared.length;k2++){
-    try{ raise(prepared[k2]); }catch(err){ statSkipped++; }
+    try{ raiseOrSplit(prepared[k2]); }catch(err){ statSkipped++; }
+  }
+  /* A building the lidar found more than one box in is drawn as those boxes.
+     The outline is cut along the axis the surface stepped on, each piece
+     keeps the tags of the whole — so its class, its wall texture and its
+     colour are unchanged — and takes its own height and roof. Everything the
+     renderer does afterwards is what it already did. */
+  function raiseOrSplit(b){
+    if(b.part || b.tags.height || b.tags["building:levels"] || b.tags["building:height"])
+      return raise(b);
+    var rec = lidarRecAt(b.c.x, b.c.z);
+    if(!rec || !rec.p) return raise(b);
+    var pieces = lidarParts(b.pts, rec);
+    if(!pieces) return raise(b);
+    LIDAR.split++;
+    for(var i=0;i<pieces.length;i++){
+      var pc = pieces[i], tg = {};
+      for(var k in b.tags) tg[k] = b.tags[k];
+      if(!lidarWrite(tg, pc.v)) continue;
+      var a = Math.abs(signedArea(pc.pts));
+      var cc = centroid(pc.pts);
+      LIDAR.parts++;
+      raise({pts:pc.pts, holes:null, tags:tg, area:a, c:cc, dist:b.dist,
+             part:false, lidarPiece:true});
+    }
+    LIDAR.hit++;
   }
   function raise(b){
     var seed = Math.round(b.pts[0].x*3.7 + b.pts[0].z*1.9);
@@ -3624,8 +3703,8 @@ function addBuildings(list, parts, group, cell){
     /* Lidar first: a measurement outranks an inference, and dressing a
        building the surface has already measured would be inventing storeys
        for a building whose height we know. */
-    if(!b.part) lidarDress(b.tags, b.c.x, b.c.z);
-    if(AI.on && !b.part) aiDress(b.tags, seed, b.area, depth);
+    if(!b.part && !b.lidarPiece) lidarDress(b.tags, b.c.x, b.c.z);
+    if(AI.on && !b.part && !b.lidarPiece) aiDress(b.tags, seed, b.area, depth);
     var v = volumeOf(b.tags, b.area, b.dist, seed, box);
     if(b.part) v.tier = "modelled";
     var h = Math.min(v.h, 400), minH = v.minH;
@@ -3697,7 +3776,7 @@ function addBuildings(list, parts, group, cell){
     statBuildings++;
     /* Labelled from the tags, not from which request happened to fetch it, so
        a landmark the core ring already drew still gets named. */
-    if(!b.part && b.tags.name && b.area > 40 && isLandmark(b.tags))
+    if(!b.part && !b.lidarPiece && b.tags.name && b.area > 40 && isLandmark(b.tags))
       addLabel(b.tags.name, b.c.x, b.c.z, pad + h, labelScore(b.tags, b.area));
   }
   if(wallsH.count()) group.add(wallsH.mesh(matHouse));
@@ -5145,7 +5224,7 @@ $("go").onclick = function(){
   AI.on = !!(AI.p && $("aiuse").checked);
   AI.applied = AI.dressed = 0; AI.walls = []; AI.roofs = []; FUNC_SEEN = {};
   BRIDGES = {drawn:0, deckOnly:0, model:0, named:0}; bridgeNamed = {};
-  LIDAR.hit = 0; LIDAR.packs = -1;
+  LIDAR.hit = 0; LIDAR.split = 0; LIDAR.parts = 0; LIDAR.packs = -1;
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (gridRef(LAT0, LON0) || "outside the OS grid") +
                          (AI.on ? " · AI interpretation: " + AI.p.place : "") +
@@ -5963,7 +6042,8 @@ window.__sim = {
                             merged:packMerged}; },
   func: function(){ return FUNC_SEEN; },
   bridges: function(){ return BRIDGES; },
-  lidar: function(){ return {footprints:LIDAR.n, used:LIDAR.hit}; },
+  lidar: function(){ return {footprints:LIDAR.n, used:LIDAR.hit,
+                             split:LIDAR.split, parts:LIDAR.parts}; },
   ai: function(){ return {on:AI.on, id:AI.p ? AI.p.id : null,
                           applied:AI.applied, dressed:AI.dressed,
                           walls:AI.walls, roofs:AI.roofs,

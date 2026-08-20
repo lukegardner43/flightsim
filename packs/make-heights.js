@@ -30,7 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 const { bng, tileOrigin, bngToWgs84 } = require('./grid-square.js');
-const { fitRoof } = require('./roof-fit.js');
+const { fitRoof, fitParts } = require('./roof-fit.js');
 
 function arg(name, dflt) {
   const i = process.argv.indexOf('--' + name);
@@ -151,6 +151,23 @@ function decodeRing(enc, q) {
    eaves in decimetres (0 = not measured), roof height in decimetres,
    ridge bearing in whole degrees (255 = none), and the shape. */
 const SHAPE_CODE = { flat: 1, gabled: 2, hipped: 3, pyramidal: 4 };
+/* A building's parts, as [axis bearing, t0|t1, height, t0|t1, height, ...].
+   The fractions are along the axis, so the sim can rebuild the cut lines from
+   the surveyed outline without knowing anything about the box this was
+   measured in. */
+function packParts(f) {
+  if (!f || !f.parts || f.parts.length < 2) return 0;
+  const out = [Math.max(0, Math.min(180, f.bearing))];
+  for (const p of f.parts) {
+    const h = packHeight(p);
+    if (!h) return 0;                            /* all of it, or none */
+    const t0 = Math.max(0, Math.min(255, Math.round(p.t0 * 255)));
+    const t1 = Math.max(0, Math.min(255, Math.round(p.t1 * 255)));
+    if (t1 <= t0) return 0;
+    out.push(t0 | (t1 << 8), h);
+  }
+  return out;
+}
 function packHeight(f) {
   if (!f || !f.ok) return 0;
   let e = Math.round(f.eaves * 10), r = Math.round(f.roofH * 10);
@@ -206,8 +223,9 @@ function main() {
 
   const q = pack.q || 1e6;
   const prev = pack.heights && pack.heights.length === pack.buildings.length ? pack.heights : [];
-  const heights = [];
-  const tally = { measured: 0, thin: 0, outside: 0, none: 0 };
+  const prevP = pack.parts && pack.parts.length === pack.buildings.length ? pack.parts : [];
+  const heights = [], parts = [];
+  const tally = { measured: 0, thin: 0, outside: 0, none: 0, split: 0, partN: 0 };
   const shapes = {};
   let sumEaves = 0;
   for (const enc of pack.buildings) {
@@ -219,26 +237,39 @@ function main() {
       if (!b) { bad = true; break; }
       ring.push([b.E, b.N]);
     }
-    if (bad || ring.length < 3 || DRY) { heights.push(0); tally.none++; continue; }
+    if (bad || ring.length < 3 || DRY) { heights.push(0); parts.push(0); tally.none++; continue; }
     /* outside the square that was fetched: leave whatever it had, so
        measuring a second square later adds to the first rather than
        wiping it */
     let inside = false;
     for (const [E, Nn] of ring)
       if (E >= o.E && E <= o.E + N*PIX && Nn >= o.N && Nn <= o.N + N*PIX) { inside = true; break; }
-    if (!inside) { heights.push(prev[heights.length] || 0); tally.outside++; continue; }
+    if (!inside) {
+      heights.push(prev[heights.length] || 0);
+      parts.push(prevP[parts.length] || 0);
+      tally.outside++; continue;
+    }
     const f = fitRoof(ring, sample, { step: PIX });
-    if (!f) { heights.push(0); tally.none++; continue; }
-    if (!f.ok) { heights.push(0); if (f.n < 4) tally.thin++; else tally.none++; continue; }
+    if (!f) { heights.push(0); parts.push(0); tally.none++; continue; }
+    if (!f.ok) { heights.push(0); parts.push(0); if (f.n < 4) tally.thin++; else tally.none++; continue; }
     /* Half a footprint of data is half a measurement. Say so rather than
        quietly averaging a building with the field next to it. */
-    if (f.fill < 0.45) { heights.push(0); tally.thin++; continue; }
+    if (f.fill < 0.45) { heights.push(0); parts.push(0); tally.thin++; continue; }
     const v = packHeight(f);
     heights.push(v);
     if (v) { tally.measured++; sumEaves += f.eaves; shapes[f.shape] = (shapes[f.shape] || 0) + 1; }
     else tally.none++;
+    /* and the massing inside it: one height per building is a lie about most
+       British houses, and the surface shows the step */
+    let pv = 0;
+    if (v) {
+      try { pv = packParts(fitParts(ring, sample, { step: PIX })); } catch (e) { pv = 0; }
+      if (pv) { tally.split++; tally.partN += (pv.length - 1) / 2; }
+    }
+    parts.push(pv);
   }
   pack.heights = heights;
+  if (parts.some(p => p)) pack.parts = parts; else delete pack.parts;
   pack.heightSource = 'Environment Agency LIDAR Composite DSM/DTM 1 m. ' +
     'Contains public sector information licensed under the Open Government Licence v3.';
   pack.heightBuilt = new Date().toISOString().slice(0, 10);
@@ -252,6 +283,9 @@ function main() {
                 (prev.length ? ' (kept what they had)' : '') : ''));
   if (tally.measured) {
     console.log('mean eaves ' + (sumEaves / tally.measured).toFixed(2) + ' m');
+    console.log('massing: ' + tally.split.toLocaleString() + ' of them are more than one box (' +
+                (tally.split / tally.measured * 100).toFixed(0) + '%), ' +
+                tally.partN.toLocaleString() + ' parts in all');
     console.log('roof shapes ' + Object.keys(shapes).sort((a, b) => shapes[b] - shapes[a])
       .map(k => k + ' ' + (shapes[k] / tally.measured * 100).toFixed(0) + '%').join(', '));
   }

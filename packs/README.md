@@ -228,23 +228,60 @@ learned from failed runs rather than from documentation:
    pack covering the square is found by asking each one whether it holds any
    of that ground.
 
-**Measure a small square first.** The `square` input takes `E,N,size` and
-fetches only that much:
+**Type a postcode.** `place` takes a postcode or an OS tile, `size` is how
+many metres square to measure around it:
 
 ```
-tile TQ15   square 511700,154400,2000     (leave pack blank)
+place  KT23 3HP        size  2000        (leave pack and square blank)
 ```
 
-is the 2 km around Great Bookham — **1,724** of the tile's 20,630 footprints,
-about a minute, against roughly half an hour for the whole tile. Pick the
-square with care: `515000,152000` is inside TQ15 but out in the fields, and
-holds only 136 footprints.
+is the 2 km around Great Bookham — **2,929** of the tile's 20,630 footprints,
+about a minute. Leave `size` blank for the whole 10 km tile: 14,918
+footprints, roughly half an hour.
+
+A grid reference is a poor thing to ask anyone for. The first square measured
+for real was one suggested from memory, `515000,152000` — inside TQ15, but
+farmland with 136 buildings in it rather than the village with thousands.
+`square` still takes an exact `E,N,size` for when you would rather say where.
 
 Squares accumulate. Footprints outside the square being measured keep whatever
 reading they already had, so you can do the village, look at it, and fill in
 the rest later. And a square that will not download after five attempts is
 left out of the mosaic rather than failing the run — the buildings under it
 simply keep no reading, and the log says how many were lost.
+
+### The massing inside the footprint
+
+One height per building is a lie about most British houses. A two-storey front
+with a single-storey rear extension, a terrace where one house has a loft
+conversion and its neighbour does not, a barn with a lean-to — the surface
+shows every one of those as a clean step, and drawing them as one box throws
+it away.
+
+`fitParts` walks one axis of the footprint in two-metre slices, takes the
+median height of each, and groups the slices that agree. The pack then carries,
+per building, the axis as a bearing and each part as a fraction along it, so
+the sim can rebuild the cut lines from the surveyed outline alone. Each piece
+keeps the tags of the whole — its class, its wall texture, its colour — and
+takes its own height and roof.
+
+One axis, not two, and the one with the bigger step in it. Two would let a
+semi with a rear extension become four boxes on evidence that does not support
+four, and the common British cases — front-to-back, and along-the-terrace —
+are each a single axis.
+
+Three things that test found, all of which were wrong first:
+
+- The slice that straddles the step reads as neither height and became a part
+  of its own, so a house with a rear extension came out as three boxes with a
+  sliver of ramp between them. Neighbours closer together than a real step are
+  fused back.
+- The step is a **wall**, not roof, and sampling it as roof dragged a
+  two-storey house's eaves down by more than a metre. Each part is described
+  from its own middle, stepping back from any boundary it shares.
+- Plain buildings must not be split at all. A semi, a flat-roofed block and a
+  terrace of one height all come back with no parts, and that is checked as
+  carefully as the splitting is.
 
 **A lidar surface cannot do bridges.** It is one height per square metre with
 no concept of "under" — a bridge comes out as solid ground where the gap

@@ -4,12 +4,13 @@ name: Measure building heights from lidar
 # Ordnance Survey 10 km tile at a time.
 #
 #   Actions tab  ->  "Measure building heights from lidar"
-#   ->  type a tile, e.g. TQ15  ->  Run workflow
+#   ->  type a postcode  ->  Run workflow
 #
-# The tile must already have a footprint pack ("Build building packs" makes
+# The ground must already have a footprint pack ("Build building packs" makes
 # those). This job adds a measured eaves height, roof height, ridge bearing
-# and roof shape to every footprint in it, read off the Environment Agency's
-# 1 m lidar surface.
+# and roof shape to every footprint in the square — and, where the surface
+# steps, the massing inside the footprint as well, so a two storey house with
+# a single storey extension is drawn as the two boxes it is.
 #
 # Set probe_only to stop after finding the services and reporting them. That
 # takes seconds and is the cheap way to check the endpoints are alive before
@@ -24,15 +25,19 @@ name: Measure building heights from lidar
 on:
   workflow_dispatch:
     inputs:
-      tile:
-        description: 'OS 10 km tile, e.g. TQ15'
+      place:
+        description: 'A postcode, or an OS 10 km tile — e.g. "KT23 3HP" or TQ15'
         required: true
       pack:
         description: 'Leave blank — the pack covering the square is found automatically. Only set this to force a particular one (e.g. kt233hp).'
         required: false
         default: ''
+      size:
+        description: 'Metres of square to measure, centred on the place. 2000 is about a minute. Blank measures the whole 10 km tile, which takes roughly half an hour.'
+        required: false
+        default: '2000'
       square:
-        description: 'Optional E,N,size in metres to measure just part of the tile, e.g. 515000,152000,2000 — a 2 km square takes about a minute where the whole tile takes half an hour'
+        description: 'Optional exact E,N,size, if you would rather say where than let the postcode decide'
         required: false
         default: ''
       probe_only:
@@ -71,36 +76,22 @@ jobs:
           sudo apt-get install -y -qq gdal-bin
           gdalinfo --version
 
-      # The tile's British National Grid extent, straight from its name, so
-      # the raster and the footprints cannot disagree about where they are.
-      - name: Work out the extent
+      # Which tile, and which square of it, from something a person would
+      # actually type. A grid reference is a poor thing to ask for: the first
+      # square measured for real was one I suggested from memory, and it was
+      # farmland with 136 buildings in it rather than the village with 1,724.
+      - name: Work out the square
         id: ext
         env:
-          TILE: ${{ inputs.tile }}
+          PLACE: ${{ inputs.place }}
+          SIZE: ${{ inputs.size }}
           SQUARE: ${{ inputs.square }}
         run: |
           set -euo pipefail
-          node -e '
-            const {tileOrigin} = require("./packs/grid-square.js");
-            const t = String(process.env.TILE).trim().toUpperCase();
-            const o = tileOrigin(t);
-            if (!o) { console.error("not a 10 km tile: " + t); process.exit(1); }
-            let e0 = o.E, n0 = o.N, size = 10000;
-            const sq = String(process.env.SQUARE || "").trim();
-            if (sq) {
-              const v = sq.split(",").map(Number);
-              if (v.length !== 3 || v.some(isNaN)) { console.error("square must be E,N,size"); process.exit(1); }
-              e0 = v[0]; n0 = v[1]; size = v[2];
-              if (size < 200 || size > 10000) { console.error("size must be 200..10000 m"); process.exit(1); }
-              if (e0 < o.E || n0 < o.N || e0 + size > o.E + 10000 || n0 + size > o.N + 10000) {
-                console.error("that square is not inside " + t); process.exit(1);
-              }
-            }
-            console.log("tile=" + t);
-            console.log("e0=" + e0); console.log("n0=" + n0);
-            console.log("e1=" + (e0 + size)); console.log("n1=" + (n0 + size));
-            console.log("size=" + size);
-          ' >> "$GITHUB_OUTPUT"
+          args=("$PLACE")
+          if [ -n "$SQUARE" ]; then args+=(--square "$SQUARE")
+          elif [ -n "$SIZE" ]; then args+=(--size "$SIZE"); fi
+          node packs/plan-square.js "${args[@]}" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
       # DEFRA moved its lidar off Esri image services onto OGC ones and
@@ -270,7 +261,7 @@ jobs:
       - name: Measure
         if: inputs.probe_only != 'true'
         env:
-          TILE: ${{ inputs.tile }}
+          TILE: ${{ steps.ext.outputs.tile }}
           PACK: ${{ inputs.pack }}
           E0: ${{ steps.ext.outputs.e0 }}
           N0: ${{ steps.ext.outputs.n0 }}
@@ -285,7 +276,7 @@ jobs:
       - name: Commit
         if: inputs.probe_only != 'true'
         env:
-          TILE: ${{ inputs.tile }}
+          TILE: ${{ steps.ext.outputs.tile }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
