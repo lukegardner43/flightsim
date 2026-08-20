@@ -29,7 +29,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { bng, tileOrigin } = require('./grid-square.js');
+const { bng, tileOrigin, bngToWgs84 } = require('./grid-square.js');
 const { fitRoof } = require('./roof-fit.js');
 
 function arg(name, dflt) {
@@ -45,7 +45,7 @@ const TILE = arg('tile').toUpperCase();
 const ORIGIN = arg('origin', '');
 /* which pack file to annotate — normally the tile's own, but the original
    centre-mode packs are named after their postcode */
-const PACK_ID = arg('pack', '').toLowerCase() || TILE.toLowerCase();
+const PACK_ID = arg('pack', '').toLowerCase();
 const N = +arg('size', '10000');            /* samples across the tile */
 const PIX = +arg('pixel', '1');             /* metres per sample */
 const DRY = process.argv.includes('--dry-run');
@@ -85,14 +85,55 @@ function normalise(dsmPath, dtmPath) {
   return { grid: out, noData: noData };
 }
 
-/* ---- reading the pack this tile already has ---- */
-function readPack(id) {
-  const f = path.join(__dirname, id + '.js');
-  if (!fs.existsSync(f)) { console.error('no pack at ' + f + ' — build the footprints first'); process.exit(1); }
-  const src = fs.readFileSync(f, 'utf8');
-  const m = /^TF_PACK\(([\s\S]*)\);\s*$/.exec(src.trim());
-  if (!m) { console.error('cannot parse ' + f); process.exit(1); }
-  return { file: f, pack: JSON.parse(m[1]) };
+/* ---- reading the pack this tile already has ----
+   Packs built in tile mode are named after their tile, but the original
+   centre-mode ones are named after a postcode — so "the pack for TQ15" is
+   not a filename you can assume. Asking every pack whether it covers the
+   square is both cheaper and more reliable than making the caller know,
+   and getting that wrong is exactly what failed the first run that
+   otherwise worked end to end. */
+function loadPack(f) {
+  const m = /^TF_PACK\(([\s\S]*)\);\s*$/.exec(fs.readFileSync(f, 'utf8').trim());
+  return m ? JSON.parse(m[1]) : null;
+}
+function readPack(id, box) {
+  if (id) {
+    const f = path.join(__dirname, id + '.js');
+    if (!fs.existsSync(f)) { console.error('no pack at ' + f); process.exit(1); }
+    const pack = loadPack(f);
+    if (!pack) { console.error('cannot parse ' + f); process.exit(1); }
+    return { file: f, pack: pack };
+  }
+  /* nobody said which, so find the one that covers this ground */
+  const skip = /^(grid-square|make-pack|make-heights|plan-tiles|check-model-sites|roof-fit|wcs-service)\.js$/;
+  const found = [];
+  for (const name of fs.readdirSync(__dirname).sort()) {
+    if (!name.endsWith('.js') || skip.test(name)) continue;
+    let pack = null;
+    try { pack = loadPack(path.join(__dirname, name)); } catch (e) { continue; }
+    if (!pack || !pack.buildings || !pack.bbox) continue;
+    const b = pack.bbox;                        /* [minLat, minLon, maxLat, maxLon] */
+    const overlaps = !(box.maxLat < b[0] || box.minLat > b[2] ||
+                       box.maxLon < b[1] || box.minLon > b[3]);
+    console.log('  pack ' + name.replace(/\.js$/, '') + ': ' +
+                pack.buildings.length.toLocaleString() + ' footprints, ' +
+                (overlaps ? 'covers this square' : 'elsewhere'));
+    if (overlaps) found.push({ file: path.join(__dirname, name), pack: pack,
+                              n: pack.buildings.length,
+                              exact: name === TILE.toLowerCase() + '.js' ? 1 : 0 });
+  }
+  if (!found.length) {
+    console.error('no pack covers that square — build the footprints first ' +
+                  '(Actions -> "Build building packs")');
+    process.exit(1);
+  }
+  /* A pack named after the tile is the tile's pack and wins outright; only
+     when there is no such thing does size decide, and then it is the one
+     with most to say about this ground. */
+  found.sort((a, b) => (b.exact - a.exact) || (b.n - a.n));
+  if (found.length > 1)
+    console.log('  chose ' + path.basename(found[0].file) + ' of ' + found.length + ' that overlap');
+  return found[0];
 }
 /* rings come back delta-encoded at 1e-6 degrees */
 function decodeRing(enc, q) {
@@ -123,13 +164,24 @@ function packHeight(f) {
 }
 
 function main() {
-  const { file, pack } = readPack(PACK_ID);
   let o = tileOrigin(TILE);
   if (ORIGIN) {
     const v = ORIGIN.split(',').map(Number);
     if (v.length !== 2 || v.some(isNaN)) { console.error('--origin must be E,N'); process.exit(1); }
     o = { E: v[0], N: v[1] };
   }
+  /* the square being measured, in degrees, so a pack can be asked whether
+     it holds any of it */
+  const c1 = bngToWgs84(o.E, o.N), c2 = bngToWgs84(o.E + N*PIX, o.N + N*PIX);
+  const c3 = bngToWgs84(o.E, o.N + N*PIX), c4 = bngToWgs84(o.E + N*PIX, o.N);
+  const box = {
+    minLat: Math.min(c1.lat, c2.lat, c3.lat, c4.lat),
+    maxLat: Math.max(c1.lat, c2.lat, c3.lat, c4.lat),
+    minLon: Math.min(c1.lon, c2.lon, c3.lon, c4.lon),
+    maxLon: Math.max(c1.lon, c2.lon, c3.lon, c4.lon)
+  };
+  const { file, pack } = readPack(PACK_ID, box);
+  console.log('using ' + path.basename(file));
   console.log(TILE + ': ' + pack.buildings.length.toLocaleString() + ' footprints, origin ' +
               o.E + ',' + o.N);
 

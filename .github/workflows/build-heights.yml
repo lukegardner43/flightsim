@@ -28,7 +28,7 @@ on:
         description: 'OS 10 km tile, e.g. TQ15'
         required: true
       pack:
-        description: 'Pack id to annotate, if not the tile itself (e.g. kt233hp)'
+        description: 'Leave blank — the pack covering the square is found automatically. Only set this to force a particular one (e.g. kt233hp).'
         required: false
         default: ''
       square:
@@ -195,7 +195,7 @@ jobs:
           set -euo pipefail
           CHUNK=1000
           chunked() {   # $1 dsm|dtm   $2 source dataset
-            local out="$1" src="$2" n=0 ok
+            local out="$1" src="$2" n=0 ok missing=0
             local across=$(( (E1-E0+CHUNK-1)/CHUNK ))
             local TOTAL=$(( across*across ))
             echo "  $out: $TOTAL squares of ${CHUNK} m"
@@ -215,10 +215,25 @@ jobs:
                   echo "  $out square $n attempt $try failed; waiting $((try*15))s"
                   sleep $((try*15))
                 done
-                [ "$ok" = "1" ] || { echo "::error::$out square $n failed five times"; exit 1; }
+                if [ "$ok" != "1" ]; then
+                  # One stubborn square is not a reason to throw away the
+                  # other twenty-four. It is left out of the mosaic, the
+                  # buildings under it simply get no reading, and the count
+                  # at the end says how many were lost.
+                  echo "::warning::$out square $n failed five times — leaving it out"
+                  rm -f "$f"
+                  missing=$((missing+1))
+                fi
               done
               echo "  $out: column at E=$e done ($n of $TOTAL squares)"
             done
+            local got
+            got=$(ls "$out.parts"/*.tif 2>/dev/null | wc -l)
+            if [ "$got" = "0" ]; then echo "::error::$out: every square failed"; exit 1; fi
+            if [ "$missing" != "0" ]; then
+              echo "::warning::$out: $missing of $TOTAL squares missing; those buildings keep no reading"
+            fi
+            echo "  $out: mosaicking $got squares"
             gdalbuildvrt -q "$out.mosaic.vrt" "$out.parts"/*.tif
             gdalwarp -q -overwrite -te "$E0" "$N0" "$E1" "$N1" -tr 1 1 \
               -ot Float32 -dstnodata -9999 -of ENVI "$out.mosaic.vrt" "$out.img"

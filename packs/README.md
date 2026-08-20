@@ -128,27 +128,6 @@ pack file — keep it if you share them:
 > Contains OS data © Crown copyright and database right. Open Government
 > Licence v3.
 
-## Measured heights, from lidar — PARKED
-
-**Status: the measuring works, the downloading does not. Nothing here is
-wired into a flight, because no pack carries heights yet, so the sim is
-exactly as it was without it.**
-
-What is done and tested: `roof-fit.js` (12 synthetic roofs recovered,
-including ground bleed and a chimney), `make-heights.js` (a synthetic tile
-round-tripped end to end, 6 of 6 buildings recovered with the right shapes),
-and the sim side (a synthetic pack moved 644 buildings from `estimated` to
-`measured`).
-
-What is not done: getting the actual surface out of the Environment Agency.
-Four CI runs, three distinct causes found and fixed, still failing. The
-notes below are the map of that minefield for whoever picks this up. If it is
-not going to be finished, the honest options are to delete
-`make-heights.js`, `roof-fit.js`, `wcs-service.js`, `build-heights.yml` and
-the `lidarDress` path in `index.html`, or to leave them inert as they are.
-
----
-
 ## Measured heights, from lidar
 
 A footprint pack says where the buildings are. It can also say how tall they
@@ -220,17 +199,29 @@ learned from failed runs rather than from documentation:
    seconds. The server also returns the odd 502 under sustained load, so each
    square gets five attempts with a lengthening pause.
 
+4. **Leave `pack` blank.** It used to default to the tile's own name, and the
+   first run that downloaded perfectly then died on `no pack at packs/tq15.js`
+   — because the only pack in this repository is named after a postcode. The
+   pack covering the square is found by asking each one whether it holds any
+   of that ground.
+
 **Measure a small square first.** The `square` input takes `E,N,size` and
 fetches only that much:
 
 ```
-tile TQ15   pack kt233hp   square 511700,154400,2000
+tile TQ15   square 511700,154400,2000     (leave pack blank)
 ```
 
-is the 2 km around Great Bookham — 1,724 of the tile's 20,630 footprints, about
-a minute, against roughly half an hour for the whole tile. Squares accumulate:
-footprints outside the square keep whatever reading they already had, so you
-can measure the village, look at it, and fill in the rest later.
+is the 2 km around Great Bookham — **1,724** of the tile's 20,630 footprints,
+about a minute, against roughly half an hour for the whole tile. Pick the
+square with care: `515000,152000` is inside TQ15 but out in the fields, and
+holds only 136 footprints.
+
+Squares accumulate. Footprints outside the square being measured keep whatever
+reading they already had, so you can do the village, look at it, and fill in
+the rest later. And a square that will not download after five attempts is
+left out of the mosaic rather than failing the run — the buildings under it
+simply keep no reading, and the log says how many were lost.
 
 **A lidar surface cannot do bridges.** It is one height per square metre with
 no concept of "under" — a bridge comes out as solid ground where the gap
