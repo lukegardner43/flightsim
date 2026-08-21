@@ -26,8 +26,9 @@ on:
   workflow_dispatch:
     inputs:
       place:
-        description: 'A postcode, or an OS 10 km tile — e.g. "KT23 3HP" or TQ15'
+        description: 'A postcode, or an OS 10 km tile — e.g. "KT23 3HP" or TQ15. Two letters on their own is a 100 km square, not a tile.'
         required: true
+        default: 'TQ15'
       pack:
         description: 'Leave blank — the pack covering the square is found automatically. Only set this to force a particular one (e.g. kt233hp).'
         required: false

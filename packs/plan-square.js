@@ -24,6 +24,11 @@ const SQUARE = arg('square', '');
 const CENTRE = arg('centre', '');
 const place = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2].trim() : '';
 
+const USAGE = 'give a postcode or a 10 km OS tile:\n' +
+  '  "KT23 3HP"   a postcode, with a size for the square around it\n' +
+  '  TQ15         a 10 km tile; with a size, the square in the middle of it\n' +
+  '  TQ15 --square 511700,154400,2000   a named square of that tile';
+
 function snap(v) { return Math.round(v / 100) * 100; }
 
 function emit(tile, e0, n0, size) {
@@ -53,7 +58,24 @@ async function main() {
     if (v.length !== 2 || v.some(isNaN)) { console.error('--centre must be lat,lon'); process.exit(1); }
     return fromLatLon(v[0], v[1]);
   }
-  if (!place) { console.error('give a postcode or an OS tile, e.g. "KT23 3HP" or TQ15'); process.exit(1); }
+  if (!place) { console.error(USAGE); process.exit(1); }
+
+  /* Something that is plainly a grid reference but not a tile should say so
+     here rather than be handed to the postcode service, which can only
+     report that it has never heard of it. Two letters on their own is a
+     100 km square: a hundred kilometres across, and not a thing to measure. */
+  const bare = place.replace(/\s+/g, '').toUpperCase();
+  if (/^[A-Z]{2}$/.test(bare)) {
+    console.error(bare + ' is a 100 km grid square, not a 10 km tile — it is a ' +
+      'hundred kilometres across.\nAdd the two digits of the tile you want, ' +
+      'e.g. ' + bare + '15, or give a postcode.');
+    process.exit(1);
+  }
+  if (/^[A-Z]{2}\d+$/.test(bare) && bare.length !== 4) {
+    console.error('not a 10 km tile: ' + bare + ' — a tile is two letters and ' +
+      'exactly two digits, e.g. TQ15.');
+    process.exit(1);
+  }
 
   /* an OS tile is two letters and two digits and nothing else */
   if (/^[A-Za-z]{2}\d{2}$/.test(place.replace(/\s+/g, ''))) {
@@ -73,7 +95,8 @@ async function main() {
   const r = await fetch('https://api.postcodes.io/postcodes/' + encodeURIComponent(place));
   const j = await r.json().catch(() => null);
   if (!j || !j.result || j.result.latitude == null) {
-    console.error('postcode not found: ' + place);
+    console.error('not a postcode and not a 10 km tile: ' + place);
+    console.error(USAGE);
     process.exit(1);
   }
   console.error('  ' + j.result.postcode + ' -> ' + j.result.latitude + ',' + j.result.longitude +
