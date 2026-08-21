@@ -228,47 +228,97 @@ function main() {
   const tally = { measured: 0, thin: 0, outside: 0, none: 0, split: 0, partN: 0 };
   const shapes = {};
   let sumEaves = 0;
-  /* ---- what the surface actually looks like over a house ----
+  /* ---- what the surface actually looks like over a building ----
 
      A summary per building cannot tell you whether a reading is wrong or the
-     roof is simply shallow. This can: every sample over every two-storey
-     house-sized footprint, stacked by how far in from the wall it sits. The
-     ramp at the edge, the pitch of the roof and where the ridge really is are
-     all readable straight off it, and it costs one pass. */
-  const PROF = { n: 0, sum: [], cnt: [], top: 0, eaves: 0, ridge: 0 };
-  function profile(ring, f) {
-    const box = orientedBox(ring);
-    if (!box) return;
-    const uLen = box.u1 - box.u0, vLen = box.v1 - box.v0;
-    const ar = uLen * vLen;
-    if (ar < 60 || ar > 200) return;              /* house-sized */
-    if (!(f.eaves >= 4.5 && f.eaves <= 6.5)) return;   /* two-storey, so the
-                                                          heights are comparable */
-    const useU = uLen <= vLen;                    /* a roof slopes across the short side */
-    const half = (useU ? uLen : vLen) / 2;
+     roof is simply shallow, and the first version of this — the mean height
+     against distance in from the wall — could not either. It came back as a
+     smooth curve with no straight part anywhere, which is the signature of a
+     SMOOTHED step rather than of a roof, but a 5.7 m eaves blurred over four
+     metres and a 2.9 m eaves blurred over two produce the same curve. The
+     mean cannot separate them.
+
+     Two things can. First, percentiles rather than a mean: where a bin is a
+     mixture of roof and ground it is wide, and where it is a surface it is
+     tight. Second, and decisively, a ruler with no pitch in it — a FLAT roof
+     of known height. Its profile can only be the edge blur, and normalising
+     each one by its own height stacks buildings of every size onto one
+     curve. Where that curve reaches 1.00 is how far the wall smears, full
+     stop, and every other reading here can be judged against it. */
+  function bins() { return { at: [], n: 0 }; }
+  const PITCH = bins(), FLAT = bins();
+  function add(p, k, v) { (p.at[k] || (p.at[k] = [])).push(v); }
+  function walk(ring, fn) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const p of ring) {
       if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
       if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
     }
-    const got = [];
     for (let y = Math.floor(y0) + 0.5; y < y1; y += PIX)
       for (let x = Math.floor(x0) + 0.5; x < x1; x += PIX) {
         if (!pip(x, y, ring)) continue;
         const z = sample(x, y);
-        if (!isFinite(z)) continue;
-        const c = useU ? (x * box.ux + y * box.uy - box.u0)
-                       : (-x * box.uy + y * box.ux - box.v0);
-        const w = half - Math.abs(c - half);
-        const k = Math.round(w / 0.5);
-        PROF.sum[k] = (PROF.sum[k] || 0) + z;
-        PROF.cnt[k] = (PROF.cnt[k] || 0) + 1;
-        got.push(z);
+        if (isFinite(z)) fn(x, y, z);
       }
-    if (got.length < 8) return;
-    got.sort((a, b) => a - b);
-    PROF.n++; PROF.top += pct(got, 0.99);
-    PROF.eaves += f.eaves; PROF.ridge += f.eaves + f.roofH;
+  }
+  function profile(ring, f) {
+    const box = orientedBox(ring);
+    if (!box) return;
+    const uLen = box.u1 - box.u0, vLen = box.v1 - box.v0, ar = uLen * vLen;
+    const uv = (x, y) => [x * box.ux + y * box.uy - box.u0,
+                          -x * box.uy + y * box.ux - box.v0];
+    /* The ruler. It cannot be chosen by the fitter's own verdict, because a
+       flat roof with a blurred edge has a slope on it and the fitter calls it
+       gabled — forty synthetic flat blocks came back 88% gabled. So flatness
+       is MEASURED instead, on a ring well inside the walls: a building wide
+       enough to have a middle, whose middle is all one height, is a flat roof
+       whatever anything else thinks, and its own middle height is the 1.00 to
+       scale by. Nothing here assumes what the blur is; it only assumes that
+       four metres in from the wall of a twenty metre building is roof. */
+    const shortSide = Math.min(uLen, vLen);
+    if (shortSide >= 16) {
+      const dist = [];
+      walk(ring, (x, y, z) => {
+        const [u, v] = uv(x, y);
+        dist.push([Math.min(uLen / 2 - Math.abs(u - uLen / 2),
+                            vLen / 2 - Math.abs(v - vLen / 2)), z]);
+      });
+      const mid = dist.filter(d => d[0] >= 4 && d[0] <= 8).map(d => d[1]);
+      if (mid.length >= 30) {
+        mid.sort((a, b) => a - b);
+        const H = pct(mid, 0.5);
+        if (pct(mid, 0.8) - pct(mid, 0.2) < 0.7 && H > 3) {
+          FLAT.n++;
+          for (const [w, z] of dist) if (w >= 0) add(FLAT, Math.round(w / 0.5), z / H);
+          return;
+        }
+      }
+    }
+    /* and the thing in question: a two-storey house-sized footprint,
+       measured across the short axis, which is the way a roof slopes */
+    if (ar < 60 || ar > 200) return;
+    if (!(f.eaves >= 4.5 && f.eaves <= 6.5)) return;
+    const useU = uLen <= vLen, half = (useU ? uLen : vLen) / 2;
+    PITCH.n++;
+    walk(ring, (x, y, z) => {
+      const c = uv(x, y)[useU ? 0 : 1];
+      const w = half - Math.abs(c - half);
+      if (w >= 0) add(PITCH, Math.round(w / 0.5), z);
+    });
+  }
+  function show(p, title, note, unit) {
+    if (p.n < 20) return;
+    console.log('\n' + title + ', from ' + p.n.toLocaleString() + ' buildings');
+    console.log(note);
+    console.log('   in (m)     p20    p50    p80    p95   samples');
+    for (let k = 0; k < p.at.length; k++) {
+      const v = p.at[k];
+      if (!v || v.length < 30) continue;
+      v.sort((a, b) => a - b);
+      console.log('    ' + (k * 0.5).toFixed(1).padStart(4) + '   ' +
+        [0.2, 0.5, 0.8, 0.95].map(q => pct(v, q).toFixed(2).padStart(6)).join(' ') +
+        '   ' + v.length.toLocaleString().padStart(7) + '  ' + unit(pct(v, 0.5)));
+    }
   }
   for (const enc of pack.buildings) {
     const ll = decodeRing(enc, q);
@@ -332,22 +382,13 @@ function main() {
     console.log('roof shapes ' + Object.keys(shapes).sort((a, b) => shapes[b] - shapes[a])
       .map(k => k + ' ' + (shapes[k] / tally.measured * 100).toFixed(0) + '%').join(', '));
   }
-  if (PROF.n >= 20) {
-    console.log('\nwhat the surface looks like over a two-storey house,');
-    console.log(PROF.n.toLocaleString() + ' house-sized footprints stacked by ' +
-                'distance in from the wall:');
-    console.log('   in (m)   mean height   samples');
-    for (let k = 0; k < PROF.cnt.length; k++) {
-      if (!PROF.cnt[k] || PROF.cnt[k] < 20) continue;
-      const mean = PROF.sum[k] / PROF.cnt[k];
-      console.log('    ' + (k * 0.5).toFixed(1).padStart(4) + '     ' + mean.toFixed(2).padStart(6) +
-                  '      ' + PROF.cnt[k].toLocaleString().padStart(7) +
-                  '  ' + '#'.repeat(Math.max(0, Math.round(mean * 4))));
-    }
-    console.log('mean 99th percentile of the raw samples ' + (PROF.top / PROF.n).toFixed(2) + ' m; ' +
-                'fitted eaves ' + (PROF.eaves / PROF.n).toFixed(2) + ' m, ' +
-                'fitted ridge ' + (PROF.ridge / PROF.n).toFixed(2) + ' m');
-  }
+  show(FLAT, 'the edge blur, measured on flat roofs',
+       'height as a fraction of that roof\'s own height, so buildings of every\n' +
+       'size stack; where it reaches 1.00 is how far in the wall smears',
+       m => '#'.repeat(Math.max(0, Math.round(m * 30))));
+  show(PITCH, 'the surface over a two-storey house',
+       'metres above ground, across the short axis, which is the way a roof slopes',
+       m => '#'.repeat(Math.max(0, Math.round(m * 4))));
   if (DRY) { console.log('dry run: nothing written'); return; }
   fs.writeFileSync(file, 'TF_PACK(' + JSON.stringify(pack) + ');\n');
   console.log('wrote ' + file + ' (' + Math.round(fs.statSync(file).size / 1024) + ' KB)');
