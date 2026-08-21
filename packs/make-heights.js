@@ -30,7 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 const { bng, tileOrigin, bngToWgs84 } = require('./grid-square.js');
-const { fitRoof, fitParts } = require('./roof-fit.js');
+const { fitRoof, fitParts, orientedBox, pip, pct } = require('./roof-fit.js');
 
 function arg(name, dflt) {
   const i = process.argv.indexOf('--' + name);
@@ -228,6 +228,48 @@ function main() {
   const tally = { measured: 0, thin: 0, outside: 0, none: 0, split: 0, partN: 0 };
   const shapes = {};
   let sumEaves = 0;
+  /* ---- what the surface actually looks like over a house ----
+
+     A summary per building cannot tell you whether a reading is wrong or the
+     roof is simply shallow. This can: every sample over every two-storey
+     house-sized footprint, stacked by how far in from the wall it sits. The
+     ramp at the edge, the pitch of the roof and where the ridge really is are
+     all readable straight off it, and it costs one pass. */
+  const PROF = { n: 0, sum: [], cnt: [], top: 0, eaves: 0, ridge: 0 };
+  function profile(ring, f) {
+    const box = orientedBox(ring);
+    if (!box) return;
+    const uLen = box.u1 - box.u0, vLen = box.v1 - box.v0;
+    const ar = uLen * vLen;
+    if (ar < 60 || ar > 200) return;              /* house-sized */
+    if (!(f.eaves >= 4.5 && f.eaves <= 6.5)) return;   /* two-storey, so the
+                                                          heights are comparable */
+    const useU = uLen <= vLen;                    /* a roof slopes across the short side */
+    const half = (useU ? uLen : vLen) / 2;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of ring) {
+      if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+      if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+    }
+    const got = [];
+    for (let y = Math.floor(y0) + 0.5; y < y1; y += PIX)
+      for (let x = Math.floor(x0) + 0.5; x < x1; x += PIX) {
+        if (!pip(x, y, ring)) continue;
+        const z = sample(x, y);
+        if (!isFinite(z)) continue;
+        const c = useU ? (x * box.ux + y * box.uy - box.u0)
+                       : (-x * box.uy + y * box.ux - box.v0);
+        const w = half - Math.abs(c - half);
+        const k = Math.round(w / 0.5);
+        PROF.sum[k] = (PROF.sum[k] || 0) + z;
+        PROF.cnt[k] = (PROF.cnt[k] || 0) + 1;
+        got.push(z);
+      }
+    if (got.length < 8) return;
+    got.sort((a, b) => a - b);
+    PROF.n++; PROF.top += pct(got, 0.99);
+    PROF.eaves += f.eaves; PROF.ridge += f.eaves + f.roofH;
+  }
   for (const enc of pack.buildings) {
     const ll = decodeRing(enc, q);
     const ring = [];
@@ -257,7 +299,8 @@ function main() {
     if (f.fill < 0.45) { heights.push(0); parts.push(0); tally.thin++; continue; }
     const v = packHeight(f);
     heights.push(v);
-    if (v) { tally.measured++; sumEaves += f.eaves; shapes[f.shape] = (shapes[f.shape] || 0) + 1; }
+    if (v) { tally.measured++; sumEaves += f.eaves; shapes[f.shape] = (shapes[f.shape] || 0) + 1;
+             try { profile(ring, f); } catch (e) { /* diagnostics never fail a run */ } }
     else tally.none++;
     /* and the massing inside it: one height per building is a lie about most
        British houses, and the surface shows the step */
@@ -288,6 +331,22 @@ function main() {
                 tally.partN.toLocaleString() + ' parts in all');
     console.log('roof shapes ' + Object.keys(shapes).sort((a, b) => shapes[b] - shapes[a])
       .map(k => k + ' ' + (shapes[k] / tally.measured * 100).toFixed(0) + '%').join(', '));
+  }
+  if (PROF.n >= 20) {
+    console.log('\nwhat the surface looks like over a two-storey house,');
+    console.log(PROF.n.toLocaleString() + ' house-sized footprints stacked by ' +
+                'distance in from the wall:');
+    console.log('   in (m)   mean height   samples');
+    for (let k = 0; k < PROF.cnt.length; k++) {
+      if (!PROF.cnt[k] || PROF.cnt[k] < 20) continue;
+      const mean = PROF.sum[k] / PROF.cnt[k];
+      console.log('    ' + (k * 0.5).toFixed(1).padStart(4) + '     ' + mean.toFixed(2).padStart(6) +
+                  '      ' + PROF.cnt[k].toLocaleString().padStart(7) +
+                  '  ' + '#'.repeat(Math.max(0, Math.round(mean * 4))));
+    }
+    console.log('mean 99th percentile of the raw samples ' + (PROF.top / PROF.n).toFixed(2) + ' m; ' +
+                'fitted eaves ' + (PROF.eaves / PROF.n).toFixed(2) + ' m, ' +
+                'fitted ridge ' + (PROF.ridge / PROF.n).toFixed(2) + ' m');
   }
   if (DRY) { console.log('dry run: nothing written'); return; }
   fs.writeFileSync(file, 'TF_PACK(' + JSON.stringify(pack) + ');\n');
