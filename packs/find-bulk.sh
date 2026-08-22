@@ -82,23 +82,64 @@ if get "survey app" "$DEFRA/survey" "$WORK/survey.html"; then
   [ -s "$WORK/apis.txt" ] || echo "      (nothing that looks like an API in them)"
 fi
 
-hr "4. shapes worth trying against $TILE"
-# Every one of these is a guess and is labelled as one. The point is that the
-# log then says which guess was right, rather than a run failing on it.
-for u in \
-  "$DEFRA/backend/catalog/api/tiles/collections/survey/products/lidar_composite_dsm/tiles/$TILE" \
-  "$DEFRA/backend/catalog/api/tiles/collections/survey/tiles/$TILE" \
-  "$DEFRA/spatialdata/lidar-composite-digital-surface-model-last-return-dsm-1m/downloads" \
-  "$DEFRA/spatialdata/lidar-composite-digital-surface-model-last-return-dsm-1m/wcs?service=WCS&version=2.0.1&request=DescribeCoverage" \
-  ; do
-  get "$(printf '%s' "$u" | sed "s#$DEFRA##" | cut -c1-44)" "$u" "$WORK/try" && head -c 300 "$WORK/try" | tr -d '\000' | sed 's/^/      /'
-  echo
-done
+hr "4. the survey index, which is where the tile list should live"
+# The first run of this found no download URL, because every shape in this
+# section was mine. What it DID find, in the CKAN resources, was a "Metadata
+# Survey Index Catalogues" published as OGC API Features and WFS — an index
+# of survey tiles is exactly the thing that would carry a download URL per
+# tile. So this section stopped guessing shapes and started following that.
+IDX=$DEFRA/spatialdata/survey-index-files
+BBOX=${BBOX:--0.4257,51.2386,-0.2791,51.3265}     # TQ15 in lon/lat
+
+if get "ogc features landing" "$IDX/ogc/features/v1" "$WORK/ogc.json"; then
+  head -c 400 "$WORK/ogc.json" | sed 's/^/      /'; echo
+fi
+if get "its collections" "$IDX/ogc/features/v1/collections" "$WORK/cols.json"; then
+  node -e '
+    const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const c = j.collections || [];
+    console.log("      " + c.length + " collections");
+    for (const x of c.slice(0, 25))
+      console.log("      " + String(x.id).padEnd(46) + String(x.title || "").slice(0, 60));
+  ' "$WORK/cols.json" 2>/dev/null | head -30
+  # and what one item actually carries, which is the whole question
+  for col in $(node -e '
+      const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+      for (const x of (j.collections || [])) if (/lidar|composite|dsm|dtm|index/i.test(x.id + " " + (x.title||""))) console.log(x.id);
+    ' "$WORK/cols.json" 2>/dev/null | head -4); do
+    if get "  $col, one item" "$IDX/ogc/features/v1/collections/$col/items?limit=1" "$WORK/item.json"; then
+      node -e '
+        const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+        const f = (j.features || [])[0];
+        if (!f) { console.log("        (no features)"); process.exit(0); }
+        for (const [k, v] of Object.entries(f.properties || {}))
+          console.log("        " + k.padEnd(28) + String(v).slice(0, 90));
+      ' "$WORK/item.json" 2>/dev/null
+    fi
+    if get "  $col, over $TILE" "$IDX/ogc/features/v1/collections/$col/items?bbox=$BBOX&limit=4" "$WORK/box.json"; then
+      node -e '
+        const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+        console.log("        " + (j.features || []).length + " tiles over this square");
+        for (const f of (j.features || []))
+          console.log("        " + JSON.stringify(f.properties).slice(0, 200));
+      ' "$WORK/box.json" 2>/dev/null
+    fi
+  done
+fi
+
+hr "5. the WFS for the same index, in case the OGC one is not it"
+get "wfs capabilities" "$IDX/wfs?service=WFS&request=GetCapabilities" "$WORK/wfs.xml" &&   grep -oE '<(wfs:)?Name>[^<]+' "$WORK/wfs.xml" | sed 's/.*Name>//' | sort -u | head -20 | sed 's/^/      /'
+
+hr "6. and whether the DSM has a tiled service worth using"
+get "wmts capabilities" "$DEFRA/spatialdata/lidar-composite-digital-surface-model-last-return-dsm-1m/wmts?request=GetCapabilities&service=WMTS&version=2.0.1" "$WORK/wmts.xml" &&   { grep -oE '<Format>[^<]+' "$WORK/wmts.xml" | sort -u | head | sed 's/^/      format /'
+    grep -oE '<ows:Identifier>[^<]+' "$WORK/wmts.xml" | sed 's/.*Identifier>//' | sort -u | head -12 | sed 's/^/      layer  /'; }
 
 hr "what to do with this"
 cat <<'NOTE'
-  A 200 with JSON in part 1, 2 or 4 that names .tif files is the answer: feed
-  those URLs to measure-tile.sh through DSM_URL and DTM_URL, which already
-  takes a direct download and skips the WCS entirely.
-  If everything here is a 404, the WCS stays and England stays a fortnight.
+  What is wanted is a property on an index feature that is a URL ending .tif
+  or .zip. Feed that to measure-tile.sh through DSM_URL / DTM_URL, which
+  already takes a direct download and skips the WCS entirely.
+  A WMTS in part 6 offering image/png is rendered hillshade, not elevation,
+  and is no use for measuring however fast it is. One offering a float or
+  tiff format is worth a look.
 NOTE
