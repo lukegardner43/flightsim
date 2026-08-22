@@ -13,13 +13,59 @@ repository, used to fill in the buildings OSM doesn't have.
 Everything happens on github.com. You don't need to install anything.
 
 1. Go to the **Actions** tab of this repository.
-2. Click **Build building packs** in the left-hand list.
+2. Click **Build a place** in the left-hand list.
 3. Click the **Run workflow** button on the right.
 4. Type one or more postcodes — `KT23 3HP, DH1 3LE` — and click the green
    **Run workflow**.
 
-Wait a few minutes. The job works out which tiles those places need, downloads
-the Ordnance Survey data, converts it, and commits the packs by itself.
+That one job does the lot: it works out which 10 km tiles those places need,
+downloads the Ordnance Survey footprints for the ones that have none, measures
+every footprint against Environment Agency lidar, and commits the result.
+
+It only does what the place actually adds. A tile already measured is left
+alone; a tile with footprints but no heights gets only the measuring; a
+postcode down the road from one already built usually costs nothing at all.
+`packs/tile-status.js` is what decides, and you can ask it yourself:
+
+    $ node packs/tile-status.js TQ04 TQ05 TQ14 TQ15
+    TQ04  no pack covers it — footprints and heights both needed
+    TQ05  kt233hp: 3,599 footprints, 4 measured (0%) — heights needed
+    TQ14  no pack covers it — footprints and heights both needed
+    TQ15  kt233hp: 14,918 footprints, 12,018 measured (81%)
+
+Note what it asks. Not "is there a file called `tq15.js`" but "does any pack
+hold ground inside TQ15, and how much of it has been measured" — because the
+older packs are named after the postcode they were built for.
+
+Budget about eleven minutes a tile for the lidar, so up to an hour for a place
+that sits where four tiles meet. Set **square** to `2000` if you would rather
+have the middle of each tile in a minute and fill the rest in later; squares
+accumulate, so nothing is wasted.
+
+### Why on demand, and not just build the country
+
+Because the country is about 20–30 million footprints and well over a
+gigabyte of packs, most of it moorland nobody will ever fly over — and GitHub
+would rather a repository stayed under one. The sim only ever loads the four
+tiles within 5.2 km of you, so the running cost is nothing; it is the storing
+and shipping that does not scale. Building on demand keeps what gets stored
+proportional to what somebody actually asked to see.
+
+The two narrower workflows are still there when you want them: **Build
+building packs** for footprints alone, and **Measure building heights from
+lidar** for one named square of one tile, which is the one to reach for when
+you are testing the fit rather than building a place.
+
+### Where the lidar reaches
+
+England, essentially: the Environment Agency's 1 m composite covers about 99%
+of it under the Open Government Licence, and that is what these workflows use.
+Wales publishes an equivalent for about 70% of the country, but through a tile
+catalogue rather than a WCS, so it needs the `dsm_url` / `dtm_url` fallback on
+the heights workflow. Scotland was around 15% flown as of January 2026 and is
+still being surveyed. Northern Ireland has river basins only. Footprints work
+anywhere in Great Britain, so everywhere gets surveyed outlines even where
+nothing has measured their height.
 
 ## Tiles, not postcodes
 

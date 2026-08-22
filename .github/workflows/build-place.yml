@@ -1,0 +1,202 @@
+name: Build a place
+
+# Everything one place needs, in one run: the surveyed building footprints,
+# and then the lidar measurements over them.
+#
+#   Actions tab  ->  "Build a place"  ->  type a postcode  ->  Run workflow
+#
+# This is the answer to "can the lidar cover the whole UK". It could, but the
+# packs for it come to well over a gigabyte, most of it moorland nobody will
+# ever fly over. So nothing is built until somebody asks for a place, and then
+# only what that place actually adds:
+#
+#   * footprints are stored per 10 km Ordnance Survey tile, so a second
+#     postcode down the road usually costs nothing at all
+#   * a tile already measured is left alone
+#   * a tile with footprints but no heights gets only the measuring
+#
+# packs/tile-status.js is what decides, and it asks the question properly:
+# not "is there a file called tq15.js" but "does any pack hold ground inside
+# TQ15, and how much of it has been measured" — because the older packs are
+# named after the postcode they were built for, not after a tile.
+#
+# England only for the heights. The Environment Agency's 1 m composite covers
+# about 99% of it under the Open Government Licence. Wales publishes an
+# equivalent for about 70% of the country but through a tile catalogue rather
+# than a WCS, so it needs the dsm_url / dtm_url fallback on the other
+# workflow; Scotland was only about 15% flown as of January 2026 and is still
+# being surveyed; Northern Ireland has river basins only. Footprints work
+# anywhere in Great Britain.
+#
+# Every input reaches the shell through the environment rather than being
+# pasted into a script, so a postcode containing shell characters is a
+# postcode, not a command.
+
+on:
+  workflow_dispatch:
+    inputs:
+      places:
+        description: 'Postcodes, comma separated, e.g. KT23 3HP, DH1 3LE'
+        required: true
+        default: 'KT23 3HP'
+      radius:
+        description: 'How far around each one to cover, in metres. 5200 is the sim''s whole square.'
+        required: false
+        default: '5200'
+      square:
+        description: 'Metres of each tile to measure, centred. Blank measures the whole 10 km tile — about 11 minutes a tile. 2000 is about a minute.'
+        required: false
+        default: ''
+      skip_heights:
+        description: 'Footprints only — no lidar'
+        required: false
+        default: 'false'
+      rebuild:
+        description: 'Redo tiles that are already built'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install GDAL
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gdal-bin
+          gdalinfo --version
+
+      # --- which tiles, and what is already done for each? ---
+      - name: Work out what is missing
+        id: plan
+        env:
+          PLACES: ${{ inputs.places }}
+          RADIUS: ${{ inputs.radius }}
+          REBUILD: ${{ inputs.rebuild }}
+        run: |
+          set -uo pipefail
+          node packs/plan-tiles.js "$PLACES" --radius "$RADIUS" > all.tsv
+          rc=$?
+          # 4 is "none of those postcodes resolved", which is the one worth
+          # stopping for; anything else non-zero is a real failure too
+          if [ "$rc" != "0" ]; then
+            echo "::error::Could not work out which tiles \"$PLACES\" needs (plan-tiles exited $rc)."
+            echo "::error::They have to be UK postcodes — TQ15 is a grid tile, not a postcode."
+            exit 1
+          fi
+          TILES=$(cut -f2 all.tsv | tr ',' '\n' | sort -u | tr '\n' ' ')
+          if [ -z "$TILES" ]; then echo "::error::no tiles came back"; exit 1; fi
+          echo "these places need: $TILES"
+          echo "tiles=$TILES" >> "$GITHUB_OUTPUT"
+          if [ "$REBUILD" = "true" ]; then
+            echo "rebuilding everything"
+            CSV=$(echo $TILES | tr -s ' ' ',' | sed 's/^,//;s/,$//')
+            echo "footprints=$CSV" >> "$GITHUB_OUTPUT"
+            echo "heights=$CSV"    >> "$GITHUB_OUTPUT"
+          else
+            node packs/tile-status.js $TILES
+          fi
+
+      # --- footprints for the tiles that have none ---
+      - name: Build the missing footprints
+        if: steps.plan.outputs.footprints != ''
+        env:
+          PLACES: ${{ inputs.places }}
+          RADIUS: ${{ inputs.radius }}
+          NEED: ${{ steps.plan.outputs.footprints }}
+        run: |
+          set -euo pipefail
+          # plan-tiles takes the tiles we already HAVE and plans the rest, so
+          # the ones needing footprints are everything minus the ones that do
+          # not need them
+          ALL="${{ steps.plan.outputs.tiles }}"
+          HAVE=$(for t in $ALL; do
+                   case ",$NEED," in *",$t,"*) ;; *) printf '%s,' "$t";; esac
+                 done | sed 's/,$//')
+          echo "already have footprints for: ${HAVE:-none}"
+          node packs/plan-tiles.js "$PLACES" --radius "$RADIUS" --have "$HAVE" > tiles.tsv
+          cat tiles.tsv
+          packs/build-tiles.sh tiles.tsv
+
+      - name: Find the lidar services
+        id: wcs
+        if: inputs.skip_heights != 'true' && steps.plan.outputs.heights != ''
+        run: packs/find-lidar.sh
+
+      # --- and the heights, one tile at a time ---
+      #
+      # A whole tile is a hundred 1 km chunks a surface and about eleven
+      # minutes; four tiles is most of an hour. That is the honest cost of
+      # doing a place properly, and it is paid once — fly anywhere else in
+      # those tiles afterwards and it is free. Set square to measure only the
+      # middle of each tile if you would rather have it in a minute.
+      #
+      # One tile that will not download does not cost the others: the run
+      # carries on and says which was lost.
+      - name: Measure them
+        if: inputs.skip_heights != 'true' && steps.plan.outputs.heights != ''
+        env:
+          NEED: ${{ steps.plan.outputs.heights }}
+          SQUARE: ${{ inputs.square }}
+          DSM_SLUG: ${{ steps.wcs.outputs.dsm_slug }}
+          DSM_COV: ${{ steps.wcs.outputs.dsm_cov }}
+          DTM_SLUG: ${{ steps.wcs.outputs.dtm_slug }}
+          DTM_COV: ${{ steps.wcs.outputs.dtm_cov }}
+        run: |
+          set -uo pipefail
+          LOST=""
+          for TILE in $(echo "$NEED" | tr ',' ' '); do
+            echo "::group::$TILE"
+            args=("$TILE")
+            [ -n "$SQUARE" ] && args+=(--size "$SQUARE")
+            if ! node packs/plan-square.js "${args[@]}" > sq.txt; then
+              echo "::warning::$TILE: could not work out the square"; LOST="$LOST $TILE"
+              echo "::endgroup::"; continue
+            fi
+            cat sq.txt
+            # read the values out by name rather than eval'ing the file
+            tile=$(sed -n 's/^tile=//p' sq.txt)
+            e0=$(sed -n 's/^e0=//p'   sq.txt); n0=$(sed -n 's/^n0=//p' sq.txt)
+            e1=$(sed -n 's/^e1=//p'   sq.txt); n1=$(sed -n 's/^n1=//p' sq.txt)
+            size=$(sed -n 's/^size=//p' sq.txt)
+            if packs/measure-tile.sh "$tile" "$e0" "$n0" "$e1" "$n1" "$size"; then
+              echo "$TILE done"
+            else
+              echo "::warning::$TILE: measuring failed — its footprints keep no heights"
+              LOST="$LOST $TILE"
+            fi
+            echo "::endgroup::"
+          done
+          if [ -n "$LOST" ]; then
+            echo "::warning::not measured:$LOST — re-run to try those again"
+          fi
+
+      - name: Commit
+        env:
+          PLACES: ${{ inputs.places }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packs/ index.html
+          if git diff --cached --quiet; then
+            echo "::notice::Everything these places need was already built. Nothing to do."
+            exit 0
+          fi
+          git commit -m "Built $PLACES: OS OpenMap Local footprints and Environment Agency lidar heights" \
+                     -m "Contains OS data (c) Crown copyright and database right, and public sector information licensed under the Open Government Licence v3. Built by .github/workflows/build-place.yml."
+          git push
+          echo "::notice::Done. Fly any of those postcodes — the report's tier line says how many buildings were measured rather than guessed."

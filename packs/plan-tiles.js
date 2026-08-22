@@ -47,10 +47,11 @@ async function resolve(place) {
 
   const bySquare = {};
   const all = new Set();
-  let already = 0;
+  let already = 0, resolved = 0;
   for (const place of list) {
     const p = await resolve(place);
     if (!p) continue;
+    resolved++;
     const tiles = tilesAround(p.lat, p.lon, RADIUS);
     const need = tiles.filter(t => !HAVE.has(t));
     already += tiles.length - need.length;
@@ -64,6 +65,15 @@ async function resolve(place) {
     }
   }
 
+  /* Told that every tile was already built, when in fact not one postcode
+     had resolved, is a misleading way to fail — and it is the failure a
+     mistyped postcode or an unreachable postcodes.io both produce. The two
+     are different and now say so. */
+  if (!resolved) {
+    console.error('none of those resolved: ' + list.join(', '));
+    console.error('they have to be UK postcodes, and postcodes.io has to be reachable');
+    process.exit(4);
+  }
   if (!all.size) { console.error('nothing new to build — every tile is already in the repo'); process.exit(3); }
   console.error(all.size + ' tile' + (all.size === 1 ? '' : 's') + ' to build across ' +
                 Object.keys(bySquare).length + ' grid square' +
