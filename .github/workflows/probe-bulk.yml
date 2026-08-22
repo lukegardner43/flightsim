@@ -13,9 +13,13 @@ on:
   workflow_dispatch:
     inputs:
       tile:
-        description: 'A tile to try the candidate URLs against'
+        description: 'A tile to try things against'
         required: false
         default: 'TQ15'
+      what:
+        description: 'sources | speed | both'
+        required: false
+        default: 'both'
 
 permissions:
   contents: read
@@ -29,7 +33,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Ask
+      - name: Ask what else is served
+        if: inputs.what != 'speed'
         env:
           TILE: ${{ inputs.tile }}
         run: packs/find-bulk.sh "$TILE"
+
+      - name: Install GDAL
+        if: inputs.what != 'sources'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gdal-bin
+
+      # Serial against parallel, on the same eight squares. This is the
+      # measurement England hangs on: if 3.25 s a chunk is the server
+      # thinking, eight at once cost barely more than one.
+      - name: Time one stream against eight
+        if: inputs.what != 'sources'
+        env:
+          TILE: ${{ inputs.tile }}
+        run: |
+          set -euo pipefail
+          eval "$(packs/find-lidar.sh)"
+          export DSM_SLUG DSM_COV DTM_SLUG DTM_COV
+          packs/time-fetch.sh "$TILE"
