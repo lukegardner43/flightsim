@@ -970,7 +970,7 @@ function modelParts(e, m){
 }
 
 /* PACKS-START */
-var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20630},{"id":"tq15","tile":"TQ15","name":"TQ15","file":"tq15.js","bbox":[51.229000000000006,-0.456,51.329,-0.296],"n":634}];
+var PACKS = [{"id":"kt233hp","name":"KT23 3HP","file":"kt233hp.js","bbox":[51.23963820517459,-0.4596478122378367,51.3337217948254,-0.3102701877621633],"n":20630}];
 /* PACKS-END */
 /* Packs are stored per 10 km Ordnance Survey tile, so two nearby places share
    their coverage instead of each carrying an overlapping square of its own.
@@ -1032,6 +1032,7 @@ function loadOnePack(p){
   PACK.files.push(f);
   var el = document.createElement("script");
   el.src = "packs/" + p.file;
+  el.setAttribute("data-optional", "1");   /* a pack may simply not be here */
   el.onerror = function(){ if(f.state === "loading") f.state = "failed"; };
   document.head.appendChild(el);
   /* a missing file on a slow host must not wedge the load */
@@ -1042,6 +1043,7 @@ function loadModels(){
   for(var i=0;i<MODEL_FILES.length;i++){
     var el = document.createElement("script");
     el.src = "models/" + MODEL_FILES[i];
+    el.setAttribute("data-optional", "1");   /* reported by its own handler */
     el.onerror = (function(f){ return function(){ report("Landmark models", new Error(f + " not found")); }; })(MODEL_FILES[i]);
     document.head.appendChild(el);
   }
@@ -4921,6 +4923,7 @@ window.TF_PLANE = function(d){
 function loadPlaneModel(){
   var el = document.createElement("script");
   el.src = "plane/hawk.js";
+  el.setAttribute("data-optional", "1");
   el.onerror = function(){};                    /* the generated one stays */
   document.head.appendChild(el);
 }
@@ -6113,6 +6116,21 @@ window.__sim = {
   window.__diag = diag;
 
   window.addEventListener("error", function(e){
+    /* This listener CAPTURES, which is the only way to see a cross-origin
+       script error at all — and it therefore also sees the error event that a
+       <script>, <img> or <link> fires when it fails to LOAD. That is not an
+       uncaught exception, and several of these loads are meant to be allowed
+       to fail: a pack the manifest lists that this deployment does not carry,
+       a landmark model that does not exist for this square, the generated
+       aircraft when no built one is present. Each already handles its own
+       failure. Reported here as a fatal runtime error, they made a page that
+       was working perfectly well announce that it had crashed. */
+    var el = e.target;
+    if(el && el !== window && el.nodeType === 1){
+      if(!el.getAttribute("data-optional"))
+        diag("Could not load", el.src || el.href || el.tagName, false);
+      return;
+    }
     var m = e.message || "(masked by cross-origin)";
     diag("Runtime error", m + (e.filename ? "  @ " + e.filename + ":" + e.lineno : ""), true);
   }, true);
