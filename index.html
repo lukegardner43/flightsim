@@ -1024,6 +1024,39 @@ window.TF_PACK = function(d){
   /* injected without a manifest entry — take it anyway rather than drop it */
   PACK.files.push({p:{id:d.id, name:d.name || d.id, file:d.id + ".js", tile:d.tile}, data:d, state:"loaded"});
 };
+/* ---- waiting for the files this page carries itself ----
+
+   The surveyed packs, the landmark models and the aircraft all live under
+   this page's own origin, and every one of them is loaded as a <script> tag,
+   which is to say asynchronously. The world used to start building the moment
+   go was pressed, so a model that arrived a second later had nothing left to
+   attach to: modelFor is asked once, as each building is made, and a model
+   that has not loaded yet is simply not there. Off a local disk that never
+   showed. Over a network it is a coin toss, and there is over a megabyte and
+   a half of it — a 478 KB aircraft, a pack of a megabyte, the models.
+
+   So these are counted out and counted back in, and the map data waits. */
+var LOCAL = {out:0, done:null};
+function localTrack(el){
+  LOCAL.out++;
+  function settled(){
+    if(el.__settled) return;                    /* load and error both fire on some paths */
+    el.__settled = true;
+    if(--LOCAL.out === 0 && LOCAL.done){ var f = LOCAL.done; LOCAL.done = null; f(); }
+  }
+  el.addEventListener("load", settled);
+  el.addEventListener("error", settled);
+}
+/* Resolves true when every one of them has landed or failed, false if they
+   are still going after ms — because a file that will never arrive must not
+   cost more than the waiting for it. */
+function localSettled(ms){
+  if(!LOCAL.out) return Promise.resolve(true);
+  return new Promise(function(res){
+    var t = setTimeout(function(){ LOCAL.done = null; res(false); }, ms);
+    LOCAL.done = function(){ clearTimeout(t); res(true); };
+  });
+}
 function loadPacks(list){
   for(var i=0;i<list.length;i++) loadOnePack(list[i]);
 }
@@ -1034,6 +1067,7 @@ function loadOnePack(p){
   el.src = "packs/" + p.file;
   el.setAttribute("data-optional", "1");   /* a pack may simply not be here */
   el.onerror = function(){ if(f.state === "loading") f.state = "failed"; };
+  localTrack(el);
   document.head.appendChild(el);
   /* a missing file on a slow host must not wedge the load */
   setTimeout(function(){ if(f.state === "loading") f.state = "failed"; }, 20000);
@@ -1045,6 +1079,7 @@ function loadModels(){
     el.src = "models/" + MODEL_FILES[i];
     el.setAttribute("data-optional", "1");   /* reported by its own handler */
     el.onerror = (function(f){ return function(){ report("Landmark models", new Error(f + " not found")); }; })(MODEL_FILES[i]);
+    localTrack(el);
     document.head.appendChild(el);
   }
 }
@@ -4925,6 +4960,7 @@ function loadPlaneModel(){
   el.src = "plane/hawk.js";
   el.setAttribute("data-optional", "1");
   el.onerror = function(){};                    /* the generated one stays */
+  localTrack(el);
   document.head.appendChild(el);
 }
 function b64bytes(s){
@@ -5253,7 +5289,14 @@ $("go").onclick = function(){
       }catch(err){ report("Terrain", err); }
       return ok;
     });
-  startLoad();
+  /* Alongside the terrain fetch, not after it: the terrain is the slower of
+     the two, so waiting for our own files is usually free. */
+  status("loading packs, models and aircraft …");
+  localSettled(15000).then(function(ok){
+    if(!ok && window.__diag)
+      window.__diag("Local files", "still arriving after 15 s — building the world without them", false);
+    startLoad();
+  });
 };
 function raceTimeout(p, ms, fallback){
   return Promise.race([p, new Promise(function(res){ setTimeout(function(){ res(fallback); }, ms); })]);
