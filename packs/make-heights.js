@@ -228,6 +228,7 @@ function main() {
   const tally = { measured: 0, thin: 0, outside: 0, none: 0, split: 0, partN: 0 };
   const shapes = {};
   let sumEaves = 0;
+  const pitch = [];
   /* ---- what the surface actually looks like over a building ----
 
      A summary per building cannot tell you whether a reading is wrong or the
@@ -384,7 +385,15 @@ function main() {
     const v = packHeight(f);
     heights.push(v);
     if (v) { tally.measured++; sumEaves += f.eaves; shapes[f.shape] = (shapes[f.shape] || 0) + 1;
-             try { profile(ring, f); } catch (e) { /* diagnostics never fail a run */ } }
+             try {
+               profile(ring, f);
+               const bx = orientedBox(ring);
+               if (bx) {
+                 const uL = bx.u1 - bx.u0, vL = bx.v1 - bx.v0, span = Math.min(uL, vL);
+                 if (uL * vL >= 60 && uL * vL <= 200 && span > 3 && f.roofH > 0.2)
+                   pitch.push(Math.atan(f.roofH / (span / 2)) * 180 / Math.PI);
+               }
+             } catch (e) { /* diagnostics never fail a run */ } }
     else tally.none++;
     /* and the massing inside it: one height per building is a lie about most
        British houses, and the surface shows the step */
@@ -415,6 +424,18 @@ function main() {
                 tally.partN.toLocaleString() + ' parts in all');
     console.log('roof shapes ' + Object.keys(shapes).sort((a, b) => shapes[b] - shapes[a])
       .map(k => k + ' ' + (shapes[k] / tally.measured * 100).toFixed(0) + '%').join(', '));
+    /* Pitch per BUILDING, never averaged across them. A population profile
+       cannot give you this: at four metres in from the wall only the deeper
+       buildings are still contributing, so the curve flattens for a reason
+       that has nothing to do with roofs. Each building against its own span
+       has no such confound. */
+    if (pitch.length > 20) {
+      pitch.sort((a, b) => a - b);
+      const q = f => pitch[Math.round((pitch.length - 1) * f)].toFixed(0);
+      console.log('roof pitch per building, degrees: p10 ' + q(0.1) + ', p25 ' + q(0.25) +
+                  ', median ' + q(0.5) + ', p75 ' + q(0.75) + ', p90 ' + q(0.9) +
+                  '  (' + pitch.length.toLocaleString() + ' house-sized)');
+    }
   }
   show(FLAT, 'the edge blur, measured on flat roofs',
        'height as a fraction of that roof\'s own height, so buildings of every\n' +
