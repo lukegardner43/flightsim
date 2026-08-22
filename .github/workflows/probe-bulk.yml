@@ -1,0 +1,35 @@
+name: Find the bulk lidar downloads
+
+# Read-only. Asks the Environment Agency what it serves besides the WCS, and
+# prints everything with its HTTP code. Writes nothing, commits nothing.
+#
+# The reason it exists is a measurement: over the WCS we get 1.2 MB/s, which
+# makes a 10 km tile eleven minutes and England 235 hours. The same lidar is
+# published as 5 km GeoTIFFs — eight files a tile rather than two hundred
+# requests. All that is missing is the URL, and guessing at one is what cost a
+# whole run last time.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tile:
+        description: 'A tile to try the candidate URLs against'
+        required: false
+        default: 'TQ15'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ask
+        env:
+          TILE: ${{ inputs.tile }}
+        run: packs/find-bulk.sh "$TILE"
