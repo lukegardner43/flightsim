@@ -245,8 +245,8 @@ function main() {
      each one by its own height stacks buildings of every size onto one
      curve. Where that curve reaches 1.00 is how far the wall smears, full
      stop, and every other reading here can be judged against it. */
-  function bins() { return { at: [], n: 0 }; }
-  const PITCH = bins(), FLAT = bins();
+  function bins() { return { at: [], n: 0, seen: 0 }; }
+  const PITCH = bins(), FLAT = bins(), RIDGE = bins();
   function add(p, k, v) { (p.at[k] || (p.at[k] = [])).push(v); }
   function walk(ring, fn) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -276,15 +276,16 @@ function main() {
        scale by. Nothing here assumes what the blur is; it only assumes that
        four metres in from the wall of a twenty metre building is roof. */
     const shortSide = Math.min(uLen, vLen);
-    if (shortSide >= 16) {
+    if (shortSide >= 12) {
+      FLAT.seen++;
       const dist = [];
       walk(ring, (x, y, z) => {
         const [u, v] = uv(x, y);
         dist.push([Math.min(uLen / 2 - Math.abs(u - uLen / 2),
                             vLen / 2 - Math.abs(v - vLen / 2)), z]);
       });
-      const mid = dist.filter(d => d[0] >= 4 && d[0] <= 8).map(d => d[1]);
-      if (mid.length >= 30) {
+      const mid = dist.filter(d => d[0] >= 3 && d[0] <= 7).map(d => d[1]);
+      if (mid.length >= 20) {
         mid.sort((a, b) => a - b);
         const H = pct(mid, 0.5);
         if (pct(mid, 0.8) - pct(mid, 0.2) < 0.7 && H > 3) {
@@ -294,20 +295,53 @@ function main() {
         }
       }
     }
-    /* and the thing in question: a two-storey house-sized footprint,
-       measured across the short axis, which is the way a roof slopes */
-    if (ar < 60 || ar > 200) return;
-    if (!(f.eaves >= 4.5 && f.eaves <= 6.5)) return;
+    /* and the thing in question: a house-sized footprint, measured across the
+       short axis, which is the way a roof slopes.
+
+       The ruler below must NOT be filtered by the fitted eaves, however
+       tempting: the eaves reading is what is on trial, and selecting cases by
+       it would decide the answer in advance. Everything the ruler reports is
+       a fraction of the house's own ridge, so houses of every height stack
+       without needing to be alike. Only the PITCH table, which is in metres
+       and so has to compare like with like, keeps the two-storey window. */
+    if (ar < 60 || ar > 250) return;
     const useU = uLen <= vLen, half = (useU ? uLen : vLen) / 2;
-    PITCH.n++;
+    const longLen = useU ? vLen : uLen;
+    const twoStorey = f.eaves >= 4.5 && f.eaves <= 6.5;
+    if (twoStorey) PITCH.n++;
+    /* The second ruler, and the one there is no shortage of. ALONG a ridge a
+       gabled roof is flat — the height depends only on how far across you
+       are, not how far along — so the length of every ordinary house is a
+       flat roof lying on its side, and the gable ends are its walls. That
+       turns a handful of industrial sheds into hundreds of houses.
+
+       A hipped roof does fall away at its ends and would read as blur, so
+       the upper percentiles are what to look at: a hip drags the p20 down
+       and leaves the p80 alone. */
+    const keep = Math.max(1.0, half * 0.36);
+    const band = [];
     walk(ring, (x, y, z) => {
-      const c = uv(x, y)[useU ? 0 : 1];
+      const p = uv(x, y), c = p[useU ? 0 : 1], a = p[useU ? 1 : 0];
       const w = half - Math.abs(c - half);
-      if (w >= 0) add(PITCH, Math.round(w / 0.5), z);
+      if (w >= 0 && twoStorey) add(PITCH, Math.round(w / 0.5), z);
+      if (Math.abs(c - half) <= keep) band.push([Math.min(a, longLen - a), z]);
     });
+    const flat = band.filter(d => d[0] > 4).map(d => d[1]);
+    if (flat.length >= 10) {
+      flat.sort((p, q) => p - q);
+      const H = pct(flat, 0.5);
+      if (H > 3) {
+        RIDGE.n++;
+        for (const [d, z] of band) if (d >= 0) add(RIDGE, Math.round(d / 0.5), z / H);
+      }
+    }
   }
   function show(p, title, note, unit) {
-    if (p.n < 20) return;
+    if (p.n < 8) {
+      console.log('\n' + title + ': only ' + p.n + ' buildings qualified' +
+                  (p.seen ? ' of ' + p.seen + ' considered' : '') + ', too few to read');
+      return;
+    }
     console.log('\n' + title + ', from ' + p.n.toLocaleString() + ' buildings');
     console.log(note);
     console.log('   in (m)     p20    p50    p80    p95   samples');
@@ -385,6 +419,10 @@ function main() {
   show(FLAT, 'the edge blur, measured on flat roofs',
        'height as a fraction of that roof\'s own height, so buildings of every\n' +
        'size stack; where it reaches 1.00 is how far in the wall smears',
+       m => '#'.repeat(Math.max(0, Math.round(m * 30))));
+  show(RIDGE, 'the edge blur, measured along the ridges of houses',
+       'height as a fraction of that ridge\'s own height, against distance in\n' +
+       'from the gable end; look at p80, which a hipped roof cannot drag down',
        m => '#'.repeat(Math.max(0, Math.round(m * 30))));
   show(PITCH, 'the surface over a two-storey house',
        'metres above ground, across the short axis, which is the way a roof slopes',

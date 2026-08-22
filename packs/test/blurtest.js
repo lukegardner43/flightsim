@@ -8,7 +8,7 @@ const fs=require('fs'), cp=require('child_process'), path=require('path');
 const ROOT=path.resolve(__dirname, '..', '..'), SP=__dirname;
 const { tileOrigin, bngToWgs84 } = require(ROOT+'/packs/grid-square.js');
 const BLUR = +(process.argv[2] || 1.5);          // metres of edge smear
-const TILE='TQ15', N=700, PIX=1, o=tileOrigin(TILE);
+const TILE='TQ15', N=1000, PIX=1, o=tileOrigin(TILE);
 
 const B=[];
 let seed=7; const rnd=()=>((seed=(seed*1103515245+12345)&0x7fffffff)/0x7fffffff);
@@ -17,14 +17,24 @@ for(let i=0;i<40;i++){
            w:18+Math.round(rnd()*16), d:14+Math.round(rnd()*12),
            h:4+Math.round(rnd()*14) });               // 4..18 m, flat
 }
-/* the surface: a flat roof, its edge ramped over BLUR metres either side of
-   the wall, exactly as a sample straddling a wall averages both */
+/* and ordinary gabled houses, for the ruler that runs along a ridge: eaves
+   in the window the diagnostic looks at, a roof of a pitch we chose, and the
+   same blur on every wall */
+for(let i=0;i<48;i++){
+  B.push({ x:70+(i%8)*80, y:680+Math.floor(i/8)*50,
+           w:12+Math.round(rnd()*6), d:8+Math.round(rnd()*3),
+           e:5.0+rnd()*1.2, r:8.2+rnd()*1.0, gabled:true });
+}
+/* the surface: a roof, its edge ramped over BLUR metres either side of the
+   wall, exactly as a sample straddling a wall averages both */
 function roofAt(b,E,Nn){
   const u=E-(o.E+b.x), v=Nn-(o.N+b.y);
   const inside=Math.min(b.w/2-Math.abs(u), b.d/2-Math.abs(v));
   if(inside<=-BLUR) return null;
-  if(inside>=BLUR) return b.h;
-  return b.h*((inside+BLUR)/(2*BLUR));
+  /* ridge runs along u, so the slope is across v */
+  const top = b.gabled ? b.e+(b.r-b.e)*(1-Math.min(1,Math.abs(v)/(b.d/2))) : b.h;
+  if(inside>=BLUR) return top;
+  return top*((inside+BLUR)/(2*BLUR));
 }
 const dsm=Buffer.allocUnsafe(N*N*4), dtm=Buffer.allocUnsafe(N*N*4);
 for(let row=0;row<N;row++){
@@ -56,6 +66,7 @@ console.log('so the roof is at full height from '+BLUR.toFixed(1)+' m in, and th
 console.log('should read 1.00 there and below it nearer the wall.\n');
 const out=cp.execSync('node '+ROOT+'/packs/make-heights.js --tile '+TILE+' --pack tq15'+
   ' --dsm '+SP+'/b-dsm.img --dtm '+SP+'/b-dtm.img --size '+N+' --pixel '+PIX,{encoding:'utf8'});
-console.log(out.split('the edge blur')[1] ? 'the edge blur'+out.split('the edge blur')[1] : out);
+const cut = out.indexOf('the edge blur');
+console.log(cut < 0 ? out : out.slice(cut));
 fs.unlinkSync(packFile);
 fs.unlinkSync(SP+'/b-dsm.img'); fs.unlinkSync(SP+'/b-dtm.img');
