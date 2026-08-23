@@ -21,6 +21,16 @@
 # The server also returns the odd 502 under sustained load, so each square
 # gets five attempts with a lengthening pause between them.
 #
+# Eight squares are fetched at once. That is measured rather than hoped for:
+# packs/time-fetch.sh asked whether 1.2 MB/s was the server's ceiling or one
+# stream's, and fetched the same eight squares serially and eight at a time.
+#
+#   one at a time    29.0 s   1.10 MB/s   8 of 8 back
+#   8 at once         9.0 s   3.56 MB/s   8 of 8 back   speedup 3.2x
+#
+# So most of those 3.25 seconds was the server thinking, not the wire, and a
+# 10 km tile goes from about twelve minutes to four. Set PAR to change it.
+#
 # Lives here rather than inside a workflow because two workflows need it.
 
 TILE=${1:?give the tile, e.g. TQ15}
@@ -32,7 +42,8 @@ export DSM_SLUG=${DSM_SLUG:-} DSM_COV=${DSM_COV:-}
 export DTM_SLUG=${DTM_SLUG:-} DTM_COV=${DTM_COV:-}
 export GDAL_HTTP_TIMEOUT=600 GDAL_HTTP_CONNECTTIMEOUT=30
 export GDAL_HTTP_MAX_RETRY=5 GDAL_HTTP_RETRY_DELAY=5
-export CPL_VSIL_CURL_USE_HEAD=NO GDAL_CACHEMAX=1024
+# 256 rather than 1024: this is per PROCESS, and there are PAR of them
+export CPL_VSIL_CURL_USE_HEAD=NO GDAL_CACHEMAX=256
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 
@@ -42,48 +53,83 @@ cd "$ROOT"
 # open — which is exactly the run that left four files behind.
 scratch(){ rm -f dsm.img dtm.img dsm.hdr dtm.hdr dsm.xml dtm.xml \
                  dsm.xml.aux.xml dtm.xml.aux.xml \
-                 dsm.info dtm.info dsm.err dtm.err; }
+                 dsm.info dtm.info dsm.err dtm.err \
+                 dsm.jobs dtm.jobs dsm.mosaic.vrt dtm.mosaic.vrt
+           rm -rf dsm.parts dtm.parts; }
 trap scratch EXIT
 
 set -euo pipefail
 CHUNK=1000
-chunked() {   # $1 dsm|dtm   $2 source dataset
-  local out="$1" src="$2" n=0 ok missing=0
-  local across=$(( (E1-E0+CHUNK-1)/CHUNK ))
-  local TOTAL=$(( across*across ))
-  echo "  $out: $TOTAL squares of ${CHUNK} m"
-  rm -rf "$out.parts"; mkdir -p "$out.parts"
-  local e n0
-  for (( e=E0; e<E1; e+=CHUNK )); do
-    for (( n0=N0; n0<N1; n0+=CHUNK )); do
-      n=$((n+1))
-      local f
-      f=$(printf '%s.parts/%03d.tif' "$out" "$n")
-      ok=0
-      for try in 1 2 3 4 5; do
-        if gdalwarp -q -overwrite -t_srs EPSG:27700 \
-             -te "$e" "$n0" "$((e+CHUNK))" "$((n0+CHUNK))" -tr 1 1 -r bilinear \
-             -ot Float32 -dstnodata -9999 -co COMPRESS=DEFLATE \
-             "$src" "$f"; then ok=1; break; fi
-        echo "  $out square $n attempt $try failed; waiting $((try*15))s"
-        sleep $((try*15))
-      done
-      if [ "$ok" != "1" ]; then
-        # One stubborn square is not a reason to throw away the
-        # other twenty-four. It is left out of the mosaic, the
-        # buildings under it simply get no reading, and the count
-        # at the end says how many were lost.
-        echo "::warning::$out square $n failed five times — leaving it out"
-        rm -f "$f"
-        missing=$((missing+1))
-      fi
-    done
-    echo "  $out: column at E=$e done ($n of $TOTAL squares)"
+PAR=${PAR:-8}
+RETRY_WAIT=${RETRY_WAIT:-15}   # 0 in the tests, so the failure path is testable
+
+# One square, with its own retries. Runs in a subshell under xargs, so it
+# takes what it needs from the environment and NEVER fails: a square that
+# will not come is left out of the mosaic and counted by its absence. Failing
+# here would abort the other ninety-nine.
+fetch_one(){   # fetch_one <e> <n> <outfile>    SRC and LABEL from the caller
+  local e="$1" n="$2" f="$3" try name
+  name=$(basename "$f" .tif)
+  for try in 1 2 3 4 5; do
+    if gdalwarp -q -overwrite -t_srs EPSG:27700 \
+         -te "$e" "$n" "$((e+CHUNK))" "$((n+CHUNK))" -tr 1 1 -r bilinear \
+         -ot Float32 -dstnodata -9999 -co COMPRESS=DEFLATE \
+         "$SRC" "$f" && [ -s "$f" ]; then
+      return 0
+    fi
+    rm -f "$f"
+    [ "$try" = "5" ] && break
+    echo "  $LABEL square $name: attempt $try failed; waiting $((try*RETRY_WAIT))s"
+    if [ "$RETRY_WAIT" != "0" ]; then sleep $((try*RETRY_WAIT)); fi
   done
+  # One stubborn square is not a reason to throw away the other ninety-nine.
+  # It is left out of the mosaic, the buildings under it simply get no
+  # reading, and the count at the end says how many were lost.
+  echo "::warning::$LABEL square $name failed five times — leaving it out"
+  return 0
+}
+export -f fetch_one
+export RETRY_WAIT CHUNK
+
+chunked() {   # $1 dsm|dtm   $2 source dataset
+  local out="$1" src="$2" i=0 missing=0
+  local across=$(( (E1-E0+CHUNK-1)/CHUNK ))
+  local down=$(( (N1-N0+CHUNK-1)/CHUNK ))
+  local TOTAL=$(( across*down ))
+  echo "  $out: $TOTAL squares of ${CHUNK} m, $PAR at a time"
+  rm -rf "$out.parts"; mkdir -p "$out.parts"
+  export SRC="$src" LABEL="$out" CHUNK
+  local e n
+  : > "$out.jobs"
+  for (( e=E0; e<E1; e+=CHUNK )); do
+    for (( n=N0; n<N1; n+=CHUNK )); do
+      i=$((i+1))
+      printf '%s %s %s\n' "$e" "$n" "$(printf '%s.parts/%03d.tif' "$out" "$i")" >> "$out.jobs"
+    done
+  done
+  # Nothing prints per square any more, because eight workers interleaving a
+  # line each is not a progress report. A count every half minute is.
+  #
+  # It watches for the job list to be deleted rather than being killed, because
+  # a shell blocked in `sleep 30` does not die when you kill it — it finishes
+  # the sleep first, and the test paid thirty seconds a surface to find that
+  # out. Two second ticks, a line every fifteenth.
+  local watch
+  ( t=0
+    while [ -e "$out.jobs" ]; do
+      sleep 2; t=$((t+1))
+      if [ $((t % 15)) = 0 ]; then
+        echo "  $out: $(ls "$out.parts"/*.tif 2>/dev/null | wc -l) of $TOTAL squares"
+      fi
+    done ) & watch=$!
+  xargs -P "$PAR" -n 3 bash -c 'fetch_one "$0" "$1" "$2"' < "$out.jobs" || true
+  rm -f "$out.jobs"
+  wait "$watch" 2>/dev/null || true
   local got
   got=$(ls "$out.parts"/*.tif 2>/dev/null | wc -l)
+  missing=$(( TOTAL - got ))
   if [ "$got" = "0" ]; then echo "::error::$out: every square failed"; exit 1; fi
-  if [ "$missing" != "0" ]; then
+  if [ "$missing" -gt 0 ]; then
     echo "::warning::$out: $missing of $TOTAL squares missing; those buildings keep no reading"
   fi
   echo "  $out: mosaicking $got squares"

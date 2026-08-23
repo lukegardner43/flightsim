@@ -7,11 +7,15 @@ set -uo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 N=2000                       # a 2 km square: 4 chunks of 1 km, twice over
+export RETRY_WAIT=0          # so the five-attempt path costs nothing to test
 
 mkdir -p "$TMP/bin"
 cat > "$TMP/bin/gdalwarp" <<'STUB'
 #!/usr/bin/env bash
 out=${@: -1}
+echo "$out" >> "$TMP_LOG"
+# a square the test wants to lose, however many times it is asked for
+if [ -n "${FAIL_SQ:-}" ] && [[ "$out" == *"$FAIL_SQ" ]]; then exit 1; fi
 # the mosaic pass writes ENVI; the chunk passes write a stand-in tif
 if [[ "$*" == *"-of ENVI"* ]]; then
   python3 -c "
@@ -20,9 +24,11 @@ n=int(sys.argv[2])
 open(sys.argv[1],'wb').write(struct.pack('<%df'%(n*n),*([5.0]*(n*n))))
 " "$out" "${SQ:-2000}"
 else
-  : > "$out"
+  # NOT an empty file: measure-tile treats a zero-byte chunk as one that did
+  # not arrive, which is the whole point of the check, and a real GeoTIFF is
+  # never empty
+  echo stub > "$out"
 fi
-echo "$out" >> "$TMP_LOG"
 STUB
 printf '#!/usr/bin/env bash\n: > "${@: -1}"\n' > "$TMP/bin/gdalbuildvrt"
 printf '#!/usr/bin/env bash\necho "Driver: stub"\n'                > "$TMP/bin/gdalinfo"
@@ -68,5 +74,17 @@ grep -q 'origin 514000,154000' <<<"$out" && { echo "PASS  measured at the origin
                                          || echo "FAIL  wrong origin"
 grep -q 'using tiletest.js' <<<"$out" && { echo "PASS  used the pack it was told to, not a real one"; pass=$((pass+1)); } \
                                       || echo "FAIL  wrong pack"
-echo; echo "$pass/4 passed"
-[ "$pass" = "4" ]
+# --- and a square that will not come, however often it is asked ---
+: > "$TMP_LOG"
+lost=$(FAIL_SQ=002.tif "$ROOT/packs/measure-tile.sh" TQ15 514000 154000 516000 156000 "$N" tiletest 2>&1)
+lrc=$?
+tries=$(grep -c 'dsm.parts/002.tif' "$TMP_LOG")
+if [ "$lrc" = "0" ] && grep -q 'mosaicking 3 squares' <<<"$lost" && [ "$tries" = "5" ]; then
+  echo "PASS  a lost square is retried five times and costs only itself"; pass=$((pass+1))
+else
+  echo "FAIL  lost square: exit $lrc, $tries attempts, $(grep -c mosaicking <<<"$lost") mosaics"
+  grep -E 'warning|mosaicking' <<<"$lost" | head -4
+fi
+
+echo; echo "$pass/5 passed"
+[ "$pass" = "5" ]
