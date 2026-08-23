@@ -38,8 +38,26 @@ probe() {
   done
   return 1
 }
-dsm=$(probe dsm $DSM_SLUGS) || dsm=""
-dtm=$(probe dtm $DTM_SLUGS) || dtm=""
+# The service FLAPS. Measured this afternoon, on the same endpoint:
+#
+#   14:47   dsm 500   dtm 500
+#   14:54   dsm 200   dtm 200      a timing test ran, 8 of 8 chunks came back
+#   14:56   dsm 500   dtm 200      the full tile died here
+#
+# Two and a half minutes between a good answer and a bad one. measure-tile.sh
+# already retries the coverage open four times a minute apart for exactly this
+# reason — but this runs BEFORE it and had one attempt per slug, so the gate
+# with no retry behind it was failing the whole job before the part that does
+# retry ever ran. That is mine, not theirs.
+dsm=""; dtm=""
+for round in 1 2 3 4; do
+  [ -z "$dsm" ] && { dsm=$(probe dsm $DSM_SLUGS) || dsm=""; }
+  [ -z "$dtm" ] && { dtm=$(probe dtm $DTM_SLUGS) || dtm=""; }
+  [ -n "$dsm" ] && [ -n "$dtm" ] && break
+  [ "$round" = "4" ] && break
+  echo "  round $round of 4 came up short; waiting 45 s" >&2
+  sleep 45
+done
 if [ -z "$dsm" ] || [ -z "$dtm" ]; then
   # stderr, not stdout: the caller may be doing eval "$(find-lidar.sh)", and a
   # failure printed to stdout gets EVALUATED. That is not a hypothetical —
