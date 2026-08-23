@@ -56,7 +56,8 @@ const models = [];
 /* ============================================================ 1 */
 models.push({
   id:'stnicolas', name:'St Nicolas Church, Great Bookham',
-  match:['st nicolas','st nicholas'], near:[51.2790,-0.3766], radius:500,
+  match:['st nicolas','st nicholas'], near:[51.279800,-0.374011], radius:500,
+  nearSource:'Historic England 1028641; the coordinate was 185 m west, on a 7.6 m building instead of the 671 m2 church',
   orient:'compass',
   confidence:'high — rebuilt from the uploaded brief and its reference photograph',
   sources:[
@@ -108,7 +109,8 @@ models.push({
   for (const u of [-0.62,-0.22,0.22,0.62]) parts.push(dormer(u,0.76,2.0,11.6,13.2,C.redBrick,'slate',C.slate));
   models.push({
     id:'fetchampark', name:'Fetcham Park House',
-    match:['fetcham park'], near:[51.2917,-0.3543], radius:700,
+    match:['fetcham park'], near:[51.288599,-0.352202], radius:700,
+    nearSource:'Historic England 1188810 (TQ 15003 55674); the coordinate read 8.8 m off a neighbour, the house itself reads 14.5 m',
     orient:'compass',
     confidence:'high — brief plus its reference photograph',
     sources:[
@@ -123,7 +125,8 @@ models.push({
 /* ============================================================ 3 */
 models.push({
   id:'fetchamstmary', name:"St Mary's Church, Fetcham",
-  match:['st mary','fetcham church'], near:[51.2925,-0.3540], radius:600,
+  match:['st mary','fetcham church'], near:[51.288164,-0.352591], radius:600,
+  nearSource:'Historic England (TQ 14977 55625); it had been anchoring on the same footprint as Fetcham Park House, which cannot be both',
   orient:'compass',
   confidence:'high — brief plus its reference photograph',
   sources:[
@@ -203,7 +206,8 @@ models.push({
            1,100 m2 within 400 m.
        What was here before, TQ 1350 5298, is 580 m NORTH of the car park —
        the wrong side of it — and is Polesden Lacey Farm. */
-    near:[51.25752,-0.37367], radius:300, packRadius:150,
+    near:[51.257612,-0.373547], radius:300, packRadius:150,
+    nearSource:'Historic England 1028665 (TQ 13591 52195); this one was already right, and lands on the same 2,078 m2 range',
     orient:'compass', replaceOutline:true,
     confidence:'high — rebuilt from the uploaded brief and two reference photographs',
     sources:[
@@ -269,7 +273,8 @@ models.push({
   for (const u of [-0.48,-0.16,0.16,0.48]) parts.push(dormer(u,0.76,1.8,8.4,10.0,C.paleStuc,'slate',C.slate));
   models.push({
     id:'bookhamgrove', name:'Bookham Grove',
-    match:['bookham grove'], near:[51.2775,-0.3800], radius:800,
+    match:['bookham grove'], near:[51.276413,-0.372682], radius:800,
+    nearSource:'Historic England 1028634 (TQ 13605 54287); the coordinate read 7.9 m off something small, the house reads 13.8 m',
     orient:'compass',
     confidence:'medium — brief only, no photograph was embedded for this entry',
     sources:[
@@ -323,7 +328,8 @@ models.push({
   for (const u of [-0.62,0.20]) parts.push(chim(u,0,1.8,12.2,5.8,'#8f5340','substantial stack'));
   models.push({
     id:'anchorinn', name:'The Anchor Inn, Great Bookham',
-    match:['anchor'], near:[51.2845,-0.3735], radius:700,
+    match:['anchor'], near:[51.281658,-0.368310], radius:700,
+    nearSource:'Historic England 1234167 (TQ 13897 54877)',
     orient:'compass',
     confidence:'medium — brief only, no photograph was embedded for this entry',
     sources:[
@@ -352,7 +358,8 @@ models.push({
   for (const u of [-0.24,0.24]) parts.push(dormer(u,0.74,1.7,7.8,9.2,'#9d5442','tile',C.redTile));
   models.push({
     id:'ralphscross', name:'Ralphs Cross, 1 and 2 Leatherhead Road',
-    match:['ralphs cross',"ralph's cross"], near:[51.2820,-0.3660], radius:800,
+    match:['ralphs cross',"ralph's cross"], near:[51.277262,-0.366487], radius:800,
+    nearSource:'Historic England 1189115 (TQ 14035 54391); the coordinate was 528 m north of it, on nothing',
     orient:'compass', replaceOutline:true,
     confidence:'medium — brief only, no photograph was embedded for this entry',
     sources:[
@@ -386,7 +393,8 @@ models.push({
   for (const s of [[-0.52,0],[-0.06,0],[0.44,-0.06]]) parts.push(chim(s[0],s[1],2.4,10.6,5.2,'#94553f'));
   models.push({
     id:'roaringhouse', name:'Roaring House Farmhouse',
-    match:['roaring house'], near:[51.2700,-0.3860], radius:900,
+    match:['roaring house'], near:[51.275042,-0.353734], radius:900,
+    nearSource:'Historic England 1188778 (TQ 14930 54164); the coordinate was 2.3 km west of it, on nothing',
     confidence:'medium — brief only, no photograph was embedded for this entry',
     replaceOutline:true,
     sources:[
@@ -403,18 +411,147 @@ models.push({
    roof to leave at least 1.2 m of wall under it. Every height above is
    written as the height to the eaves because that is how a building is
    actually described, so convert here and check the clearance. */
-let bumped = 0;
 for (const m of models) for (const p of m.parts) {
   if (p.roofHeight == null || p.height == null) continue;
   p.height = +(p.height + p.roofHeight).toFixed(2);
-  const need = (p.minHeight || 0) + 1.2 + p.roofHeight;
-  if (p.height < need) { p.height = +need.toFixed(2); bumped++; }
 }
-console.log(bumped ? '  raised ' + bumped + ' part(s) to leave 1.2 m of wall under the roof' : '  no clearance problems');
 
 /* ---- keep the earlier landmarks that the brief does not cover ---- */
 const REPLACED = new Set(models.map(m => m.id));
 for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
+
+/* ---- and then let the laser have a say about how big they are ----
+
+   These heights were written from a brief and photographs. The Environment
+   Agency's lidar has now measured every footprint in the tile, and where a
+   model stands on one it can be held up against it.
+
+   What is compared is an AVERAGE OVER THE FOOTPRINT, both sides: every part
+   weighted by the ground it covers, against the pack's reading for that
+   footprint. That is the only symmetric comparison — picking "the main mass"
+   went wrong twice, once on a 5x2 m entrance surround and once on a terrace.
+
+   Three rules, and they matter more than the arithmetic:
+
+     * the model must STAND ON the footprint — inside its ring, or within
+       30 m of its centre. A reading from the building next door is worse
+       than no reading because it looks like an answer, and most of what
+       first looked like "the models are all too tall" was a coordinate
+       being wrong rather than a height.
+     * nothing slender is touched. If the model's tallest part is more than
+       1.35x its own footprint average it has a tower, a spire or a lantern
+       on it, and a 1 m grid blurred over 1.5 m cannot see those: St Nicolas'
+       spire, Polesden's clock lantern and Ranmore's 52 m spire are all
+       excluded by that one test. Lidar informs the main mass. It must never
+       overrule an authored spire.
+     * either direction. An earlier draft of this only corrected downwards,
+       on the evidence that ten of eleven models read taller than the ground.
+       That evidence was wrong: the checker was adding roofHeight to a
+       `height` this file has ALREADY made roof-inclusive, so every authored
+       figure was a roof too tall. With that fixed, eleven of the sixteen
+       agree within 2.5 m and the remainder fall both ways, so there is no
+       bias to lean on and the rule goes.
+
+   The factor is recorded on the model and divided back out before a new one
+   is worked out, so re-running this after a fresh measurement is idempotent
+   rather than shrinking everything a little more each time. */
+(function fitToLidar(){
+  const rings = [];
+  global.TF_PACK = d => {
+    const q = d.q || 1e6;
+    for (const a of d.buildings) {
+      const pts = []; let lat = a[0], lon = a[1];
+      pts.push([lat / q, lon / q]);
+      for (let i = 2; i < a.length; i += 2) { lat += a[i]; lon += a[i+1]; pts.push([lat/q, lon/q]); }
+      rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0 });
+    }
+  };
+  const dir = path.join(HERE, '..', 'packs');
+  for (const f of fs.readdirSync(dir).filter(f => /^[a-z0-9]+\.js$/.test(f)))
+    { try { require(path.join(dir, f)); } catch (e) {} }
+  if (!rings.length) { console.log('  no packs to measure against — heights left as authored'); return; }
+
+  const inRing = (pts, lat, lon) => {
+    let hit = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const yi = pts[i][0], xi = pts[i][1], yj = pts[j][0], xj = pts[j][1];
+      if ((yi > lat) !== (yj > lat) && lon < (xj-xi)*(lat-yi)/(yj-yi) + xi) hit = !hit;
+    }
+    return hit;
+  };
+  const stats = (pts, lat0) => {
+    const mLat = 110540, mLon = 111320 * Math.cos(lat0 * Math.PI/180);
+    let a2 = 0, cl = 0, co = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i+1) % pts.length];
+      const px = p[1]*mLon, py = p[0]*mLat, qx = q[1]*mLon, qy = q[0]*mLat;
+      const c = px*qy - qx*py; a2 += c; cl += (p[0]+q[0])*c; co += (p[1]+q[1])*c;
+    }
+    return { area: Math.abs(a2)/2, lat: cl/(3*a2), lon: co/(3*a2) };
+  };
+  const done = [];
+  for (const m of models) {
+    if (!m.near || !m.parts || !m.parts.length) continue;
+    /* undo whatever a previous run applied, so this is worked out from the
+       authored heights however many times it is run */
+    const had = m.measuredFit && m.measuredFit.factor;
+    if (had) for (const p of m.parts) {
+      if (p.height != null) p.height = +(p.height / had).toFixed(2);
+      if (p.roofHeight != null) p.roofHeight = +(p.roofHeight / had).toFixed(2);
+      if (p.minHeight != null) p.minHeight = +(p.minHeight / had).toFixed(2);
+    }
+    delete m.measuredFit;
+
+    const [tlat, tlon] = m.near;
+    const mLat = 110540, mLon = 111320 * Math.cos(tlat * Math.PI/180);
+    let site = null;
+    for (const r of rings) {
+      const s = stats(r.pts, tlat);
+      const d = Math.hypot((s.lat - tlat)*mLat, (s.lon - tlon)*mLon);
+      const on = inRing(r.pts, tlat, tlon);
+      if (!on && d > 30) continue;
+      if (!site || (on && !site.on) || (on === site.on && s.area > site.s.area)) site = { s, d, h: r.h, on };
+    }
+    if (!site || !site.h) continue;
+    const measured = (site.h & 1023)/10 + ((site.h >> 10) & 255)/10;
+
+    let sum = 0, area = 0, tallest = 0;
+    for (const p of m.parts) {
+      const h = (p.height || 0);
+      let a = 0;
+      if (p.on === 'footprint') a = site.s.area;
+      else if ((p.wF||0)*(p.dF||0) > 0) a = p.wF * p.dF * site.s.area;
+      else if ((p.w||0)*(p.d||0) > 0) a = p.w * p.d;
+      if (!(a > 0)) continue;
+      sum += a*h; area += a; if (h > tallest) tallest = h;
+    }
+    if (!(area > 0)) continue;
+    const authored = sum / area;
+    if (Math.abs(authored - measured) <= 2.5) continue;    /* close enough to leave alone */
+    if (tallest > authored * 1.35) continue;               /* a spire, and not ours to move */
+
+    const k = +(measured / authored).toFixed(4);
+    for (const p of m.parts) {
+      if (p.height != null) p.height = +(p.height * k).toFixed(2);
+      if (p.roofHeight != null) p.roofHeight = +(p.roofHeight * k).toFixed(2);
+      if (p.minHeight != null) p.minHeight = +(p.minHeight * k).toFixed(2);
+    }
+    m.measuredFit = { factor:k, authored:+authored.toFixed(1), measured:+measured.toFixed(1),
+      footprint:Math.round(site.s.area) + ' m2' + (site.on ? ' it stands on' : ' ' + Math.round(site.d) + ' m away'),
+      source:'Environment Agency LIDAR Composite DSM/DTM 1 m, averaged over the surveyed footprint' };
+    done.push(m.id + ' ' + authored.toFixed(1) + ' -> ' + measured.toFixed(1) + ' m (x' + k.toFixed(2) + ')');
+  }
+  console.log(done.length ? '  fitted to lidar: ' + done.join(', ') : '  nothing to fit to lidar');
+})();
+
+/* The roof must still leave a wall under it, and the fit above moved both. */
+let bumped = 0;
+for (const m of models) for (const p of m.parts) {
+  if (p.roofHeight == null || p.height == null) continue;
+  const need = +((p.minHeight || 0) + 1.2 + p.roofHeight).toFixed(2);
+  if (p.height < need) { p.height = need; bumped++; }
+}
+console.log(bumped ? '  raised ' + bumped + ' part(s) to leave 1.2 m of wall under the roof' : '  no clearance problems');
 
 const out = {
   id:'kt23-3hp',

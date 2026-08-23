@@ -33,9 +33,25 @@ global.TF_PACK = d => {
     let lat = a[0], lon = a[1];
     pts.push([lat / q, lon / q]);
     for (let i = 2; i < a.length; i += 2) { lat += a[i]; lon += a[i + 1]; pts.push([lat / q, lon / q]); }
-    rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0 });
+    rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0,
+                 p: (d.parts && d.parts[rings.length]) || null });
   }
 };
+/* The tallest box the surface was split into, which is the number to hold a
+   model's main mass against. One reading covers a whole footprint, so a house
+   with lower wings reads lower than its main block — the massing is what
+   tells the two apart, and comparing an authored main block against a
+   whole-footprint average understates it every time. */
+function tallestPart(p) {
+  if (!p || p.length < 3) return 0;
+  let top = 0;
+  for (let i = 2; i < p.length; i += 2) {
+    const v = p[i]; if (!v) continue;
+    const h = (v & 1023) / 10 + ((v >> 10) & 255) / 10;
+    if (h > top) top = h;
+  }
+  return top;
+}
 const packs = fs.readdirSync(path.join(root, 'packs')).filter(f => /^[a-z0-9]+\.js$/.test(f) &&
   !/^(make-pack|grid-square|plan-tiles|check-model-sites)\.js$/.test(f));
 for (const f of packs) require(path.join(root, 'packs', f));
@@ -86,11 +102,45 @@ function stats(pts, lat0) {
        blurred over a metre and a half the apex is smeared away. Lidar informs
        the main mass; it must never overrule an authored spire. */
 function unpackH(v){ return { eaves:(v & 1023)/10, roofH:((v >> 10) & 255)/10 }; }
-function mainMass(m){
+/* What the model would read if you flew a laser over it.
+
+   Picking "the main mass" is the wrong question, and I asked it twice. A part
+   is sized three ways — `on:'footprint'` is the surveyed outline itself,
+   wF/dF are FRACTIONS of it, w/d are metres — and sorting by metres alone
+   skipped every range of Polesden Lacey (four wings at 17.2 m, written as
+   fractions) to settle on the 5x2 m stone entrance surround. Sorting by
+   fraction instead put Thorncroft's main mass at 1.5 m, because its widest
+   fractional part is a terrace.
+
+   The measurement is an area-weighted average of roof height over a
+   footprint. So the model's comparable number is the same thing: every part
+   weighted by its plan area, in the same units, which the surveyed area
+   makes possible. That is symmetric, needs no judgement about which box
+   matters, and cannot be defeated by a wide low terrace or a tall thin
+   chimney — both are weighted by exactly what they cover.
+
+   The tallest part is reported beside it, because a spire is the one thing a
+   metre grid cannot see and must never be allowed to overrule. */
+function modelProfile(m, footArea) {
   const ps = m.parts || [];
-  let main = ps.find(p => p.on === 'footprint');
-  if (!main) main = ps.slice().sort((a,b) => (b.w||0)*(b.d||0) - (a.w||0)*(a.d||0))[0];
-  return main ? (main.height||0) + (main.roofHeight||0) : 0;
+  let sum = 0, area = 0, tallest = 0, what = '';
+  for (const p of ps) {
+    /* `height` in the JSON is ALREADY roof-inclusive — the builder converts
+       the authored eaves to OSM's whole-building height on the way out — so
+       adding roofHeight to it counts the roof twice. It did, and every
+       authored figure this printed was a roof too tall: the Anchor read
+       15.8 m when the model is 10.8. */
+    const h = (p.height || 0);
+    let a = 0;
+    if (p.on === 'footprint') a = footArea;
+    else if ((p.wF || 0) * (p.dF || 0) > 0) a = p.wF * p.dF * footArea;
+    else if ((p.w || 0) * (p.d || 0) > 0) a = p.w * p.d;
+    if (!(a > 0)) continue;
+    sum += a * h; area += a;
+    if (h > tallest) { tallest = h; what = p.note || p.type || ''; }
+  }
+  if (!(area > 0)) return null;
+  return { h: sum / area, tallest: tallest, what: what };
 }
 function ref(lat, lon) {
   const b = bng(lat, lon);
@@ -107,7 +157,7 @@ for (const m of models) {
   for (const r of rings) {
     const s = stats(r.pts, tlat);
     const d = Math.hypot((s.lat - tlat) * mLat, (s.lon - tlon) * mLon);
-    if (d < 400) found.push({ s, d, h: r.h, on: inside(r.pts, tlat, tlon) });
+    if (d < 400) found.push({ s, d, h: r.h, p: r.p, on: inside(r.pts, tlat, tlon) });
   }
   found.sort((a, b) => b.s.area - a.s.area);
   const best = found[0];
@@ -122,7 +172,6 @@ for (const m of models) {
   console.log(line + 'biggest near: ' + Math.round(best.s.area).toString().padStart(5) + ' m2 at ' +
     Math.round(best.d).toString().padStart(3) + ' m' +
     (claim ? ';  would take ' + Math.round(claim.s.area) + ' m2 at ' + Math.round(claim.d) + ' m' : '') + note);
-  const want = mainMass(m);
   /* Compare against the building the model STANDS ON, or against nothing.
 
      The anchor above is "biggest nearby, discounted by distance", which is
@@ -138,23 +187,32 @@ for (const m of models) {
      settle the height. */
   const site = found.filter(x => x.on).sort((a, b) => b.s.area - a.s.area)[0] ||
                found.filter(x => x.d <= 30).sort((a, b) => b.s.area - a.s.area)[0];
-  if (want && !site) {
+  const mm = modelProfile(m, site ? site.s.area : (claim ? claim.s.area : 500));
+  if (mm && !site) {
     astray++;
-    console.log(' '.repeat(28) + 'main mass ' + want.toFixed(1) +
-                ' m authored; nothing under this coordinate to check it against' +
+    console.log(' '.repeat(28) + 'averages ' + mm.h.toFixed(1) +
+                ' m over its own plan; nothing under this coordinate to check it against' +
                 (claim ? ' (nearest is ' + Math.round(claim.d) + ' m away)' : ''));
   }
-  if (site && want) {
-    if (!site.h) { unmeasured++; console.log(' '.repeat(28) + 'main mass ' + want.toFixed(1) +
-                    ' m authored; that footprint has no lidar reading yet'); }
+  if (site && mm) {
+    if (!site.h) { unmeasured++; console.log(' '.repeat(28) + 'averages ' + mm.h.toFixed(1) +
+                    ' m over its own plan; that footprint has no lidar reading yet'); }
     else {
-      const u = unpackH(site.h), got = u.eaves + u.roofH, d = want - got;
+      const u = unpackH(site.h), whole = u.eaves + u.roofH;
+      const top = tallestPart(site.p);
+      const d = mm.h - whole;
       checked++;
       const verdict = Math.abs(d) < 2.5 ? '' :
-        '   <-- ' + Math.abs(d).toFixed(1) + ' m ' + (d > 0 ? 'taller than measured' : 'shorter than measured');
+        '   <-- ' + Math.abs(d).toFixed(1) + ' m ' + (d > 0 ? 'taller' : 'shorter');
       if (verdict) off++;
-      console.log(' '.repeat(28) + 'main mass ' + want.toFixed(1).padStart(5) + ' m authored, ' +
-                  got.toFixed(1).padStart(5) + ' m measured' + verdict);
+      console.log(' '.repeat(28) + 'over the footprint: ' + mm.h.toFixed(1).padStart(5) +
+                  ' m authored, ' + whole.toFixed(1).padStart(5) + ' m measured' + verdict);
+      /* and the tallest thing on each, which is where a spire lives and where
+         the metre grid gives up */
+      console.log(' '.repeat(28) + 'tallest part:      ' + mm.tallest.toFixed(1).padStart(5) +
+                  ' m authored, ' + (top ? top.toFixed(1).padStart(5) + ' m in ' +
+                  ((site.p.length - 1) / 2) + ' measured boxes' : '    — not split') +
+                  (mm.what ? '   (' + String(mm.what).slice(0, 44) + ')' : ''));
     }
   }
 }
