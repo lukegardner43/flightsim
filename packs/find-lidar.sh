@@ -48,8 +48,18 @@ if [ -z "$dsm" ] || [ -z "$dtm" ]; then
   echo "::error::No lidar WCS answered — every slug above is a miss." >&2
   echo "::error::Download the 5 km DSM and DTM tiles for this square by hand from" >&2
   echo "::error::https://environment.data.gov.uk/survey and re-run with dsm_url / dtm_url." >&2
-  echo "--- first 40 lines of the last DSM response ---"
-  head -40 cap-dsm.xml 2>/dev/null || true
+  # Forty lines of whatever came back turned out to be a wall of
+  # styled-components CSS, because what the platform serves when the service
+  # is down is its own HTML front page. Say that, and show its title, rather
+  # than printing the stylesheet.
+  if head -c 600 cap-dsm.xml 2>/dev/null | grep -qi '<!doctype html\|<html'; then
+    echo "::error::The response was an HTML page, not XML — the platform is serving" >&2
+    echo "::error::its front page where the service should be:" >&2
+    sed -n 's/.*<title[^>]*>\([^<]*\)<\/title>.*/    title: \1/p' cap-dsm.xml | head -1 >&2
+  else
+    echo "--- first 20 lines of the last DSM response ---" >&2
+    head -20 cap-dsm.xml 2>/dev/null >&2 || true
+  fi
   exit 1
 fi
 OUT=$(printf 'dsm_slug=%s\ndsm_cov=%s\ndtm_slug=%s\ndtm_cov=%s\n' \
