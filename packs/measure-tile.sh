@@ -100,6 +100,32 @@ prepare() {  # $1 dsm|dtm  $2 direct url  $3 slug  $4 coverage
     echo "$1.xml"
   fi
 }
+# The Environment Agency's WCS answers GetCapabilities and then 500s on
+# DescribeCoverage, intermittently. GDAL needs DescribeCoverage to open the
+# coverage at all, gives up after about eleven seconds of its own retries, and
+# then reports "dsm.xml not recognized as a supported file format" — which
+# blames our file for their outage and sent me looking in the wrong place.
+# So the open is retried on a human timescale, and if it still will not go,
+# the log says whose fault it is.
+open_source(){ # open_source <dsm|dtm> <src>
+  local i
+  for i in 1 2 3 4; do
+    if gdalinfo "$2" > "$1.info" 2> "$1.err"; then head -6 "$1.info"; return 0; fi
+    echo "  $1: could not open the coverage (attempt $i)"
+    sed 's/^/    /' "$1.err" | head -4
+    [ "$i" = "4" ] && break
+    echo "  waiting 60 s"
+    sleep 60
+  done
+  echo "::error::$1: GDAL could not open the coverage after four attempts."
+  if grep -q '500' "$1.err"; then
+    echo "::error::Those are HTTP 500s from the Environment Agency's WCS, not a"
+    echo "::error::problem here — GetCapabilities answers and DescribeCoverage"
+    echo "::error::does not. It comes and goes; try again later, or pass"
+    echo "::error::dsm_url / dtm_url to download the 5 km tiles by hand."
+  fi
+  return 1
+}
 for which in dsm dtm; do
   if [ "$which" = "dsm" ]; then
     src=$(prepare dsm "$DSM_URL" "$DSM_SLUG" "$DSM_COV")
@@ -107,7 +133,7 @@ for which in dsm dtm; do
     src=$(prepare dtm "$DTM_URL" "$DTM_SLUG" "$DTM_COV")
   fi
   echo "--- $which from $src"
-  gdalinfo "$src" | head -6
+  open_source "$which" "$src" || exit 1
   time chunked "$which" "$src"
 done
 args=(--tile "$TILE" --dsm dsm.img --dtm dtm.img --origin "$E0,$N0" --size "$SIZE")
