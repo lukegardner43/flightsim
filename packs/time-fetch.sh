@@ -50,11 +50,21 @@ one(){ # one <e> <n> <out>
 }
 export -f one
 
-rate(){ # rate <label> <seconds>
-  local mb=$(( N * 4 ))
-  awk -v l="$1" -v s="$2" -v mb="$mb" \
-    'BEGIN{ printf "  %-22s %6.1f s   %5.2f MB/s\n", l, s, mb/s }'
+rate(){ # rate <label> <seconds> <how many came back>
+  local mb=$(( $3 * 4 ))
+  awk -v l="$1" -v s="$2" -v mb="$mb" -v g="$3" -v n="$N" \
+    'BEGIN{ printf "  %-22s %6.1f s   %5.2f MB/s   %d of %d back\n", l, s, (s>0?mb/s:0), g, n }'
 }
+# A fetch that FAILS returns in no time at all, so timing failures reports a
+# magnificent rate for having done nothing. one() returns gdalwarp's status
+# and the loops below ignored it, which would have made this whole test a
+# number measured off nothing — and not hypothetically: the Environment
+# Agency's WCS answers GetCapabilities and then 500s on DescribeCoverage often
+# enough to have killed a full-tile run this week, and under that every chunk
+# comes back at once and empty.
+# So count what actually arrived. Over 100 KB, because a 4 MB chunk that turns
+# up as a stub has not arrived either.
+count(){ ls -l "$1"*.tif 2>/dev/null | awk '$5 > 100000' | wc -l; }
 
 echo "$N squares of 1 km from $TILE, about $(( N * 4 )) MB each way"
 echo
@@ -62,7 +72,8 @@ echo
 t0=$SECONDS
 i=0; while read -r e n; do i=$((i+1)); one "$e" "$n" "s$i.tif"; done < squares.txt
 SER=$(( SECONDS - t0 )); [ "$SER" = "0" ] && SER=1
-rate "one at a time" "$SER"
+SGOT=$(count s)
+rate "one at a time" "$SER" "$SGOT"
 
 rm -f s*.tif
 t0=$SECONDS
@@ -70,11 +81,22 @@ i=0
 while read -r e n; do i=$((i+1)); printf '%s %s p%s.tif\n' "$e" "$n" "$i"; done < squares.txt \
   | xargs -P "$N" -n 3 bash -c 'one "$0" "$1" "$2"'
 PAR=$(( SECONDS - t0 )); [ "$PAR" = "0" ] && PAR=1
-rate "$N at once" "$PAR"
+PGOT=$(count p)
+rate "$N at once" "$PAR" "$PGOT"
 
-got=$(ls p*.tif 2>/dev/null | wc -l)
+if [ "$SGOT" != "$N" ] || [ "$PGOT" != "$N" ]; then
+  echo
+  echo "::warning::only $SGOT and $PGOT of $N squares actually came back, so the rates"
+  echo "::warning::above are timing failures as well as fetches and mean nothing."
+  if ! gdalinfo svc.xml > /dev/null 2> open.err; then
+    echo "  the coverage will not open at all:"
+    sed 's/^/    /' open.err | head -4
+    grep -q '500' open.err && \
+      echo "  those 500s are the Environment Agency's, not ours — try again later"
+  fi
+  exit 1
+fi
 echo
-echo "  $got of $N came back on the parallel pass"
 awk -v a="$SER" -v b="$PAR" 'BEGIN{ printf "  speedup %.1fx\n", a/b }'
 echo
 awk -v a="$SER" -v b="$PAR" -v n="$N" 'BEGIN{
