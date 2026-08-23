@@ -849,10 +849,47 @@ function modelAnchor(e){
    silently does not appear can be diagnosed from the report instead of by
    guessing. */
 var MODEL_MISS = [], MODEL_FROMPACK = [];
+/* A model whose own coordinate falls INSIDE this building has found it,
+   whatever the building is called — including nothing at all.
+
+   Matching by name alone is why Polesden Lacey came out drawn twice. OSM has
+   the house and does not name it, so no model attached to it and it was
+   built as an ordinary box, with a lidar height on it. The pack footprint
+   under it was recognised as a duplicate and set aside; claimPackFootprints
+   then handed that set-aside footprint to the model, which drew its ranges,
+   its dormers and its clock tower on top of the box already standing there.
+   The rule that removes an outline when modelled parts land inside it works
+   per batch, and by then the box was in a batch baked minutes earlier —
+   nothing can take it out again.
+
+   Claiming it here, before anything is drawn, removes the whole race: the
+   model stands on the OSM building, modelSeen stops the pack claim, and one
+   building is drawn once. Standing inside a surveyed ring is the strongest
+   evidence there is — eight of these coordinates were checked against
+   Historic England list entries — and it is the same rule the pack claim
+   already uses. */
+function modelHere(e){
+  if(!MODELS.length) return null;
+  var rings = ringsOf(e), outer = null, i;
+  for(i=0;i<rings.length;i++)
+    if(rings[i].role === "outer" && rings[i].pts.length > 2){ outer = rings[i].pts; break; }
+  if(!outer) return null;
+  var key = (e.type === "relation" ? "r" : "w") + e.id;
+  for(i=0;i<MODELS.length;i++){
+    var m = MODELS[i];
+    if(!m.near) continue;
+    if(modelSeen[m.id] && modelSeen[m.id] !== key) continue;
+    var c = toWorld(m.near[1], m.near[0]);
+    if(Math.abs(c.x) > 1e7 || Math.abs(c.z) > 1e7) continue;
+    if(pointInPoly({x:c.x, z:c.z}, outer)) return m;
+  }
+  return null;
+}
 function modelFor(t, e){
-  if(!MODELS.length || !t.name) return null;
+  if(!MODELS.length) return null;
+  if(!t.name) return modelHere(e);
   var g = modelAnchor(e);
-  if(!g) return null;
+  if(!g) return modelHere(e);
   var n = String(t.name).toLowerCase(), i, j;
   for(i=0;i<MODELS.length;i++){
     var m = MODELS[i], hit = false;
@@ -892,7 +929,7 @@ function modelFor(t, e){
     }
     return m;
   }
-  return null;
+  return modelHere(e);            /* named, but not one of ours — is it under one? */
 }
 function modelParts(e, m){
   var rings = ringsOf(e), outer = null, i;

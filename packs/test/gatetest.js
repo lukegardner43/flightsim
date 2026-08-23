@@ -11,8 +11,17 @@ const ROOT = path.resolve(__dirname, '..', '..');
 /* three.js normally comes off a CDN. If a copy is sitting next to this test
    it is used, so the test runs with no network at all; otherwise the request
    goes out as it would in a browser. */
-const LOCAL_THREE = path.join(__dirname, 'three.min.js');
-const THREE_JS = fs.existsSync(LOCAL_THREE) ? fs.readFileSync(LOCAL_THREE, 'utf8') : null;
+/* three.js normally comes off a CDN, which is where the browser gets it and
+   what CI exercises. Offline, a copy beside this test is used, and failing
+   that the devDependency — so `npm i` is all it takes to run these on a
+   machine with no network, instead of the manual download the skip message
+   used to ask for. */
+const THREE_JS = (function(){
+  for (const f of [path.join(__dirname, 'three.min.js'),
+                   path.join(ROOT, 'node_modules', 'three', 'build', 'three.min.js')])
+    { try { if (fs.existsSync(f)) return fs.readFileSync(f, 'utf8'); } catch (e) {} }
+  return null;
+})();
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64');
 const DELAY = +(process.argv[2] || 3000);
 const LAT = 51.28668, LON = -0.384959;
