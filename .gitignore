@@ -1,0 +1,10 @@
+# 19 MB of somebody else's code, restored by `npm i` in seconds
+node_modules/
+
+# what the workflows leave in the repository root while measuring a tile;
+# measure-tile.sh traps them away on exit, but a hard kill does not run traps
+dsm.img
+dtm.img
+dsm.hdr
+dtm.hdr
+*.mosaic.vrt
