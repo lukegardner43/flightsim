@@ -94,3 +94,4 @@ for (const t of cases){
   console.log((ok?'PASS ':'FAIL ')+t.name.padEnd(22)+' parts '+got+' (want '+t.want+')  '+detail);
 }
 console.log('\n'+pass+'/'+cases.length+' passed');
+process.exit(pass === cases.length ? 0 : 1);

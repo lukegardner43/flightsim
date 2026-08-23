@@ -76,4 +76,9 @@ for (const [label, cx, cy, w, d, ang, kind, eaves, ridge, bleed, chim] of cases.
     ' bearing ' + String(f.bearing) + ' (want ' + Math.round(ridgeBearing) + ')' +
     ' n=' + f.n);
 }
-console.log('\n' + pass + '/' + (cases.length + hard.length) + ' passed');
+const want = cases.length + hard.length;
+console.log('\n' + pass + '/' + want + ' passed');
+/* A test that cannot fail is not a test. These three printed their score and
+   exited 0 either way, so wiring them into CI would have produced a green
+   tick whatever the fitter did. */
+process.exit(pass === want ? 0 : 1);

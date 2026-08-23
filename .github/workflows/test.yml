@@ -1,0 +1,102 @@
+name: Tests
+
+# Nothing ran these until now.
+#
+# There were five workflows in this directory and every one of them builds
+# data; not one ran packs/test. Every suite was run by hand, in a sandbox, by
+# whoever happened to remember — and the two that drive a browser had never
+# run at all, because that sandbox cannot reach a CDN for three.js and
+# gatetest skips rather than fails when three.js does not arrive. So the test
+# that checks a landmark model still finds its building had never once been
+# executed against the code that finds it.
+#
+# Two things had to be true before this was worth adding, and neither was:
+#
+#   * rooftest, partstest and edgetest printed "3/12 passed" and exited 0.
+#     A test that cannot fail is not a test, and wiring those into CI would
+#     have produced a green tick whatever the fitter did. They exit 1 now,
+#     which is verified by breaking the fitter on purpose: eaves + 3 m takes
+#     them to 0/12, 3/7 and 1/7, all exit 1.
+#   * both browser tests hard-coded /opt/pw-browsers/chromium, which is a
+#     sandbox path that does not exist on a runner. packs/test/chromium.js
+#     uses the pre-installed browser where there is one and lets playwright
+#     find its own where there is not.
+#
+# A SKIP HERE IS A FAILURE. Skipping is right on a laptop with no playwright;
+# in CI it means the test silently did not run, which is the whole problem
+# this workflow exists to fix.
+
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'packs/**'
+      - 'models/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/test.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The fitter and the end-to-end run: no browser, no network, seconds.
+      - name: The roof fitter, the massing, the edges, the fill gate
+        run: npm test
+
+      - name: Install a browser
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # gatetest fetches three.js the way index.html does, which is the one
+      # thing this environment has and the sandbox does not.
+      - name: The load gate and the diagnostics panel
+        run: |
+          set -uo pipefail
+          fail=0
+          for t in gatetest diagtest; do
+            echo "::group::$t"
+            out=$(node "packs/test/$t.js" 2>&1); rc=$?
+            echo "$out"
+            echo "::endgroup::"
+            if [ "$rc" != "0" ]; then
+              echo "::error::$t failed"; fail=1
+            elif grep -qi '^skipped' <<<"$out"; then
+              # exit 0 and "skipped" is how a test disappears without anyone
+              # noticing. Not here.
+              echo "::error::$t SKIPPED, which in CI means it did not run:"
+              grep -i '^skipped' <<<"$out" | sed 's/^/::error::  /'
+              fail=1
+            fi
+          done
+          exit $fail
+
+      # The landmark models are generated, and a generated file that has
+      # drifted from its generator is a file nobody can safely edit.
+      - name: The models still rebuild to what is committed
+        run: |
+          set -euo pipefail
+          before=$(node -e 'console.log(require("crypto").createHash("md5").update(JSON.stringify(require("./models/kt23-3hp.json").models)).digest("hex"))')
+          node models/build-kt23-3hp.js
+          node models/embed.js
+          after=$(node -e 'console.log(require("crypto").createHash("md5").update(JSON.stringify(require("./models/kt23-3hp.json").models)).digest("hex"))')
+          if [ "$before" != "$after" ]; then
+            echo "::error::models/kt23-3hp.json is not what build-kt23-3hp.js produces."
+            echo "::error::Run  node models/build-kt23-3hp.js && node models/embed.js  and commit the result."
+            git --no-pager diff --stat models/ || true
+            exit 1
+          fi
+          echo "  rebuild is identical, and the lidar fit is idempotent"

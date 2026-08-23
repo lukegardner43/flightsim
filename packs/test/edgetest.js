@@ -39,3 +39,4 @@ for (const [n,w,d,e,r,ramp,hip] of cases){
     '   '+f.ridge.toFixed(2)+'('+r+')  '+(dr>=0?'+':'')+dr.toFixed(2));
 }
 console.log('\n' + pass + '/' + cases.length + ' passed');
+process.exit(pass === cases.length ? 0 : 1);

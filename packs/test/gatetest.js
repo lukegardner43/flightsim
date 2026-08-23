@@ -4,13 +4,8 @@
    still in flight was simply absent and the landmark came out as an ordinary
    extruded box — silently, with nothing in the log to say so. This holds the
    models back by a chosen delay and checks they still land. */
-let chromium;
-try { chromium = require('playwright').chromium; }
-catch (e) {
-  console.log('skipped: this one needs playwright, which the other tests here do not.');
-  console.log('  npm i playwright   (chromium is already at /opt/pw-browsers/chromium)');
-  process.exit(0);
-}
+const { chromium, launchOpts, need } = require('./chromium.js');
+if (!need()) process.exit(0);
 const fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 /* three.js normally comes off a CDN. If a copy is sitting next to this test
@@ -23,8 +18,8 @@ const DELAY = +(process.argv[2] || 3000);
 const LAT = 51.28668, LON = -0.384959;
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
-    args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox'] });
+  const browser = await chromium.launch(launchOpts({
+    args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox'] }));
   const page = await browser.newPage({ viewport: { width: 900, height: 640 } });
   let modelsSentAt = 0;
   await page.route('**/*', async route => {

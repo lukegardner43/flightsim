@@ -1,13 +1,8 @@
 /* The diagnostics panel must still shout about a real exception, and must
    stay silent for a load that is allowed to fail. Both halves, on the real
    handler lifted from index.html. */
-let chromium;
-try { chromium = require('playwright').chromium; }
-catch (e) {
-  console.log('skipped: this one needs playwright, which the other tests here do not.');
-  console.log('  npm i playwright   (chromium is already at /opt/pw-browsers/chromium)');
-  process.exit(0);
-}
+const { chromium, launchOpts, need } = require('./chromium.js');
+if (!need()) process.exit(0);
 const fs = require('fs');
 const html = fs.readFileSync(require('path').resolve(__dirname, '..', '..', 'index.html'), 'utf8');
 const block = html.slice(html.indexOf('  window.addEventListener("error"'),
@@ -22,7 +17,7 @@ ${block}
 <script>setTimeout(function(){ null.boom; }, 10);</script>
 </body>`;
 (async () => {
-  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args:['--no-sandbox'] });
+  const b = await chromium.launch(launchOpts());
   const p = await b.newPage();
   await p.route('**/*', r => r.request().url().startsWith('data:') ? r.continue() : r.abort());
   await p.setContent(page_html, { waitUntil: 'load' });
