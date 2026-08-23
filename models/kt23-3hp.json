@@ -3,7 +3,7 @@
  "name": "Landmarks around Great Bookham",
  "produced_by": "Claude Opus 5",
  "produced_on": "2026-08-18",
- "method": "Massing models fitted to whatever footprint OpenStreetMap holds. The first ten follow the uploaded \"Landmark Building 3D Modelling Brief, KT23 3HP\" and, where the brief embedded a reference photograph, that photograph — the brief states that the imagery governs where it and the text disagree, and it does disagree, twice. The remaining models are written from the model's own knowledge or from listed-building descriptions and say so in their confidence field.",
+ "method": "Massing models fitted to whatever footprint OpenStreetMap holds. The first ten follow the uploaded \"Landmark Building 3D Modelling Brief, KT23 3HP\" and, where the brief embedded a reference photograph, that photograph \u2014 the brief states that the imagery governs where it and the text disagree, and it does disagree, twice. The remaining models are written from the model's own knowledge or from listed-building descriptions and say so in their confidence field.",
  "confidence_scale": "high = drawn from the brief and a reference photograph of the building. medium = drawn from the brief's written description with no photograph. low = plausible massing, treat as a placeholder.",
  "reference_images": "The brief embedded photographs for St Nicolas Great Bookham, Fetcham Park House, St Mary's Fetcham, Polesden Lacey (two views), Thorncroft Manor and Bookham station (two views). Entries 6, 8, 9 and 10 carried no embeddable image and are modelled from their written descriptions.",
  "models": [
@@ -20,13 +20,13 @@
    ],
    "radius": 500,
    "orient": "compass",
-   "confidence": "high — rebuilt from the uploaded brief and its reference photograph",
+   "confidence": "high \u2014 rebuilt from the uploaded brief and its reference photograph",
    "sources": [
     "Uploaded brief \"Landmark Building 3D Modelling Brief, KT23 3HP\", entry 1, with embedded reference photograph (St Nicolas' Church, Great Bookham, Wikimedia Commons / CC0).",
     "Brief: \"predominantly constructed from knapped flint with limestone and Roman-tile elements ... The upper portion of the tower is weatherboarded and the tower terminates in a distinctive shingle-clad spire.\"",
     "Brief: \"Model the lower tower as a substantial square masonry volume, with the upper tower changing visually from masonry to white-painted/weatherboarded timber. Above this create a steep, narrow, dark shingle-covered spire.\""
    ],
-   "note": "The photograph corrects what I had built from the list entry alone: the spire rises straight off the SQUARE weatherboarded stage as a steep narrow pyramid — there is no octagon under it — and the boarded stage carries a clock on its south face. The long nave and chancel run under one continuous grey stone-slate roof with very low eaves; only the porch is red tile.",
+   "note": "The photograph corrects what I had built from the list entry alone: the spire rises straight off the SQUARE weatherboarded stage as a steep narrow pyramid \u2014 there is no octagon under it \u2014 and the boarded stage carries a clock on its south face. The long nave and chancel run under one continuous grey stone-slate roof with very low eaves; only the porch is red tile.",
    "parts": [
     {
      "on": "footprint",
@@ -152,7 +152,7 @@
    ],
    "radius": 700,
    "orient": "compass",
-   "confidence": "high — brief plus its reference photograph",
+   "confidence": "high \u2014 brief plus its reference photograph",
    "sources": [
     "Uploaded brief, entry 2, with reference photograph of the garden front and its circular fountain.",
     "Brief: \"Grade II* listed early-18th-century country house designed by William Talman, dating principally from 1705-1710\"; \"red brick in Flemish bond\"; \"contrasting Portland stone, sandstone and terracotta architectural dressings\"; \"approximately two-and-a-half storeys over a basement\"."
@@ -341,12 +341,12 @@
    ],
    "radius": 600,
    "orient": "compass",
-   "confidence": "high — brief plus its reference photograph",
+   "confidence": "high \u2014 brief plus its reference photograph",
    "sources": [
     "Uploaded brief, entry 3, with reference photograph across the churchyard.",
     "Brief: \"three-stage square masonry tower with changing proportions between levels ... diagonal buttresses, brick detailing, arched/lancet openings and timber louvres in the belfry\"; \"knapped flint, with irregular pale-grey and dark-grey flints\"; \"roofs are predominantly red clay tile, with areas of graduated stone slate on the aisles\"."
    ],
-   "note": "The photograph shows a squat square tower with a plain parapet and a small stair turret at one corner — no spire — a steeply gabled end with a large traceried pointed window, and a lower lean-to aisle running along the far side.",
+   "note": "The photograph shows a squat square tower with a plain parapet and a small stair turret at one corner \u2014 no spire \u2014 a steeply gabled end with a large traceried pointed window, and a lower lean-to aisle running along the far side.",
    "parts": [
     {
      "on": "footprint",
@@ -472,14 +472,14 @@
    "packRadius": 150,
    "orient": "compass",
    "replaceOutline": true,
-   "confidence": "high — rebuilt from the uploaded brief and two reference photographs",
+   "confidence": "high \u2014 rebuilt from the uploaded brief and two reference photographs",
    "sources": [
     "Uploaded brief, entry 4, with reference photograph \"Polesden Lacey House by Dave Spicer, via Geograph/Wikimedia Commons, CC BY-SA 2.0\" and a second oblique view of the same front.",
     "Brief: \"large symmetrical central composition with projecting side wings and multiple interconnected volumes\"; \"warm honey-coloured/red-brown brick with extensive pale stone or rendered architectural detailing\"; \"Model the small square cupola/turret rising above the main roof, with windows, projecting cornice and dark domed roof\"; \"numerous brick chimney stacks, dormer windows\".",
     "Historic England list entry 1028665 (Grade II*): \"in the form of a quadrangle around a large central courtyard\"; \"stucco on brick, slate roofs, and stuccoed chimneys\"; \"two storeys, with a prominent cornice carried round\".",
     "Position: National Trust visitor information gives grid reference TQ 133524 for the car park (nationaltrust.org.uk/visit/surrey/polesden-lacey), and the OS OpenMap Local pack holds a 2,078 m2 twelve-cornered quadrangle 360 m south-east of it at TQ 1358 5218."
    ],
-   "note": "The photographs overturn most of what I had built from the list entry. The walls are a strong ochre-yellow RENDER, not brick. The cupola is SQUARE and white with clock faces under a dark domed lead roof, not the tall octagon the listing describes — the listing and the photograph disagree and the photograph wins, as the brief instructs. The show front is long, flat and shallow-centred rather than deeply E-planned, it carries a run of dormers, about ten tall slim stuccoed stacks, and a giant-order colonnade along its eastern half. The quadrangle plan is kept from the listing because it is not visible in either photograph and is not contradicted by them.",
+   "note": "The photographs overturn most of what I had built from the list entry. The walls are a strong ochre-yellow RENDER, not brick. The cupola is SQUARE and white with clock faces under a dark domed lead roof, not the tall octagon the listing describes \u2014 the listing and the photograph disagree and the photograph wins, as the brief instructs. The show front is long, flat and shallow-centred rather than deeply E-planned, it carries a run of dormers, about ten tall slim stuccoed stacks, and a giant-order colonnade along its eastern half. The quadrangle plan is kept from the listing because it is not visible in either photograph and is not contradicted by them.",
    "parts": [
     {
      "at": [
@@ -496,7 +496,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "south range — the show front, ochre render, dark green shutters"
+     "note": "south range \u2014 the show front, ochre render, dark green shutters"
     },
     {
      "at": [
@@ -997,7 +997,7 @@
    "radius": 600,
    "orient": "compass",
    "replaceOutline": true,
-   "confidence": "high — brief plus its reference photograph",
+   "confidence": "high \u2014 brief plus its reference photograph",
    "sources": [
     "Uploaded brief, entry 5, with reference photograph \"Thorncroft Manor by Ian Capper, via Geograph/Wikimedia Commons, CC BY-SA 2.0\".",
     "Brief: \"rebuilt in the 18th century, while a striking modern extension was added in 1974-76 by Michael Manser and Partners\"; \"steel frame clad with reflective/mirror glass, sitting on a raised brick and cobble plinth ... approximately three storeys, with the upper floor set back and canted\"."
@@ -1141,7 +1141,7 @@
    ],
    "radius": 800,
    "orient": "compass",
-   "confidence": "medium — brief only, no photograph was embedded for this entry",
+   "confidence": "medium \u2014 brief only, no photograph was embedded for this entry",
    "sources": [
     "Uploaded brief, entry 6: \"Grade II listed large country house dating from 1765, built for Admiral Broderick and enlarged in 1822\"; \"smooth scored stucco over brick, appearing pale cream/grey rather than exposed brick\"; \"The facade contains a central triangular pediment/gable feature at roof level. Include the circular/oval decorative feature within this composition\"; \"dark grey slate with several brick chimney stacks. Add prominent dormer windows\"."
    ],
@@ -1301,7 +1301,7 @@
     -0.3733
    ],
    "radius": 600,
-   "confidence": "high — brief plus two reference photographs (forecourt and platforms)",
+   "confidence": "high \u2014 brief plus two reference photographs (forecourt and platforms)",
    "sources": [
     "Uploaded brief, entry 7, with two reference photographs: the forecourt elevation and a view along the platforms.",
     "Brief: \"The station dates from the 1880s and was built for the London and South Western Railway\"; \"red brick laid in Flemish bond. Use a compact low-rise composition with pitched red clay-tile roofs\"; \"Platform canopies should use slender cast-iron columns and timber framing\"."
@@ -1422,7 +1422,7 @@
    ],
    "radius": 700,
    "orient": "compass",
-   "confidence": "medium — brief only, no photograph was embedded for this entry",
+   "confidence": "medium \u2014 brief only, no photograph was embedded for this entry",
    "sources": [
     "Uploaded brief, entry 8: \"Grade II listed former 17th-century house now operating as a public house\"; \"white-painted roughcast walls\"; \"The main roof should be covered in traditional red/brown clay tiles. The roof should be relatively steep and visually substantial compared with the two-storey walls\"; \"The entrance should be approached through a projecting gabled porch\"."
    ],
@@ -1518,7 +1518,7 @@
    "radius": 800,
    "orient": "compass",
    "replaceOutline": true,
-   "confidence": "medium — brief only, no photograph was embedded for this entry",
+   "confidence": "medium \u2014 brief only, no photograph was embedded for this entry",
    "sources": [
     "Uploaded brief, entry 9: \"Grade II listed pair of cottages designed by William Butterfield and constructed in 1864-66\"; \"red brick incorporating contrasting blue-header brick diaper patterns\"; \"The central roof should be steeply pitched and hipped, with a very prominent large chimney stack positioned centrally along the building\"; \"At either end, create the projecting/set-back porch-and-stair-turret wings.\"",
     "Historic England list entry 1189115 (cited in the brief)."
@@ -1555,7 +1555,7 @@
      "type": "house",
      "material": "brick",
      "colour": "#8d4a3a",
-     "note": "the huge central chimney stack — the whole point of the composition"
+     "note": "the huge central chimney stack \u2014 the whole point of the composition"
     },
     {
      "at": [
@@ -1638,7 +1638,7 @@
     -0.386
    ],
    "radius": 900,
-   "confidence": "medium — brief only, no photograph was embedded for this entry",
+   "confidence": "medium \u2014 brief only, no photograph was embedded for this entry",
    "replaceOutline": true,
    "sources": [
     "Uploaded brief, entry 10: \"Grade II listed historic farmhouse, probably originating in the 17th century, with 18th-century and 20th-century additions\"; \"handmade red brick in random bond\"; \"Include areas of exposed timber framing\"; \"Incorporate areas of knapped flint into the elevations\"; \"The roof should be pitched and irregular, with different roof levels corresponding to various phases of extension.\"",
@@ -1678,7 +1678,7 @@
      "colour": "#9c5a45",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "18th-century extension along the range — lower ridge, more regular openings"
+     "note": "18th-century extension along the range \u2014 lower ridge, more regular openings"
     },
     {
      "at": [
@@ -1783,12 +1783,12 @@
     "ranmore"
    ],
    "near": [
-    51.2453,
-    -0.3549
+    51.241831,
+    -0.360049
    ],
    "radius": 700,
-   "confidence": "high — checked against descriptions of the building",
-   "note": "Gilbert Scott's 'High Victoriana' estate church for the Cubitts of Denbies, Early English Gothic Revival. Two things the sources corrected: the exterior is rounded FLINT COBBLE, not ashlar stone, and the spire does not sit straight on the tower — it rises off an OCTAGONAL stage, which is modelled here as an octagon between the two.",
+   "confidence": "high \u2014 checked against descriptions of the building",
+   "note": "Gilbert Scott's 'High Victoriana' estate church for the Cubitts of Denbies, Early English Gothic Revival. Two things the sources corrected: the exterior is rounded FLINT COBBLE, not ashlar stone, and the spire does not sit straight on the tower \u2014 it rises off an OCTAGONAL stage, which is modelled here as an octagon between the two.",
    "parts": [
     {
      "on": "footprint",
@@ -1848,7 +1848,8 @@
    ],
    "sources": [
     "Sir George Gilbert Scott, consecrated 1859, for George Cubitt of Denbies. 'The exterior is entirely faced in rounded flint cobbles'; 'a prominent spire on an octagon'; the tall slender spire stands 700 ft above sea level and is seen from hills across Surrey."
-   ]
+   ],
+   "nearSource": "Historic England 1189879 (TQ 14572 50461); 338 m2 surveyed footprint 7 m away"
   },
   {
    "id": "mickleham",
@@ -1923,12 +1924,12 @@
     "norbury park"
    ],
    "near": [
-    51.2745,
-    -0.332
+    51.270771,
+    -0.339135
    ],
    "radius": 700,
    "confidence": "low to medium",
-   "note": "Georgian villa on the slope above the Mole, in the estate woodland. Modelled as a compact three-storey block with a low hipped roof — the standard form for a house of that date and size. Detail is a placeholder.",
+   "note": "Georgian villa on the slope above the Mole, in the estate woodland. Modelled as a compact three-storey block with a low hipped roof \u2014 the standard form for a house of that date and size. Detail is a placeholder.",
    "parts": [
     {
      "on": "footprint",
@@ -1939,7 +1940,8 @@
      "roofMaterial": "slate",
      "type": "manor"
     }
-   ]
+   ],
+   "nearSource": "Historic England 1228829 (TQ 1595 5371); 1,404 m2 surveyed footprint 10 m away"
   },
   {
    "id": "juniperhall",
@@ -1948,8 +1950,8 @@
     "juniper hall"
    ],
    "near": [
-    51.257,
-    -0.3238
+    51.261422,
+    -0.321685
    ],
    "radius": 500,
    "confidence": "low to medium",
@@ -1964,7 +1966,8 @@
      "roofMaterial": "slate",
      "type": "manor"
     }
-   ]
+   ],
+   "nearSource": "Historic England 1228450 (TQ 172 527); 662 m2 surveyed footprint 59 m away"
   },
   {
    "id": "effinghamjn",
@@ -1995,7 +1998,7 @@
  "known_gaps": [
   "These are massing models, not architecture. A church gets a nave, a tower and a spire of about the right height; it does not get its aisles, porch, transepts or windows.",
   "Nothing here is measured. Heights are judged from the building type and from how these places read in the landscape, not from drawings.",
-  "A model only applies if OpenStreetMap has the building mapped AND named close to the way this file spells it. Where OSM has no footprint, nothing is drawn — deliberately, so a wrong guess can never put a building in an empty field.",
+  "A model only applies if OpenStreetMap has the building mapped AND named close to the way this file spells it. Where OSM has no footprint, nothing is drawn \u2014 deliberately, so a wrong guess can never put a building in an empty field.",
   "Coordinates are approximate. They exist only to stop 'St Mary's Church' matching the wrong St Mary's; the radius is generous for that reason.",
   "Polesden Lacey is modelled range by range because it is a courtyard house; the others are massing in two or three volumes. All of them are still proportion and silhouette, not architecture."
  ],
