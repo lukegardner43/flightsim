@@ -41,9 +41,13 @@ probe() {
 dsm=$(probe dsm $DSM_SLUGS) || dsm=""
 dtm=$(probe dtm $DTM_SLUGS) || dtm=""
 if [ -z "$dsm" ] || [ -z "$dtm" ]; then
-  echo "::error::No lidar WCS answered — every slug above is a miss."
-  echo "::error::Download the 5 km DSM and DTM tiles for this square by hand from"
-  echo "::error::https://environment.data.gov.uk/survey and re-run with dsm_url / dtm_url."
+  # stderr, not stdout: the caller may be doing eval "$(find-lidar.sh)", and a
+  # failure printed to stdout gets EVALUATED. That is not a hypothetical —
+  # "::error::No: command not found", exit 127, is what the timing run died of
+  # rather than reporting the outage it had correctly detected.
+  echo "::error::No lidar WCS answered — every slug above is a miss." >&2
+  echo "::error::Download the 5 km DSM and DTM tiles for this square by hand from" >&2
+  echo "::error::https://environment.data.gov.uk/survey and re-run with dsm_url / dtm_url." >&2
   echo "--- first 40 lines of the last DSM response ---"
   head -40 cap-dsm.xml 2>/dev/null || true
   exit 1

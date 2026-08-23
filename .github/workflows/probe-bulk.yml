@@ -59,7 +59,14 @@ jobs:
           # wants; the scripts take uppercase. Exporting the uppercase names
           # without assigning them exported nothing, and the run died on the
           # first line of time-fetch.sh saying so.
-          eval "$(packs/find-lidar.sh)"
+          # Take the exit status before eval'ing anything. eval "$(...)" runs
+          # whatever came out on stdout, including a failure message, and swallows
+          # the status of the thing that produced it.
+          if ! WCS=$(packs/find-lidar.sh); then
+            echo "::error::The lidar services are not answering — see the codes above."
+            exit 1
+          fi
+          eval "$WCS"
           export DSM_SLUG="$dsm_slug" DSM_COV="$dsm_cov"
           export DTM_SLUG="$dtm_slug" DTM_COV="$dtm_cov"
           packs/time-fetch.sh "$TILE"
