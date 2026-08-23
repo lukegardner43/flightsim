@@ -33,7 +33,7 @@ global.TF_PACK = d => {
     let lat = a[0], lon = a[1];
     pts.push([lat / q, lon / q]);
     for (let i = 2; i < a.length; i += 2) { lat += a[i]; lon += a[i + 1]; pts.push([lat / q, lon / q]); }
-    rings.push(pts);
+    rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0 });
   }
 };
 const packs = fs.readdirSync(path.join(root, 'packs')).filter(f => /^[a-z0-9]+\.js$/.test(f) &&
@@ -54,6 +54,32 @@ function stats(pts, lat0) {
   }
   return { area: Math.abs(a2) / 2, lat: cl / (3 * a2), lon: co / (3 * a2) };
 }
+/* ---- what the model claims, against what the laser saw ----
+
+   These heights were authored from a written brief and photographs. Nothing
+   has ever checked them, and until the lidar landed there was nothing to
+   check them against.
+
+   Compare the MAIN MASS, not the tallest thing on the model. The fit
+   deliberately drops anything standing well above the roof, because a chimney
+   read as a ridge made an eight metre house eleven metres tall — so measuring
+   Polesden Lacey's clock lantern against Polesden Lacey's roof and calling
+   the difference an error is a mistake I made on the first pass of this.
+
+   Two things this cannot settle, and both matter:
+     * one reading covers the WHOLE footprint, so a house with lower wings
+       reads lower than its main block. The measurement is a floor, not the
+       height of the tallest part. The pack's massing carries the steps.
+     * a spire is a needle. St Nicolas' is a 4.8 m square, and on a metre grid
+       blurred over a metre and a half the apex is smeared away. Lidar informs
+       the main mass; it must never overrule an authored spire. */
+function unpackH(v){ return { eaves:(v & 1023)/10, roofH:((v >> 10) & 255)/10 }; }
+function mainMass(m){
+  const ps = m.parts || [];
+  let main = ps.find(p => p.on === 'footprint');
+  if (!main) main = ps.slice().sort((a,b) => (b.w||0)*(b.d||0) - (a.w||0)*(a.d||0))[0];
+  return main ? (main.height||0) + (main.roofHeight||0) : 0;
+}
 function ref(lat, lon) {
   const b = bng(lat, lon);
   if (!b) return '(outside the grid)';
@@ -61,15 +87,15 @@ function ref(lat, lon) {
   return b.square + ' ' + p((b.E % 100000) / 10) + ' ' + p((b.N % 100000) / 10);
 }
 
-let suspect = 0;
+let suspect = 0, checked = 0, off = 0, unmeasured = 0;
 for (const m of models) {
   const [tlat, tlon] = m.near;
   const mLat = 110540, mLon = 111320 * Math.cos(tlat * Math.PI / 180);
   const found = [];
   for (const r of rings) {
-    const s = stats(r, tlat);
+    const s = stats(r.pts, tlat);
     const d = Math.hypot((s.lat - tlat) * mLat, (s.lon - tlon) * mLon);
-    if (d < 400) found.push({ s, d });
+    if (d < 400) found.push({ s, d, h: r.h });
   }
   found.sort((a, b) => b.s.area - a.s.area);
   const best = found[0];
@@ -84,5 +110,29 @@ for (const m of models) {
   console.log(line + 'biggest near: ' + Math.round(best.s.area).toString().padStart(5) + ' m2 at ' +
     Math.round(best.d).toString().padStart(3) + ' m' +
     (claim ? ';  would take ' + Math.round(claim.s.area) + ' m2 at ' + Math.round(claim.d) + ' m' : '') + note);
+  const want = mainMass(m);
+  if (claim && want) {
+    if (!claim.h) { unmeasured++; console.log(' '.repeat(28) + 'main mass ' + want.toFixed(1) +
+                    ' m authored; that footprint has no lidar reading yet'); }
+    else {
+      const u = unpackH(claim.h), got = u.eaves + u.roofH, d = want - got;
+      checked++;
+      const verdict = Math.abs(d) < 2.5 ? '' :
+        '   <-- ' + Math.abs(d).toFixed(1) + ' m ' + (d > 0 ? 'taller than measured' : 'shorter than measured');
+      if (verdict) off++;
+      console.log(' '.repeat(28) + 'main mass ' + want.toFixed(1).padStart(5) + ' m authored, ' +
+                  got.toFixed(1).padStart(5) + ' m measured' + verdict);
+    }
+  }
 }
 console.log('\n' + (suspect ? suspect + ' model site(s) worth checking by hand' : 'every model has a substantial building where it expects one'));
+if (checked) {
+  console.log(checked + ' had a lidar reading to check the height against; ' + off +
+              ' disagree by more than 2.5 m' +
+              (unmeasured ? ', and ' + unmeasured + ' more sit on ground not measured yet' : ''));
+  if (off) console.log('A footprint with lower wings reads lower than its main block, so ' +
+                       'some of that gap is real and some is the blend. The massing in the ' +
+                       'pack is what tells them apart.');
+} else if (unmeasured) {
+  console.log('no landmark sits on measured ground yet — run "Build a place" over these tiles');
+}

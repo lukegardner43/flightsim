@@ -55,6 +55,11 @@ jobs:
           TILE: ${{ inputs.tile }}
         run: |
           set -euo pipefail
+          # find-lidar.sh emits lowercase, because that is what $GITHUB_OUTPUT
+          # wants; the scripts take uppercase. Exporting the uppercase names
+          # without assigning them exported nothing, and the run died on the
+          # first line of time-fetch.sh saying so.
           eval "$(packs/find-lidar.sh)"
-          export DSM_SLUG DSM_COV DTM_SLUG DTM_COV
+          export DSM_SLUG="$dsm_slug" DSM_COV="$dsm_cov"
+          export DTM_SLUG="$dtm_slug" DTM_COV="$dtm_cov"
           packs/time-fetch.sh "$TILE"
