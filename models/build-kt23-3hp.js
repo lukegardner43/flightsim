@@ -492,9 +492,22 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
                    p: (d.parts && d.parts[rings.length]) || null });
     }
   };
+  /* A pack starts with TF_PACK(. Anything else here is a tool, and requiring
+     a tool RUNS it — packs/boxes.js was loaded as a pack by this very loop,
+     hit its own command line with no arguments and called process.exit(0),
+     which stopped the build at this line without a word. */
+  const isPack = file => {
+    let fd;
+    try {
+      fd = fs.openSync(file, 'r');
+      const b = Buffer.alloc(8);
+      return fs.readSync(fd, b, 0, 8, 0) === 8 && b.toString('utf8') === 'TF_PACK(';
+    } catch (e) { return false; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch (e) {} }
+  };
   const dir = path.join(HERE, '..', 'packs');
-  for (const f of fs.readdirSync(dir).filter(f => /^[a-z0-9]+\.js$/.test(f)))
-    { try { require(path.join(dir, f)); } catch (e) {} }
+  for (const f of fs.readdirSync(dir))
+    if (f.endsWith('.js') && isPack(path.join(dir, f)))
+      { try { require(path.join(dir, f)); } catch (e) {} }
   if (!rings.length) { console.log('  no packs to measure against — heights left as authored'); return; }
 
   const inRing = (pts, lat, lon) => {
@@ -520,11 +533,12 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
     if (!m.near || !m.parts || !m.parts.length) continue;
     /* undo whatever a previous run applied, so this is worked out from the
        authored heights however many times it is run */
-    const had = m.measuredFit && m.measuredFit.factor;
-    if (had) for (const p of m.parts) {
-      if (p.height != null) p.height = +(p.height / had).toFixed(2);
-      if (p.roofHeight != null) p.roofHeight = +(p.roofHeight / had).toFixed(2);
-      if (p.minHeight != null) p.minHeight = +(p.minHeight / had).toFixed(2);
+    for (const p of m.parts) {
+      if (!p.authored) continue;
+      if (p.authored.h  !== undefined) p.height     = p.authored.h;
+      if (p.authored.mh !== undefined) p.minHeight  = p.authored.mh;
+      if (p.authored.rh !== undefined) p.roofHeight = p.authored.rh;
+      delete p.authored;
     }
     delete m.measuredFit;
 
@@ -584,16 +598,73 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
                                     (p.height || 0) > authored * 1.35);
     if (tower) { standing.push(m.id); continue; }
 
+    /* Apply it only where it has authority.
+
+       A uniform scale was the first attempt and it is wrong, which Polesden
+       Lacey showed within a day of shipping. The laser said one thing — the
+       ranges' roof is at 10.8 m, not the authored 13.8 — and a x0.78 across
+       every part took the clock lantern from 25.8 m to 20.0, the chimney
+       stacks from 17.4 to 13.6 and the colonnade from 9.2 to 7.2. None of
+       those was measured. Scaling a clock tower by a number derived from a
+       roof reading is not using a measurement; it is spreading it over
+       things it says nothing about.
+
+       What the surface measures is the ROOF of the fabric. So:
+
+         * the fabric takes the measurement, roof and all, in proportion.
+         * anything standing ON the fabric — dormers at the eaves, stacks
+           through them, a cupola on the ridge, a lantern on the cupola —
+           MOVES with it and keeps its own size. A 7 m chimney is 7 m of
+           chimney whether the house under it is 13.8 m or 10.8.
+         * anything tucked UNDER the eaves — a colonnade, an entrance
+           surround — scales with the wall, because what it is doing is
+           standing against that wall and it has to stay under it.
+
+       For Polesden that is ranges 13.8 -> 10.8, the lantern's apex down the
+       same 3.0 m to 22.8 rather than scaled to 20.0, and every dormer and
+       stack still its authored size. */
     const k = +(measured / authored).toFixed(4);
+    /* The fabric has two levels the rest of the building hangs off, and they
+       do not move by the same amount: the RIDGE goes where the laser says,
+       and the EAVES follow it in proportion, because a roof squashed to fit
+       is as wrong as a wall left too tall. Everything else is anchored to one
+       of the two, and a part's BASE says which — a dormer and a chimney start
+       at the eaves, a cupola sits on the ridge. Each moves with its own
+       anchor and keeps its own size, so a 7 m chimney is still 7 m of chimney
+       and a 2.8 m dormer is still a dormer.
+
+       Getting this wrong is visible: anchoring everything to the ridge put
+       Polesden's dormers 0.74 m BELOW its eaves, poking out of the wall
+       instead of the roof. */
+    const ridge = authored, eaves = authored - (fab.roofHeight || 0);
+    const dRidge = +(measured - ridge).toFixed(2);
+    const dEaves = +(eaves * k - eaves).toFixed(2);
+    let moved = 0, scaled = 0;
     for (const p of m.parts) {
-      if (p.height != null) p.height = +(p.height * k).toFixed(2);
-      if (p.roofHeight != null) p.roofHeight = +(p.roofHeight * k).toFixed(2);
-      if (p.minHeight != null) p.minHeight = +(p.minHeight * k).toFixed(2);
+      /* exactly what it was before the laser touched it, so a later run can
+         put it back and work the fit out again from the authored heights */
+      p.authored = { h:p.height, mh:p.minHeight, rh:p.roofHeight };
+      const base = p.minHeight || 0;
+      if (base < eaves - 0.01) {
+        /* it stands against the wall — a colonnade, an entrance surround, or
+           the fabric itself — so it goes with the wall */
+        if (p.height != null) p.height = +(p.height * k).toFixed(2);
+        if (p.roofHeight != null) p.roofHeight = +(p.roofHeight * k).toFixed(2);
+        if (p.minHeight != null) p.minHeight = +(p.minHeight * k).toFixed(2);
+        scaled++;
+      } else {
+        const d = Math.abs(base - ridge) < Math.abs(base - eaves) ? dRidge : dEaves;
+        if (p.height != null) p.height = +(p.height + d).toFixed(2);
+        if (p.minHeight != null) p.minHeight = +(p.minHeight + d).toFixed(2);
+        moved++;                                   /* roofHeight is its own size */
+      }
     }
-    m.measuredFit = { factor:k, authoredFabric:+authored.toFixed(1), measuredFabric:+measured.toFixed(1),
+    m.measuredFit = { factor:k, ridgeShift:dRidge, eavesShift:dEaves, authoredFabric:+authored.toFixed(1),
+      measuredFabric:+measured.toFixed(1), scaledParts:scaled, movedParts:moved,
       fabric:'largest measured box on a ' + Math.round(site.s.area) + ' m2 footprint' + (site.on ? ' it stands on' : ' ' + Math.round(site.d) + ' m away'),
-      source:'Environment Agency LIDAR Composite DSM/DTM 1 m, averaged over the surveyed footprint' };
-    done.push(m.id + ' ' + authored.toFixed(1) + ' -> ' + measured.toFixed(1) + ' m (x' + k.toFixed(2) + ')');
+      source:'Environment Agency LIDAR Composite DSM/DTM 1 m. The fabric scales to it; what stands on the fabric moves with it and keeps its own size.' };
+    done.push(m.id + ' ' + authored.toFixed(1) + ' -> ' + measured.toFixed(1) + ' m (' +
+              scaled + ' with the wall, ' + moved + ' moved with the roof)');
   }
   console.log(done.length ? '  fitted to lidar: ' + done.join(', ') : '  nothing to fit to lidar');
   if (standing.length) console.log('  left alone, free-standing tower: ' + standing.join(', '));

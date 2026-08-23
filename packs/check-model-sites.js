@@ -79,8 +79,22 @@ function fabric(m, footArea) {
   }
   return best;
 }
-const packs = fs.readdirSync(path.join(root, 'packs')).filter(f => /^[a-z0-9]+\.js$/.test(f) &&
-  !/^(make-pack|grid-square|plan-tiles|check-model-sites)\.js$/.test(f));
+/* A pack file starts with TF_PACK(. Anything else in this directory is a
+   tool, and requiring a tool RUNS it: packs/boxes.js got loaded as a pack by
+   this loader, hit its own command line with no arguments, and called
+   process.exit(0) — which stopped the build dead and made the checker print
+   nothing and return success. Renaming it fixed today's instance; this stops
+   the next one. */
+function isPack(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const b = Buffer.alloc(8);
+    return fs.readSync(fd, b, 0, 8, 0) === 8 && b.toString('utf8') === 'TF_PACK(';
+  } catch (e) { return false; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch (e) {} }
+}
+const packs = fs.readdirSync(path.join(root, 'packs'))
+  .filter(f => f.endsWith('.js') && isPack(path.join(root, 'packs', f)));
 for (const f of packs) require(path.join(root, 'packs', f));
 if (!rings.length) { console.error('no packs to check against'); process.exit(1); }
 console.log('checking ' + models.length + ' models against ' + rings.length.toLocaleString() +
@@ -268,7 +282,7 @@ if (checked) {
   if (off) console.log('Both numbers are the biggest piece of ground at one height — the ' +
                        'model\'s fabric against the surface\'s. A footprint holding two ' +
                        'buildings has no single answer, and that is what a gap here usually ' +
-                       'means: run  node packs/boxes.js <id>  and look at the split.');
+                       'means: run  node packs/show-boxes.js <id>  and look at the split.');
 } else if (unmeasured) {
   console.log('no landmark sits on measured ground yet — run "Build a place" over these tiles');
 }

@@ -500,7 +500,11 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "south range — the show front, ochre render, dark green shutters"
+     "note": "south range — the show front, ochre render, dark green shutters",
+     "authored": {
+      "h": 13.8,
+      "rh": 3.4
+     }
     },
     {
      "at": [
@@ -517,7 +521,11 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "north range across the courtyard"
+     "note": "north range across the courtyard",
+     "authored": {
+      "h": 13.8,
+      "rh": 3.4
+     }
     },
     {
      "at": [
@@ -534,7 +542,11 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "west range"
+     "note": "west range",
+     "authored": {
+      "h": 13.8,
+      "rh": 3.4
+     }
     },
     {
      "at": [
@@ -551,7 +563,11 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "east range"
+     "note": "east range",
+     "authored": {
+      "h": 13.8,
+      "rh": 3.4
+     }
     },
     {
      "at": [
@@ -568,7 +584,11 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "centre bay breaking forward, pedimented entrance below"
+     "note": "centre bay breaking forward, pedimented entrance below",
+     "authored": {
+      "h": 14.2,
+      "rh": 2.6
+     }
     },
     {
      "at": [
@@ -582,7 +602,10 @@
      "type": "manor",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "stone entrance surround and steps"
+     "note": "stone entrance surround and steps",
+     "authored": {
+      "h": 5.2
+     }
     },
     {
      "at": [
@@ -596,7 +619,10 @@
      "roof": "flat",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "colonnade column"
+     "note": "colonnade column",
+     "authored": {
+      "h": 9.2
+     }
     },
     {
      "at": [
@@ -610,7 +636,10 @@
      "roof": "flat",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "colonnade column"
+     "note": "colonnade column",
+     "authored": {
+      "h": 9.2
+     }
     },
     {
      "at": [
@@ -624,7 +653,10 @@
      "roof": "flat",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "colonnade column"
+     "note": "colonnade column",
+     "authored": {
+      "h": 9.2
+     }
     },
     {
      "at": [
@@ -638,7 +670,10 @@
      "roof": "flat",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "colonnade column"
+     "note": "colonnade column",
+     "authored": {
+      "h": 9.2
+     }
     },
     {
      "at": [
@@ -652,7 +687,10 @@
      "roof": "flat",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "colonnade column"
+     "note": "colonnade column",
+     "authored": {
+      "h": 9.2
+     }
     },
     {
      "at": [
@@ -666,7 +704,10 @@
      "roof": "flat",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "colonnade column"
+     "note": "colonnade column",
+     "authored": {
+      "h": 9.2
+     }
     },
     {
      "at": [
@@ -680,7 +721,10 @@
      "roof": "flat",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "colonnade column"
+     "note": "colonnade column",
+     "authored": {
+      "h": 9.2
+     }
     },
     {
      "at": [
@@ -695,7 +739,11 @@
      "type": "manor",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "colonnade entablature"
+     "note": "colonnade entablature",
+     "authored": {
+      "h": 10.2,
+      "mh": 9.2
+     }
     },
     {
      "at": [
@@ -705,14 +753,19 @@
      "w": 1.9,
      "d": 1.71,
      "minHeight": 8.14,
-     "height": 10.33,
+     "height": 10.94,
      "roof": "gabled",
-     "roofHeight": 0.7,
+     "roofHeight": 0.9,
      "material": "wood",
      "colour": "#efece4",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "dormer"
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
     },
     {
      "at": [
@@ -722,14 +775,19 @@
      "w": 1.9,
      "d": 1.71,
      "minHeight": 8.14,
-     "height": 10.33,
+     "height": 10.94,
      "roof": "gabled",
-     "roofHeight": 0.7,
+     "roofHeight": 0.9,
      "material": "wood",
      "colour": "#efece4",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "dormer"
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
     },
     {
      "at": [
@@ -739,14 +797,19 @@
      "w": 1.9,
      "d": 1.71,
      "minHeight": 8.14,
-     "height": 10.33,
+     "height": 10.94,
      "roof": "gabled",
-     "roofHeight": 0.7,
+     "roofHeight": 0.9,
      "material": "wood",
      "colour": "#efece4",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "dormer"
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
     },
     {
      "at": [
@@ -756,14 +819,19 @@
      "w": 1.9,
      "d": 1.71,
      "minHeight": 8.14,
-     "height": 10.33,
+     "height": 10.94,
      "roof": "gabled",
-     "roofHeight": 0.7,
+     "roofHeight": 0.9,
      "material": "wood",
      "colour": "#efece4",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "dormer"
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
     },
     {
      "at": [
@@ -773,14 +841,19 @@
      "w": 1.9,
      "d": 1.71,
      "minHeight": 8.14,
-     "height": 10.33,
+     "height": 10.94,
      "roof": "gabled",
-     "roofHeight": 0.7,
+     "roofHeight": 0.9,
      "material": "wood",
      "colour": "#efece4",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "dormer"
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
     },
     {
      "at": [
@@ -790,14 +863,19 @@
      "w": 1.9,
      "d": 1.71,
      "minHeight": 8.14,
-     "height": 10.33,
+     "height": 10.94,
      "roof": "gabled",
-     "roofHeight": 0.7,
+     "roofHeight": 0.9,
      "material": "wood",
      "colour": "#efece4",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "dormer"
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
     },
     {
      "at": [
@@ -807,11 +885,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -821,11 +903,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -835,11 +921,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -849,11 +939,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -863,11 +957,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -877,11 +975,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -891,11 +993,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -905,11 +1011,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -919,11 +1029,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -933,11 +1047,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -947,11 +1065,15 @@
      "w": 1.7,
      "d": 1.054,
      "minHeight": 8.14,
-     "height": 13.62,
+     "height": 15.14,
      "roof": "flat",
      "material": "brick",
      "colour": "#d9b874",
-     "note": "tall stuccoed stack"
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
     },
     {
      "at": [
@@ -960,13 +1082,17 @@
      ],
      "w": 4.6,
      "d": 4.6,
-     "minHeight": 10.49,
-     "height": 11.9,
+     "minHeight": 10.4,
+     "height": 12.2,
      "roof": "flat",
      "type": "manor",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "cupola base"
+     "note": "cupola base",
+     "authored": {
+      "h": 15.2,
+      "mh": 13.4
+     }
     },
     {
      "at": [
@@ -975,24 +1101,33 @@
      ],
      "w": 4,
      "d": 4,
-     "minHeight": 11.9,
-     "height": 17.69,
+     "minHeight": 12.2,
+     "height": 19.6,
      "roof": "dome",
-     "roofHeight": 2.5,
+     "roofHeight": 3.2,
      "type": "manor",
      "material": "plaster",
      "colour": "#e8e5dc",
      "roofMaterial": "lead",
      "roofColour": "#5a5f64",
-     "note": "white lantern with clock faces under a dark domed lead roof and finial"
+     "note": "white lantern with clock faces under a dark domed lead roof and finial",
+     "authored": {
+      "h": 22.6,
+      "mh": 15.2,
+      "rh": 3.2
+     }
     }
    ],
    "measuredFit": {
     "factor": 0.7826,
+    "ridgeShift": -3,
+    "eavesShift": -2.26,
     "authoredFabric": 13.8,
     "measuredFabric": 10.8,
+    "scaledParts": 14,
+    "movedParts": 19,
     "fabric": "largest measured box on a 2078 m2 footprint it stands on",
-    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m, averaged over the surveyed footprint"
+    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m. The fabric scales to it; what stands on the fabric moves with it and keeps its own size."
    }
   },
   {
@@ -1330,7 +1465,11 @@
      "colour": "#a4503c",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "single-storey booking hall and offices, red Flemish bond, shallow red tile roof"
+     "note": "single-storey booking hall and offices, red Flemish bond, shallow red tile roof",
+     "authored": {
+      "h": 8,
+      "rh": 3.4
+     }
     },
     {
      "at": [
@@ -1345,7 +1484,11 @@
      "type": "train_station",
      "material": "metal",
      "colour": "#6d7278",
-     "note": "flat entrance canopy on iron brackets"
+     "note": "flat entrance canopy on iron brackets",
+     "authored": {
+      "h": 3.6,
+      "mh": 3.2
+     }
     },
     {
      "at": [
@@ -1362,7 +1505,11 @@
      "colour": "#a4503c",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "lower later wing at the east end"
+     "note": "lower later wing at the east end",
+     "authored": {
+      "h": 6.1,
+      "rh": 2.2
+     }
     },
     {
      "at": [
@@ -1372,11 +1519,15 @@
      "w": 1.5,
      "d": 0.9299999999999999,
      "minHeight": 2.82,
-     "height": 6,
+     "height": 8.02,
      "roof": "flat",
      "material": "brick",
      "colour": "#96452f",
-     "note": "tall corbelled brick stack"
+     "note": "tall corbelled brick stack",
+     "authored": {
+      "h": 9.8,
+      "mh": 4.6
+     }
     },
     {
      "at": [
@@ -1386,11 +1537,15 @@
      "w": 1.5,
      "d": 0.9299999999999999,
      "minHeight": 2.82,
-     "height": 6,
+     "height": 8.02,
      "roof": "flat",
      "material": "brick",
      "colour": "#96452f",
-     "note": "tall corbelled brick stack"
+     "note": "tall corbelled brick stack",
+     "authored": {
+      "h": 9.8,
+      "mh": 4.6
+     }
     },
     {
      "at": [
@@ -1400,11 +1555,15 @@
      "w": 1.5,
      "d": 0.9299999999999999,
      "minHeight": 2.82,
-     "height": 6,
+     "height": 8.02,
      "roof": "flat",
      "material": "brick",
      "colour": "#96452f",
-     "note": "tall corbelled brick stack"
+     "note": "tall corbelled brick stack",
+     "authored": {
+      "h": 9.8,
+      "mh": 4.6
+     }
     },
     {
      "at": [
@@ -1414,19 +1573,27 @@
      "w": 1.5,
      "d": 0.9299999999999999,
      "minHeight": 2.82,
-     "height": 6,
+     "height": 8.02,
      "roof": "flat",
      "material": "brick",
      "colour": "#96452f",
-     "note": "tall corbelled brick stack"
+     "note": "tall corbelled brick stack",
+     "authored": {
+      "h": 9.8,
+      "mh": 4.6
+     }
     }
    ],
    "measuredFit": {
     "factor": 0.6125,
+    "ridgeShift": -3.1,
+    "eavesShift": -1.78,
     "authoredFabric": 8,
     "measuredFabric": 4.9,
+    "scaledParts": 3,
+    "movedParts": 4,
     "fabric": "largest measured box on a 693 m2 footprint 14 m away",
-    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m, averaged over the surveyed footprint"
+    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m. The fabric scales to it; what stands on the fabric moves with it and keeps its own size."
    }
   },
   {
@@ -1458,7 +1625,11 @@
      "colour": "#eceae2",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "two-storey roughcast range under a steep red clay tile roof"
+     "note": "two-storey roughcast range under a steep red clay tile roof",
+     "authored": {
+      "h": 10.8,
+      "rh": 5
+     }
     },
     {
      "at": [
@@ -1475,7 +1646,11 @@
      "colour": "#eceae2",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "projecting gabled porch, obviously a later addition"
+     "note": "projecting gabled porch, obviously a later addition",
+     "authored": {
+      "h": 5.1,
+      "rh": 1.9
+     }
     },
     {
      "at": [
@@ -1492,7 +1667,11 @@
      "colour": "#eceae2",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "single-storey 19th-century extension"
+     "note": "single-storey 19th-century extension",
+     "authored": {
+      "h": 5.2,
+      "rh": 2
+     }
     },
     {
      "at": [
@@ -1502,11 +1681,15 @@
      "w": 1.8,
      "d": 1.116,
      "minHeight": 3.76,
-     "height": 7.91,
+     "height": 10.16,
      "roof": "flat",
      "material": "brick",
      "colour": "#8f5340",
-     "note": "substantial stack"
+     "note": "substantial stack",
+     "authored": {
+      "h": 12.2,
+      "mh": 5.8
+     }
     },
     {
      "at": [
@@ -1516,19 +1699,27 @@
      "w": 1.8,
      "d": 1.116,
      "minHeight": 3.76,
-     "height": 7.91,
+     "height": 10.16,
      "roof": "flat",
      "material": "brick",
      "colour": "#8f5340",
-     "note": "substantial stack"
+     "note": "substantial stack",
+     "authored": {
+      "h": 12.2,
+      "mh": 5.8
+     }
     }
    ],
    "measuredFit": {
     "factor": 0.6481,
+    "ridgeShift": -3.8,
+    "eavesShift": -2.04,
     "authoredFabric": 10.8,
     "measuredFabric": 7,
+    "scaledParts": 3,
+    "movedParts": 2,
     "fabric": "largest measured box on a 119 m2 footprint it stands on",
-    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m, averaged over the surveyed footprint"
+    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m. The fabric scales to it; what stands on the fabric moves with it and keeps its own size."
    }
   },
   {
@@ -1690,7 +1881,11 @@
      "colour": "#a35d47",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "the 17th-century two-unit core: tallest ridge, handmade brick in random bond"
+     "note": "the 17th-century two-unit core: tallest ridge, handmade brick in random bond",
+     "authored": {
+      "h": 9.4,
+      "rh": 4.2
+     }
     },
     {
      "at": [
@@ -1707,7 +1902,11 @@
      "colour": "#9c5a45",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "18th-century extension along the range — lower ridge, more regular openings"
+     "note": "18th-century extension along the range — lower ridge, more regular openings",
+     "authored": {
+      "h": 8,
+      "rh": 3.4
+     }
     },
     {
      "at": [
@@ -1724,7 +1923,11 @@
      "colour": "#8d8e86",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "flint-faced range, a third phase again, lower still"
+     "note": "flint-faced range, a third phase again, lower still",
+     "authored": {
+      "h": 6.8,
+      "rh": 2.8
+     }
     },
     {
      "at": [
@@ -1741,7 +1944,11 @@
      "colour": "#bfae92",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "20th-century addition, simplified but clearly attached"
+     "note": "20th-century addition, simplified but clearly attached",
+     "authored": {
+      "h": 5,
+      "rh": 2
+     }
     },
     {
      "at": [
@@ -1758,7 +1965,11 @@
      "colour": "#bfae92",
      "roofMaterial": "tile",
      "roofColour": "#9c5236",
-     "note": "lean-to outshut on the front, as farmhouses always grow"
+     "note": "lean-to outshut on the front, as farmhouses always grow",
+     "authored": {
+      "h": 4.6,
+      "rh": 1.4
+     }
     },
     {
      "at": [
@@ -1768,11 +1979,15 @@
      "w": 2.4,
      "d": 1.488,
      "minHeight": 3.71,
-     "height": 7.56,
+     "height": 9.11,
      "roof": "flat",
      "material": "brick",
      "colour": "#94553f",
-     "note": "chimney stack"
+     "note": "chimney stack",
+     "authored": {
+      "h": 10.6,
+      "mh": 5.2
+     }
     },
     {
      "at": [
@@ -1782,11 +1997,15 @@
      "w": 2.4,
      "d": 1.488,
      "minHeight": 3.71,
-     "height": 7.56,
+     "height": 9.11,
      "roof": "flat",
      "material": "brick",
      "colour": "#94553f",
-     "note": "chimney stack"
+     "note": "chimney stack",
+     "authored": {
+      "h": 10.6,
+      "mh": 5.2
+     }
     },
     {
      "at": [
@@ -1796,19 +2015,27 @@
      "w": 2.4,
      "d": 1.488,
      "minHeight": 3.71,
-     "height": 7.56,
+     "height": 9.11,
      "roof": "flat",
      "material": "brick",
      "colour": "#94553f",
-     "note": "chimney stack"
+     "note": "chimney stack",
+     "authored": {
+      "h": 10.6,
+      "mh": 5.2
+     }
     }
    ],
    "measuredFit": {
     "factor": 0.7128,
+    "ridgeShift": -2.7,
+    "eavesShift": -1.49,
     "authoredFabric": 9.4,
     "measuredFabric": 6.7,
+    "scaledParts": 5,
+    "movedParts": 3,
     "fabric": "largest measured box on a 145 m2 footprint it stands on",
-    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m, averaged over the surveyed footprint"
+    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m. The fabric scales to it; what stands on the fabric moves with it and keeps its own size."
    }
   },
   {

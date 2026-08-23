@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 /* What did the laser actually see over this building?
 
-     node packs/boxes.js polesden ranmore mickleham      # by landmark model
-     node packs/boxes.js 51.2790,-0.3740                 # or by coordinate
+     node packs/show-boxes.js polesden ranmore mickleham   # by landmark model
+     node packs/show-boxes.js 51.2790,-0.3740              # or by coordinate
+
+   The name has a hyphen in it because everything in packs/ that is a TOOL
+   does, and everything that is a PACK does not: the loaders here take every
+   packs/*.js matching ^[a-z0-9]+$ and require it as a pack. Called boxes.js,
+   this file got required by the model builder and by check-model-sites, ran
+   its own command line, found no arguments and called process.exit(0) — so
+   the build stopped dead and the checker printed nothing and returned 0.
 
    One reading per footprint is an average, and an average is the wrong
    number whenever a footprint holds more than one thing. make-heights
@@ -43,7 +50,7 @@ global.TF_PACK = d => {
   }
 };
 const dir = __dirname;
-for (const f of fs.readdirSync(dir).filter(f => /^[a-z0-9]+\.js$/.test(f) && f !== 'boxes.js'))
+for (const f of fs.readdirSync(dir).filter(f => /^[a-z0-9]+\.js$/.test(f)))
   { try { require(path.join(dir, f)); } catch (e) {} }
 if (!rings.length) { console.error('no packs to read'); process.exit(1); }
 
