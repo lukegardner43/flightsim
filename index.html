@@ -5599,17 +5599,30 @@ function claimPackFootprints(els, dropped){
     var pts = ringToPts(all[i].geometry);
     if(pts.length < 3) continue;
     var cc = centroid(pts), area = Math.abs(signedArea(pts));
-    /* No landmark this system models is the size of a garden shed. Without
-       this floor the nearest outbuilding wins whenever the real building is
-       not among the candidates, and a country house gets built on a 108 m2
-       store. */
-    if(!(area > 200)) continue;
     for(j=0;j<want.length;j++){
       var w = want[j];
       var dx = cc.x - w.x, dz = cc.z - w.z, d = Math.sqrt(dx*dx + dz*dz);
-      if(d > w.r) continue;
-      var sc = area/(1 + d/100);                 /* big and near beats small and nearer */
-      if(sc > w.score){ w.score = sc; w.best = all[i]; w.dist = d; w.area = area; }
+      /* Standing INSIDE a footprint is not a guess, and the rules below are
+         all about guessing well. Eleven of these coordinates have now been
+         checked against Historic England list entries and eight were moved,
+         so a point landing inside a surveyed ring is the strongest evidence
+         there is — stronger than any amount of area or nearness. Roaring
+         House Farmhouse is a 145 m2 farmhouse and was matching nothing at
+         all; St Barnabas Ranmore is a 338 m2 church and was flagged as
+         "something small". Neither is a shed, and the coordinate is on top
+         of both. */
+      var on = d < 400 && pointInPoly({x:w.x, z:w.z}, pts);
+      if(!on){
+        /* No landmark this system models is the size of a garden shed.
+           Without this floor the nearest outbuilding wins whenever the real
+           building is not among the candidates, and a country house gets
+           built on a 108 m2 store. It is a floor for GUESSES: it does not
+           apply above, where the point is inside the building. */
+        if(!(area > 200)) continue;
+        if(d > w.r) continue;
+      }
+      var sc = (on ? 1e9 : 0) + area/(1 + d/100);  /* big and near beats small and nearer */
+      if(sc > w.score){ w.score = sc; w.best = all[i]; w.dist = d; w.area = area; w.on = on; }
     }
   }
   for(j=0;j<want.length;j++){
@@ -5619,7 +5632,8 @@ function claimPackFootprints(els, dropped){
     /* it may be one of the footprints that was not going to be drawn */
     if(els.indexOf(want[j].best) < 0) els.push(want[j].best);
     MODEL_FROMPACK.push(want[j].m.name + " (" + Math.round(want[j].area) + " m2, " +
-                        Math.round(want[j].dist) + " m from where it was expected)");
+                        (want[j].on ? "standing on it"
+                                    : Math.round(want[j].dist) + " m from where it was expected") + ")");
   }
 }
 function mergePack(){

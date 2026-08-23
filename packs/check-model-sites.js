@@ -161,17 +161,24 @@ for (const m of models) {
   }
   found.sort((a, b) => b.s.area - a.s.area);
   const best = found[0];
-  const claim = found.filter(x => x.d <= Math.min(m.radius || 500, m.packRadius || 220) && x.s.area > 200)
-    .sort((a, b) => (b.s.area / (1 + b.d / 100)) - (a.s.area / (1 + a.d / 100)))[0];
+  /* the same rule the sim uses to put a model on a surveyed footprint, which
+     is what this is checking — including that standing inside a ring beats
+     any amount of area or nearness, and skips the shed floor meant for
+     guesses */
+  const claim = found.filter(x => x.on).sort((a, b) => b.s.area - a.s.area)[0] ||
+    found.filter(x => x.d <= Math.min(m.radius || 500, m.packRadius || 220) && x.s.area > 200)
+      .sort((a, b) => (b.s.area / (1 + b.d / 100)) - (a.s.area / (1 + a.d / 100)))[0];
   const line = m.id.padEnd(14) + ref(tlat, tlon).padEnd(14);
   if (!best) { console.log(line + 'NOTHING within 400 m — check this one'); suspect++; continue; }
   const note = !claim ? '  <-- nothing it would anchor on'
+             : claim.on ? ''                       /* it is standing on it */
              : claim.s.area < 400 ? '  <-- would anchor on something small'
              : '';
   if (note) suspect++;
   console.log(line + 'biggest near: ' + Math.round(best.s.area).toString().padStart(5) + ' m2 at ' +
     Math.round(best.d).toString().padStart(3) + ' m' +
-    (claim ? ';  would take ' + Math.round(claim.s.area) + ' m2 at ' + Math.round(claim.d) + ' m' : '') + note);
+    (claim ? ';  would take ' + Math.round(claim.s.area) + ' m2 ' +
+      (claim.on ? 'it stands on' : 'at ' + Math.round(claim.d) + ' m') : '') + note);
   /* Compare against the building the model STANDS ON, or against nothing.
 
      The anchor above is "biggest nearby, discounted by distance", which is
@@ -185,8 +192,11 @@ for (const m of models) {
      So: the footprint containing the model's own coordinate, or one whose
      centroid is within 30 m, and otherwise say plainly that nothing here can
      settle the height. */
-  const site = found.filter(x => x.on).sort((a, b) => b.s.area - a.s.area)[0] ||
-               found.filter(x => x.d <= 30).sort((a, b) => b.s.area - a.s.area)[0];
+  /* the footprint the SIM will draw this model on, and only when it is close
+     enough to be the building rather than its neighbour. Two rules that both
+     try to answer "which building is this" will disagree eventually, and when
+     they do the height gets checked against something the model is not. */
+  const site = claim && (claim.on || claim.d <= 30) ? claim : null;
   const mm = modelProfile(m, site ? site.s.area : (claim ? claim.s.area : 500));
   if (mm && !site) {
     astray++;
@@ -221,7 +231,8 @@ if (checked) {
   console.log(checked + ' stand on a measured footprint; ' + off +
               ' disagree with it by more than 2.5 m' +
               (unmeasured ? ', ' + unmeasured + ' sit on ground not measured yet' : '') +
-              (astray ? ', and ' + astray + ' have no building under the coordinate at all' : ''));
+              (astray ? ', and ' + astray + (astray === 1 ? ' has' : ' have') +
+                        ' no building under the coordinate at all' : ''));
   if (off) console.log('A footprint with lower wings reads lower than its main block, so ' +
                        'some of that gap is real and some is the blend. The massing in the ' +
                        'pack is what tells them apart.');

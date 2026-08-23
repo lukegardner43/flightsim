@@ -2000,30 +2000,25 @@
     "effingham junction"
    ],
    "near": [
-    51.2856,
-    -0.4106
+    51.291289,
+    -0.420038
    ],
    "radius": 600,
    "confidence": "medium on scale, low on detail",
-   "note": "Junction station with a depot alongside. Same reasoning as Bookham: low platform buildings, not a terminus.",
+   "note": "Junction station with a depot alongside. Same reasoning as Bookham: low platform buildings, not a terminus. packRadius is tight because Effingham Junction sits beside a 6,161 m2 carriage depot, and \"big and near beats small and nearer\" hands the station to the depot at 195 m unless the search is kept close to the platforms.",
    "parts": [
     {
      "on": "footprint",
-     "height": 8.3,
+     "height": 5,
      "roof": "gabled",
-     "roofHeight": 3.98,
+     "roofHeight": 2.4,
      "material": "brick",
      "roofMaterial": "slate",
      "type": "train_station"
     }
    ],
-   "measuredFit": {
-    "factor": 1.66,
-    "authored": 5,
-    "measured": 8.3,
-    "footprint": "29 m2 19 m away",
-    "source": "Environment Agency LIDAR Composite DSM/DTM 1 m, averaged over the surveyed footprint"
-   }
+   "nearSource": "Wikidata Q2164410 and OS TQ102558, which agree; the coordinate was 913 m south-east of the station, anchoring on a 229 m2 building that is not it",
+   "packRadius": 80
   }
  ],
  "known_gaps": [
