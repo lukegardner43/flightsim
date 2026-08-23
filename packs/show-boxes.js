@@ -74,7 +74,9 @@ const area = (pts, lat0) => {
   }
   return Math.abs(a2) / 2;
 };
-const un = v => (v & 1023)/10 + ((v >> 10) & 255)/10;
+/* bit 29: half-metres rather than decimetres, for anything over 102.3 m */
+const un = v => { const u = ((v >> 29) & 1) ? 2 : 10;
+                  return (v & 1023)/u + ((v >> 10) & 255)/u; };
 
 const args = process.argv.slice(2);
 if (!args.length) {

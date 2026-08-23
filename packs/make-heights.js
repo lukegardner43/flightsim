@@ -168,16 +168,32 @@ function packParts(f) {
   }
   return out;
 }
+/* Decimetres in ten bits stop at 102.3 m, and cities have towers.
+
+   Building the four tiles round Old Street turned up eight buildings at
+   exactly 127.8 m — eaves 1023 plus roof 255, the largest number this format
+   can hold. That is not a measurement, it is a ceiling, and the Shard, 22
+   Bishopsgate and Heron Tower were all pinned to the same value.
+
+   Bit 29 says the same two fields are in HALF-METRES instead, which reaches
+   511.5 m and costs 0.4 m of precision on a building nobody is measuring to
+   the decimetre from four hundred feet up. Every pack built before this has
+   the bit clear and decodes exactly as it did. */
 function packHeight(f) {
   if (!f || !f.ok) return 0;
-  let e = Math.round(f.eaves * 10), r = Math.round(f.roofH * 10);
+  let e = Math.round(f.eaves * 10), r = Math.round(f.roofH * 10), tall = 0;
   if (e < 1) return 0;
+  if (e > 1023 || r > 255) {
+    tall = 1;
+    e = Math.round(f.eaves * 2);
+    r = Math.round(f.roofH * 2);
+  }
   if (e > 1023) e = 1023;
   if (r > 255) r = 255;
   if (r < 0) r = 0;
   const b = f.bearing == null ? 255 : Math.max(0, Math.min(180, f.bearing));
   const s = SHAPE_CODE[f.shape] || 0;
-  return e | (r << 10) | (b << 18) | (s << 26);
+  return e | (r << 10) | (b << 18) | (s << 26) | (tall << 29);
 }
 
 function main() {

@@ -47,7 +47,7 @@ function tallestPart(p) {
   let top = 0;
   for (let i = 2; i < p.length; i += 2) {
     const v = p[i]; if (!v) continue;
-    const h = (v & 1023) / 10 + ((v >> 10) & 255) / 10;
+    const h = topOf(v);
     if (h > top) top = h;
   }
   return top;
@@ -61,7 +61,7 @@ function widestBox(p) {
   let span = 0, h = 0;
   for (let i = 1; i + 1 < p.length; i += 2) {
     const t = p[i], s = (((t >> 8) & 255) - (t & 255)) / 255;
-    if (s > span && p[i+1]) { span = s; h = (p[i+1] & 1023)/10 + ((p[i+1] >> 10) & 255)/10; }
+    if (s > span && p[i+1]) { span = s; h = topOf(p[i+1]); }
   }
   return span ? { span: span, h: h } : null;
 }
@@ -142,7 +142,11 @@ function stats(pts, lat0) {
      * a spire is a needle. St Nicolas' is a 4.8 m square, and on a metre grid
        blurred over a metre and a half the apex is smeared away. Lidar informs
        the main mass; it must never overrule an authored spire. */
-function unpackH(v){ return { eaves:(v & 1023)/10, roofH:((v >> 10) & 255)/10 }; }
+/* bit 29: the height fields are half-metres, not decimetres — how a tower
+   over 102.3 m fits in ten bits. Clear on every pack built before that. */
+function unpackH(v){ const u = ((v >> 29) & 1) ? 2 : 10;
+                     return { eaves:(v & 1023)/u, roofH:((v >> 10) & 255)/u }; }
+function topOf(v){ const m = unpackH(v); return m.eaves + m.roofH; }
 /* What the model would read if you flew a laser over it.
 
    Picking "the main mass" is the wrong question, and I asked it twice. A part

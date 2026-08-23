@@ -553,7 +553,9 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
       if (!site || (on && !site.on) || (on === site.on && s.area > site.s.area)) site = { s, d, h: r.h, p: r.p, on };
     }
     if (!site || !site.h) continue;
-    const un = v => (v & 1023)/10 + ((v >> 10) & 255)/10;
+    /* bit 29: half-metres rather than decimetres, for anything over 102.3 m */
+    const un = v => { const u = ((v >> 29) & 1) ? 2 : 10;
+                      return (v & 1023)/u + ((v >> 10) & 255)/u; };
     /* the biggest piece of ground the surface was split into, or the whole
        footprint where it was not split at all */
     let measured = un(site.h), widest = 1;

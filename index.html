@@ -2022,7 +2022,11 @@ var statStreamed = 0, statTrees = 0, statLandmarks = 0, drawnIds = {};
    ------------------------------------------------------------------ */
 var LIDAR = {ready:false, packs:-1, n:0, hit:0, split:0, parts:0, cell:64, map:{}};
 function lidarUnpack(v){
-  return {eaves:(v & 1023)/10, roofH:((v >> 10) & 255)/10,
+  /* bit 29 says these are HALF-METRES, which is how a 310 m tower fits in
+     ten bits that otherwise stop at 102.3 m. Clear on every pack built
+     before that, and those decode exactly as they did. */
+  var u = ((v >> 29) & 1) ? 2 : 10;
+  return {eaves:(v & 1023)/u, roofH:((v >> 10) & 255)/u,
           bearing:(v >> 18) & 255, shape:(v >> 26) & 7};
 }
 var LIDAR_SHAPE = [null, "flat", "gabled", "hipped", "pyramidal"];

@@ -52,7 +52,7 @@ jobs:
           node-version: '22'
 
       # The fitter and the end-to-end run: no browser, no network, seconds.
-      - name: The roof fitter, the massing, the edges, the fill gate
+      - name: The roof fitter, the massing, the edges, the gate, the pack format
         run: npm test
 
       - name: Install a browser
