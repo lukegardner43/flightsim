@@ -187,6 +187,7 @@ jobs:
       - name: Commit
         env:
           PLACES: ${{ inputs.places }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
@@ -198,5 +199,28 @@ jobs:
           fi
           git commit -m "Built $PLACES: OS OpenMap Local footprints and Environment Agency lidar heights" \
                      -m "Contains OS data (c) Crown copyright and database right, and public sector information licensed under the Open Government Licence v3. Built by .github/workflows/build-place.yml."
-          git push
-          echo "::notice::Done. Fly any of those postcodes — the report's tier line says how many buildings were measured rather than guessed."
+          done_msg="::notice::Done. Fly any of those postcodes — the report's tier line says how many buildings were measured rather than guessed."
+          # A run takes minutes, and anything pushed to main while it runs makes
+          # its commit a non-fast-forward. That is exactly how four minutes of
+          # lidar were lost: the measurement finished, the pack was written, and
+          # `git push` said "! [rejected] main -> main (fetch first)" — throwing
+          # away work that had already succeeded because a workflow file changed
+          # underneath it.
+          #
+          # So: rebase onto whatever landed and try again. Rebase rather than
+          # merge because this commit touches one pack and nothing else, and if
+          # two measuring runs really did collide on the same pack the conflict
+          # is worth stopping for rather than resolving blind.
+          for i in 1 2 3; do
+            if git push; then echo "$done_msg"; exit 0; fi
+            echo "::notice::push rejected — something landed on main while this ran; rebasing"
+            if ! git pull --rebase origin "$BRANCH"; then
+              git rebase --abort || true
+              echo "::error::the rebase conflicted — another run measured the same pack."
+              echo "::error::Nothing was pushed. Re-run this workflow; it will re-measure."
+              exit 1
+            fi
+          done
+          echo "::error::could not push after three attempts"
+          exit 1
+
