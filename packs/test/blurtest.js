@@ -57,16 +57,24 @@ const buildings=B.map(b=>{ const pts=[];
   for(const [sx,sy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
     const w=bngToWgs84(o.E+b.x+sx*b.w/2, o.N+b.y+sy*b.d/2); pts.push([w.lat,w.lon]); }
   return enc(pts); });
-const packFile=ROOT+'/packs/tq15.js';
-fs.writeFileSync(packFile,'TF_PACK('+JSON.stringify({id:'tq15',tile:TILE,name:'blur test',
+/* NOT tq15.js. A test fixture must never take the name of a pack somebody
+   flies: this one did, and when make-pack.js ran while it happened to be on
+   disk, a phantom "tq15" went into the sim's PACKS list and had to be taken
+   out again. The unlink below is in a finally for the same reason — a test
+   that throws must not leave a pack behind. */
+const packFile=ROOT+'/packs/blurtest.js';
+fs.writeFileSync(packFile,'TF_PACK('+JSON.stringify({id:'blurtest',tile:TILE,name:'blur test',
   bbox:[0,0,0,0],q:Q,source:'synthetic',updated:'2026-08-21',buildings})+');\n');
+try {
 
 console.log('BLUR built into the surface: '+BLUR.toFixed(1)+' m either side of the wall');
 console.log('so the roof is at full height from '+BLUR.toFixed(1)+' m in, and the curve');
 console.log('should read 1.00 there and below it nearer the wall.\n');
-const out=cp.execSync('node '+ROOT+'/packs/make-heights.js --tile '+TILE+' --pack tq15'+
+const out=cp.execSync('node '+ROOT+'/packs/make-heights.js --tile '+TILE+' --pack blurtest'+
   ' --dsm '+SP+'/b-dsm.img --dtm '+SP+'/b-dtm.img --size '+N+' --pixel '+PIX,{encoding:'utf8'});
 const cut = out.indexOf('the edge blur');
 console.log(cut < 0 ? out : out.slice(cut));
-fs.unlinkSync(packFile);
-fs.unlinkSync(SP+'/b-dsm.img'); fs.unlinkSync(SP+'/b-dtm.img');
+} finally {
+  fs.unlinkSync(packFile);
+  try { fs.unlinkSync(SP+'/b-dsm.img'); fs.unlinkSync(SP+'/b-dtm.img'); } catch (e) {}
+}

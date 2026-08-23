@@ -77,9 +77,11 @@ function collect(ring, sample, opt) {
 
   /* collect the samples, and where each one sits in the building's own frame */
   const h = [], us = [], vs = [];
+  let inN = 0;
   for (let y = Math.floor(y0) + 0.5; y < y1; y += STEP) {
     for (let x = Math.floor(x0) + 0.5; x < x1; x += STEP) {
       if (!pip(x, y, ring)) continue;
+      inN++;                                  /* inside the WALLS, data or not */
       const z = sample(x, y);
       if (!isFinite(z)) continue;
       h.push(z);
@@ -89,7 +91,26 @@ function collect(ring, sample, opt) {
   }
   if (h.length < 4) return { n: h.length, ok: false };
   const rawN = h.length;
-  const bboxN = Math.max(1, Math.round((x1 - x0) * (y1 - y0) / (STEP * STEP)));
+  /* How much of the footprint had data: samples that landed inside the ring
+     over cells that are inside the ring at all.
+
+     This used to divide by the axis-aligned BOUNDING BOX, which measures
+     nothing of the sort — it measures how nearly rectangular the building is
+     and how squarely it sits to north. A perfectly surveyed barn at 45
+     degrees fills half its own bounding box, and make-heights throws away
+     anything under 0.45 as half-covered. So it threw away the buildings that
+     are L-shaped, or set at an angle, or built round a courtyard, and kept
+     the plain ones:
+
+       footprint      in TQ15    measured
+       0-200 m2        11,067       88%
+       200-400 m2       2,853       67%
+       400-1000 m2        797       45%
+       over 1000 m2       195       43%
+
+     Which is why ten of the sixteen landmark models still had no reading
+     after a whole tile was measured. Country houses have wings. */
+  const ringN = Math.max(1, inN);
 
   /* Throw the garden away first.
 
@@ -107,7 +128,7 @@ function collect(ring, sample, opt) {
   for (let i = 0; i < h.length; i++)
     if (h[i] >= floor) { kh.push(h[i]); ku.push(us[i]); kv.push(vs[i]); }
   if (kh.length < 4) return { n: rawN, ok: false };
-  return { ok: true, h: kh, us: ku, vs: kv, box: box, rawN: rawN, bboxN: bboxN,
+  return { ok: true, h: kh, us: ku, vs: kv, box: box, rawN: rawN, ringN: ringN,
            uLen: box.u1 - box.u0, vLen: box.v1 - box.v0 };
 }
 
@@ -341,7 +362,7 @@ function fitRoof(ring, sample, opt) {
   /* how much of the footprint had data at all, and how much of it read as
      building rather than garden — a half-covered building is a
      half-believable measurement */
-  d.fill = c.rawN / c.bboxN;
+  d.fill = c.rawN / c.ringN;
   d.onRoof = c.h.length / Math.max(1, c.rawN);
   return d;
 }
