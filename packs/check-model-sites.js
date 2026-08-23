@@ -52,6 +52,33 @@ function tallestPart(p) {
   }
   return top;
 }
+/* The biggest piece of GROUND the surface was split into, and how much of the
+   footprint it is. A spire is never the biggest piece of ground — which is
+   why this is the number to hold a model's fabric against, and an average
+   over the whole footprint is not. */
+function widestBox(p) {
+  if (!p || p.length < 3) return null;
+  let span = 0, h = 0;
+  for (let i = 1; i + 1 < p.length; i += 2) {
+    const t = p[i], s = (((t >> 8) & 255) - (t & 255)) / 255;
+    if (s > span && p[i+1]) { span = s; h = (p[i+1] & 1023)/10 + ((p[i+1] >> 10) & 255)/10; }
+  }
+  return span ? { span: span, h: h } : null;
+}
+/* and the model's fabric: the part that is most of the BUILDING, plan times
+   height. Not the largest by plan — Thorncroft's widest is a 32% terrace
+   1.5 m high — and not the tallest, which is the spire. */
+function fabric(m, footArea) {
+  let best = null, most = 0;
+  for (const p of m.parts || []) {
+    const plan = p.on === 'footprint' ? 1
+               : (p.wF||0)*(p.dF||0) > 0 ? p.wF * p.dF
+               : (p.w||0)*(p.d||0) > 0 ? (p.w * p.d) / footArea : 0;
+    const v = plan * (p.height || 0);
+    if (v > most) { most = v; best = p; }
+  }
+  return best;
+}
 const packs = fs.readdirSync(path.join(root, 'packs')).filter(f => /^[a-z0-9]+\.js$/.test(f) &&
   !/^(make-pack|grid-square|plan-tiles|check-model-sites)\.js$/.test(f));
 for (const f of packs) require(path.join(root, 'packs', f));
@@ -210,32 +237,38 @@ for (const m of models) {
     else {
       const u = unpackH(site.h), whole = u.eaves + u.roofH;
       const top = tallestPart(site.p);
-      const d = mm.h - whole;
+      const box = widestBox(site.p);
+      const fab = fabric(m, site.s.area);
+      const gotFab = box ? box.h : whole;
+      const wantFab = fab ? (fab.height || 0) : mm.h;
+      const d = wantFab - gotFab;
       checked++;
       const verdict = Math.abs(d) < 2.5 ? '' :
         '   <-- ' + Math.abs(d).toFixed(1) + ' m ' + (d > 0 ? 'taller' : 'shorter');
       if (verdict) off++;
-      console.log(' '.repeat(28) + 'over the footprint: ' + mm.h.toFixed(1).padStart(5) +
-                  ' m authored, ' + whole.toFixed(1).padStart(5) + ' m measured' + verdict);
+      console.log(' '.repeat(28) + 'the fabric:   ' + wantFab.toFixed(1).padStart(5) +
+                  ' m authored, ' + gotFab.toFixed(1).padStart(5) + ' m measured' + verdict +
+                  (box ? '   (the ' + (box.span * 100).toFixed(0) + '% of the footprint at one height)'
+                       : '   (the whole footprint; not split)'));
       /* and the tallest thing on each, which is where a spire lives and where
          the metre grid gives up */
-      console.log(' '.repeat(28) + 'tallest part:      ' + mm.tallest.toFixed(1).padStart(5) +
-                  ' m authored, ' + (top ? top.toFixed(1).padStart(5) + ' m in ' +
-                  ((site.p.length - 1) / 2) + ' measured boxes' : '    — not split') +
-                  (mm.what ? '   (' + String(mm.what).slice(0, 44) + ')' : ''));
+      console.log(' '.repeat(28) + 'tallest part: ' + mm.tallest.toFixed(1).padStart(5) +
+                  ' m authored, ' + (top ? top.toFixed(1).padStart(5) + ' m measured' : '    — not split') +
+                  (mm.what ? '   (' + String(mm.what).slice(0, 40) + ')' : ''));
     }
   }
 }
 console.log('\n' + (suspect ? suspect + ' model site(s) worth checking by hand' : 'every model has a substantial building where it expects one'));
 if (checked) {
   console.log(checked + ' stand on a measured footprint; ' + off +
-              ' disagree with it by more than 2.5 m' +
+              (off === 1 ? ' disagrees' : ' disagree') + ' with it by more than 2.5 m' +
               (unmeasured ? ', ' + unmeasured + ' sit on ground not measured yet' : '') +
               (astray ? ', and ' + astray + (astray === 1 ? ' has' : ' have') +
                         ' no building under the coordinate at all' : ''));
-  if (off) console.log('A footprint with lower wings reads lower than its main block, so ' +
-                       'some of that gap is real and some is the blend. The massing in the ' +
-                       'pack is what tells them apart.');
+  if (off) console.log('Both numbers are the biggest piece of ground at one height — the ' +
+                       'model\'s fabric against the surface\'s. A footprint holding two ' +
+                       'buildings has no single answer, and that is what a gap here usually ' +
+                       'means: run  node packs/boxes.js <id>  and look at the split.');
 } else if (unmeasured) {
   console.log('no landmark sits on measured ground yet — run "Build a place" over these tiles');
 }

@@ -431,19 +431,44 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
    footprint. That is the only symmetric comparison — picking "the main mass"
    went wrong twice, once on a 5x2 m entrance surround and once on a terrace.
 
-   Three rules, and they matter more than the arithmetic:
+   What is compared is the ORDINARY FABRIC on each side — the nave, the
+   ranges, the main block — and not an average over the whole thing. An
+   average is the wrong number when either side has a tower on it, and both
+   sides do:
+
+     ranmore    model averages 16.0 m over its plan, because three tower
+                stages are weighted against a 338 m2 footprint; the
+                footprint reads 29.0 m, because a spire smeared over 338 m2
+                lifts everything. Thirteen metres apart, and both numbers
+                describe nothing that exists. Box to box the nave is 11.0 m
+                authored against 11.4 m measured.
+     mickleham  8.9 against 12.4 by the averages; 8.5 against 8.7 nave to
+                nave, and 15.0 against 15.5 tower to tower.
+
+   Neither was ever wrong. The comparison was.
+
+   So the model's fabric is its `on:'footprint'` part, or its largest, and
+   the measured fabric is the largest of the boxes make-heights split the
+   surface into — the biggest piece of ground on each side. A spire is never
+   the biggest piece of ground; that is what makes it a spire.
+
+   Two more rules, and they matter more than the arithmetic:
 
      * the model must STAND ON the footprint — inside its ring, or within
        30 m of its centre. A reading from the building next door is worse
        than no reading because it looks like an answer, and most of what
        first looked like "the models are all too tall" was a coordinate
        being wrong rather than a height.
-     * nothing slender is touched. If the model's tallest part is more than
-       1.35x its own footprint average it has a tower, a spire or a lantern
-       on it, and a 1 m grid blurred over 1.5 m cannot see those: St Nicolas'
-       spire, Polesden's clock lantern and Ranmore's 52 m spire are all
-       excluded by that one test. Lidar informs the main mass. It must never
-       overrule an authored spire.
+     * a model with a FREE-STANDING TOWER is not scaled at all. The fit is a
+       uniform scale, which is safe exactly when every part rests on the
+       fabric — Polesden's dormers sit on its eaves at 10.4 m, its stacks on
+       the same, its cupola on the ridge at 13.4 and its lantern on the
+       cupola at 15.2, so moving the ranges moves all of it and nothing comes
+       adrift. A tower that starts at the ground does not move with the nave,
+       and scaling it would shrink a spire a metre grid cannot see anyway.
+       Ranmore's 7 m square tower stage and Mickleham's 5.5 m one both start
+       at the ground and both stand more than a third above their nave, so
+       neither model is touched — and box to box neither needs to be.
      * either direction. An earlier draft of this only corrected downwards,
        on the evidence that ten of eleven models read taller than the ground.
        That evidence was wrong: the checker was adding roofHeight to a
@@ -463,7 +488,8 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
       const pts = []; let lat = a[0], lon = a[1];
       pts.push([lat / q, lon / q]);
       for (let i = 2; i < a.length; i += 2) { lat += a[i]; lon += a[i+1]; pts.push([lat/q, lon/q]); }
-      rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0 });
+      rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0,
+                   p: (d.parts && d.parts[rings.length]) || null });
     }
   };
   const dir = path.join(HERE, '..', 'packs');
@@ -489,7 +515,7 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
     }
     return { area: Math.abs(a2)/2, lat: cl/(3*a2), lon: co/(3*a2) };
   };
-  const done = [];
+  const done = [], standing = [], mixed = [];
   for (const m of models) {
     if (!m.near || !m.parts || !m.parts.length) continue;
     /* undo whatever a previous run applied, so this is worked out from the
@@ -510,25 +536,53 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
       const d = Math.hypot((s.lat - tlat)*mLat, (s.lon - tlon)*mLon);
       const on = inRing(r.pts, tlat, tlon);
       if (!on && d > 30) continue;
-      if (!site || (on && !site.on) || (on === site.on && s.area > site.s.area)) site = { s, d, h: r.h, on };
+      if (!site || (on && !site.on) || (on === site.on && s.area > site.s.area)) site = { s, d, h: r.h, p: r.p, on };
     }
     if (!site || !site.h) continue;
-    const measured = (site.h & 1023)/10 + ((site.h >> 10) & 255)/10;
-
-    let sum = 0, area = 0, tallest = 0;
-    for (const p of m.parts) {
-      const h = (p.height || 0);
-      let a = 0;
-      if (p.on === 'footprint') a = site.s.area;
-      else if ((p.wF||0)*(p.dF||0) > 0) a = p.wF * p.dF * site.s.area;
-      else if ((p.w||0)*(p.d||0) > 0) a = p.w * p.d;
-      if (!(a > 0)) continue;
-      sum += a*h; area += a; if (h > tallest) tallest = h;
+    const un = v => (v & 1023)/10 + ((v >> 10) & 255)/10;
+    /* the biggest piece of ground the surface was split into, or the whole
+       footprint where it was not split at all */
+    let measured = un(site.h), widest = 1;
+    if (site.p && site.p.length >= 3) {
+      widest = 0;
+      for (let i = 1; i + 1 < site.p.length; i += 2) {
+        const t = site.p[i], span = (((t >> 8) & 255) - (t & 255)) / 255;
+        if (span > widest && site.p[i+1]) { widest = span; measured = un(site.p[i+1]); }
+      }
     }
-    if (!(area > 0)) continue;
-    const authored = sum / area;
+    /* One number cannot correct a model of two buildings. Thorncroft Manor's
+       footprint is 7,022 m2 of Georgian house AND modern offices, and the
+       surface says so — 32% at 9.0 m, 50% at 9.2, 11% at 12.0, 8% at 9.8.
+       Its model's fabric is 16.0 m, which matches no box on that footprint,
+       and scaling the whole thing to the office block would flatten the
+       manor. Where the ground is not mostly one height, there is nothing
+       here to scale to. */
+    if (widest < 0.6) { mixed.push(m.id); continue; }
+    /* And the model's own fabric. NOT its largest part by plan: Thorncroft
+       Manor's widest is a 32% terrace 1.5 m high, so "largest" made the
+       fabric 1.5 m against a 9.2 m measurement and would have scaled the
+       manor by six. It is the part that is most of the BUILDING — plan times
+       height — which a terrace loses on height and a chimney on plan.
+
+       The measured side cannot use the same rule, and does not: volume there
+       would pick Ranmore's spire box (21% of the length but 35.6 m) over its
+       nave. The biggest piece of GROUND is right there, because a spire is
+       never the biggest piece of ground. */
+    const plan = p => p.on === 'footprint' ? 1
+                    : (p.wF||0)*(p.dF||0) > 0 ? p.wF * p.dF
+                    : (p.w||0)*(p.d||0) > 0 ? (p.w * p.d) / site.s.area : 0;
+    let fab = null, most = 0;
+    for (const p of m.parts) {
+      const v = plan(p) * (p.height || 0);
+      if (v > most) { most = v; fab = p; }
+    }
+    if (!fab || !(fab.height > 0)) continue;
+    const authored = fab.height;
     if (Math.abs(authored - measured) <= 2.5) continue;    /* close enough to leave alone */
-    if (tallest > authored * 1.35) continue;               /* a spire, and not ours to move */
+    /* a tower that starts at the ground moves with nothing, so nothing moves */
+    const tower = m.parts.some(p => p !== fab && !(p.minHeight > 0) &&
+                                    (p.height || 0) > authored * 1.35);
+    if (tower) { standing.push(m.id); continue; }
 
     const k = +(measured / authored).toFixed(4);
     for (const p of m.parts) {
@@ -536,12 +590,14 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
       if (p.roofHeight != null) p.roofHeight = +(p.roofHeight * k).toFixed(2);
       if (p.minHeight != null) p.minHeight = +(p.minHeight * k).toFixed(2);
     }
-    m.measuredFit = { factor:k, authored:+authored.toFixed(1), measured:+measured.toFixed(1),
-      footprint:Math.round(site.s.area) + ' m2' + (site.on ? ' it stands on' : ' ' + Math.round(site.d) + ' m away'),
+    m.measuredFit = { factor:k, authoredFabric:+authored.toFixed(1), measuredFabric:+measured.toFixed(1),
+      fabric:'largest measured box on a ' + Math.round(site.s.area) + ' m2 footprint' + (site.on ? ' it stands on' : ' ' + Math.round(site.d) + ' m away'),
       source:'Environment Agency LIDAR Composite DSM/DTM 1 m, averaged over the surveyed footprint' };
     done.push(m.id + ' ' + authored.toFixed(1) + ' -> ' + measured.toFixed(1) + ' m (x' + k.toFixed(2) + ')');
   }
   console.log(done.length ? '  fitted to lidar: ' + done.join(', ') : '  nothing to fit to lidar');
+  if (standing.length) console.log('  left alone, free-standing tower: ' + standing.join(', '));
+  if (mixed.length) console.log('  left alone, footprint holds more than one building: ' + mixed.join(', '));
 })();
 
 /* The roof must still leave a wall under it, and the fit above moved both. */
