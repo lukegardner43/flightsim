@@ -43,6 +43,18 @@ if (!rings.length) { console.error('no packs to check against'); process.exit(1)
 console.log('checking ' + models.length + ' models against ' + rings.length.toLocaleString() +
             ' surveyed footprints from ' + packs.join(', ') + '\n');
 
+/* is the model's own coordinate inside this footprint? Distance to a
+   centroid cannot answer that: a 7,000 m2 range has a centroid 40 m from
+   parts of itself, and a neighbour's centroid can be nearer than the
+   building's own. */
+function inside(pts, lat, lon) {
+  let hit = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const yi = pts[i][0], xi = pts[i][1], yj = pts[j][0], xj = pts[j][1];
+    if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
 function stats(pts, lat0) {
   const mLat = 110540, mLon = 111320 * Math.cos(lat0 * Math.PI / 180);
   let a2 = 0, cl = 0, co = 0;
@@ -87,7 +99,7 @@ function ref(lat, lon) {
   return b.square + ' ' + p((b.E % 100000) / 10) + ' ' + p((b.N % 100000) / 10);
 }
 
-let suspect = 0, checked = 0, off = 0, unmeasured = 0;
+let suspect = 0, checked = 0, off = 0, unmeasured = 0, astray = 0;
 for (const m of models) {
   const [tlat, tlon] = m.near;
   const mLat = 110540, mLon = 111320 * Math.cos(tlat * Math.PI / 180);
@@ -95,7 +107,7 @@ for (const m of models) {
   for (const r of rings) {
     const s = stats(r.pts, tlat);
     const d = Math.hypot((s.lat - tlat) * mLat, (s.lon - tlon) * mLon);
-    if (d < 400) found.push({ s, d, h: r.h });
+    if (d < 400) found.push({ s, d, h: r.h, on: inside(r.pts, tlat, tlon) });
   }
   found.sort((a, b) => b.s.area - a.s.area);
   const best = found[0];
@@ -111,11 +123,32 @@ for (const m of models) {
     Math.round(best.d).toString().padStart(3) + ' m' +
     (claim ? ';  would take ' + Math.round(claim.s.area) + ' m2 at ' + Math.round(claim.d) + ' m' : '') + note);
   const want = mainMass(m);
-  if (claim && want) {
-    if (!claim.h) { unmeasured++; console.log(' '.repeat(28) + 'main mass ' + want.toFixed(1) +
+  /* Compare against the building the model STANDS ON, or against nothing.
+
+     The anchor above is "biggest nearby, discounted by distance", which is
+     the right rule for placing a model and the wrong one for checking its
+     height: it put St Nicolas' church against a 2,494 m2 building 173 m away
+     and read 5.4 m, then called the church ten metres too tall. Fetcham Park
+     and St Mary's Fetcham — a house and a church — both anchored on the same
+     footprint. A reading from the building next door is worse than no
+     reading, because it looks like an answer.
+
+     So: the footprint containing the model's own coordinate, or one whose
+     centroid is within 30 m, and otherwise say plainly that nothing here can
+     settle the height. */
+  const site = found.filter(x => x.on).sort((a, b) => b.s.area - a.s.area)[0] ||
+               found.filter(x => x.d <= 30).sort((a, b) => b.s.area - a.s.area)[0];
+  if (want && !site) {
+    astray++;
+    console.log(' '.repeat(28) + 'main mass ' + want.toFixed(1) +
+                ' m authored; nothing under this coordinate to check it against' +
+                (claim ? ' (nearest is ' + Math.round(claim.d) + ' m away)' : ''));
+  }
+  if (site && want) {
+    if (!site.h) { unmeasured++; console.log(' '.repeat(28) + 'main mass ' + want.toFixed(1) +
                     ' m authored; that footprint has no lidar reading yet'); }
     else {
-      const u = unpackH(claim.h), got = u.eaves + u.roofH, d = want - got;
+      const u = unpackH(site.h), got = u.eaves + u.roofH, d = want - got;
       checked++;
       const verdict = Math.abs(d) < 2.5 ? '' :
         '   <-- ' + Math.abs(d).toFixed(1) + ' m ' + (d > 0 ? 'taller than measured' : 'shorter than measured');
@@ -127,9 +160,10 @@ for (const m of models) {
 }
 console.log('\n' + (suspect ? suspect + ' model site(s) worth checking by hand' : 'every model has a substantial building where it expects one'));
 if (checked) {
-  console.log(checked + ' had a lidar reading to check the height against; ' + off +
-              ' disagree by more than 2.5 m' +
-              (unmeasured ? ', and ' + unmeasured + ' more sit on ground not measured yet' : ''));
+  console.log(checked + ' stand on a measured footprint; ' + off +
+              ' disagree with it by more than 2.5 m' +
+              (unmeasured ? ', ' + unmeasured + ' sit on ground not measured yet' : '') +
+              (astray ? ', and ' + astray + ' have no building under the coordinate at all' : ''));
   if (off) console.log('A footprint with lower wings reads lower than its main block, so ' +
                        'some of that gap is real and some is the blend. The massing in the ' +
                        'pack is what tells them apart.');
