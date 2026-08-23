@@ -123,14 +123,26 @@ const OSM = { version: 0.6, elements: [{
     (r.models.matched.some(n => /polesden/i.test(n)) ? 'placed' : 'NOT placed') +
     (r.models.fromPack.some(n => /polesden/i.test(n)) ? ', on a pack footprint' : '') +
     ';  pack ' + r.pack.drawn + ' drawn, ' + r.pack.dup + ' duplicates set aside');
+  if (r.models.massed && r.models.massed.length)
+    for (const line of r.models.massed) console.log('  surveyed massing: ' + line);
+  else console.log('  surveyed massing: nothing lowered');
   console.log('  straight down through the courtyard, ' + r.hits.length + ' surface(s):');
   for (const h of r.hits) console.log('    ' + h.y.toFixed(1).padStart(6) + ' m above ground   ' + h.name);
 
   /* Anything solid well above the ground in the middle of a courtyard is a
      box that should not be there. Below a metre is terrain. */
   const roofs = r.hits.filter(h => h.y > 1.5);
-  const ok = roofs.length === 0;
-  console.log('\n' + (ok ? 'PASS  nothing is drawn over the courtyard'
-                         : 'FAIL  ' + roofs.length + ' surface(s) over the courtyard — an outline is drawn under the model'));
-  process.exit(ok ? 0 : 1);
+  const clear = roofs.length === 0;
+  console.log('\n' + (clear ? 'PASS  nothing is drawn over the courtyard'
+                             : 'FAIL  ' + roofs.length + ' surface(s) over the courtyard — an outline is drawn under the model'));
+  /* The surface over Polesden steps: 86% of the footprint at 10.8 m and a
+     strip at the north end at 5.1. A model that takes one height for the
+     whole quadrangle draws the low service range as tall as the show front. */
+  const massed = (r.models.massed || []).filter(l => /polesden/i.test(l));
+  const ranges = massed.filter(l => /range/i.test(l));
+  const used = ranges.length > 0;
+  console.log((used ? 'PASS  the low range is cut to the surveyed step'
+                    : 'FAIL  the surveyed massing is not reaching the model') +
+              '  (' + massed.length + ' part(s) lowered, ' + ranges.length + ' of them ranges)');
+  process.exit(clear && used ? 0 : 1);
 })();

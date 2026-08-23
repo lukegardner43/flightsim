@@ -860,7 +860,7 @@ function modelAnchor(e){
 /* Names that matched a model but were turned away, and why — so a model that
    silently does not appear can be diagnosed from the report instead of by
    guessing. */
-var MODEL_MISS = [], MODEL_FROMPACK = [];
+var MODEL_MISS = [], MODEL_FROMPACK = [], MODEL_MASSED = [];
 /* A model whose own coordinate falls INSIDE this building has found it,
    whatever the building is called — including nothing at all.
 
@@ -960,9 +960,33 @@ function modelParts(e, m){
            hu:(bb[2]-bb[0])/2, hv:(bb[3]-bb[1])/2};
     box.area = 4*box.hu*box.hv;
   }
-  var out = [];
+  /* The surveyed massing under this model, looked up once — and only used
+     when the model is BUILT of positioned parts.
+
+     A model whose fabric is one `on:'footprint'` volume spans every box on
+     the footprint, so there is no "part of the fabric" to bring down: the
+     only things standing over a lower box are its dormers and its chimneys,
+     and lowering those while the range they sit on stays put sinks a chimney
+     into its own roof. That is what the first version of this did to Fetcham
+     Park's dormers and Bookham Grove's stack. Polesden Lacey is four ranges
+     written as fractions of the quadrangle, so each range can take the box it
+     actually stands on, and everything resting on a range moves with it
+     because it is standing in the same place. */
+  var oneVolume = false;
+  for(i=0;i<(m.parts||[]).length;i++) if(m.parts[i].on === "footprint") oneVolume = true;
+  var mrec = (!oneVolume && typeof lidarRecAt === "function") ? lidarRecAt(box.cx, box.cz) : null;
+  var mmain = mrec ? lidarMainBox(mrec) : 0;
+  var bands = mrec ? lidarBands(mrec) : null;
+  function ringFromWorld(w){
+    var g = [], q;
+    for(q=0;q<w.length;q++){ var ll = worldToLatLon(w[q].x, w[q].z); g.push({lat:ll.lat, lon:ll.lon}); }
+    if(g.length) g.push(g[0]);
+    return g;
+  }
+  var out = [], pcx = box.cx, pcz = box.cz, world = null;
   for(i=0;i<(m.parts||[]).length;i++){
     var p = m.parts[i], geom;
+    pcx = box.cx; pcz = box.cz; world = null;
     if(p.on === "footprint"){
       geom = e.geometry;
     }else{
@@ -971,6 +995,7 @@ function modelParts(e, m){
       var cu = (p.at ? p.at[0] : 0)*box.hu, cv = (p.at ? p.at[1] : 0)*box.hv;
       var cx = box.cx + cu*box.ux - cv*box.uz;
       var cz = box.cz + cu*box.uz + cv*box.ux;
+      pcx = cx; pcz = cz;
       var rot = (p.rot || 0)*Math.PI/180;
       var ax = Math.cos(rot)*box.ux - Math.sin(rot)*box.uz;
       var az = Math.cos(rot)*box.uz + Math.sin(rot)*box.ux;
@@ -993,27 +1018,69 @@ function modelParts(e, m){
       }else{
         cs = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]];
       }
-      geom = [];
+      world = [];
       for(k=0;k<cs.length;k++){
-        var wx = cx + cs[k][0]*ax - cs[k][1]*az;
-        var wz = cz + cs[k][0]*az + cs[k][1]*ax;
-        var ll = worldToLatLon(wx, wz);
-        geom.push({lat:ll.lat, lon:ll.lon});
+        world.push({x:cx + cs[k][0]*ax - cs[k][1]*az,
+                    z:cz + cs[k][0]*az + cs[k][1]*ax});
       }
-      geom.push(geom[0]);
+      geom = ringFromWorld(world);
     }
     if(!geom || geom.length < 4) continue;
-    var tg = {"building:part":"yes", "tf:part":"model"};
-    if(p.type) tg.building = p.type;             /* drives material and roof defaults */
-    if(p.height != null)     tg.height = String(p.height);
-    if(p.minHeight != null)  tg.min_height = String(p.minHeight);
-    if(p.roof)               tg["roof:shape"] = p.roof;
-    if(p.roofHeight != null) tg["roof:height"] = String(p.roofHeight);
-    if(p.material)           tg["building:material"] = p.material;
-    if(p.roofMaterial)       tg["roof:material"] = p.roofMaterial;
-    if(p.roofColour)         tg["roof:colour"] = p.roofColour;
-    if(p.colour)             tg["building:colour"] = p.colour;
-    out.push({type:"way", id:"md" + m.id + "_" + i, tags:tg, geometry:geom});
+    var mainTop = mmain ? lidarTop(mmain) : 0;
+    /* A range is CUT at the measured steps, the same way lidarParts cuts an
+       ordinary building, and each piece takes the box it stands on.
+       Polesden's low box is a strip 14% of the way along the axis, and the
+       north range's centre is at 19% — so asking which box a part's CENTRE
+       is in lowered ten chimneys and not one range, which would have sunk
+       every one of them into a roof that had not moved. Cutting the range
+       puts its outer half at 5.1 m and its inner half at 10.8, and the
+       chimneys standing on the low half come down with it. */
+    var ground = !(p.minHeight > 0), pieces = null, bi, pi;
+    if(bands && mainTop && ground && world){
+      pieces = [];
+      for(bi=0;bi<bands.length;bi++){
+        var bd = bands[bi], sub = world;
+        if(bd.cut0) sub = clipHalf(sub, -bd.ax, -bd.az, -bd.t0);
+        if(bd.cut1) sub = clipHalf(sub,  bd.ax,  bd.az,  bd.t1);
+        if(sub.length < 3) continue;
+        if(Math.abs(signedArea(sub)) < 4) continue;      /* a sliver is not a range */
+        var dd = mainTop - bd.top;
+        pieces.push({g:ringFromWorld(sub), drop:dd > 1.5 ? dd : 0});
+      }
+      if(pieces.length < 2) pieces = null;               /* one band, nothing to cut */
+    }
+    if(!pieces){
+      /* not a range: it rests on one, and takes the step underneath it */
+      var d0 = 0;
+      if(bands && mainTop && !ground){
+        var mv = lidarBoxAt(mrec, pcx, pcz);
+        if(mv){ var d1 = mainTop - lidarTop(mv); if(d1 > 1.5) d0 = d1; }
+      }
+      pieces = [{g:geom, drop:d0}];
+    }
+    for(pi=0;pi<pieces.length;pi++){
+      var pc = pieces[pi], drop = pc.drop;
+      if(drop > 0){
+        /* cells overlap, so this runs for the same model more than once —
+           the same line twenty times over is not twenty pieces of news */
+        var msg = m.name + ": " + (p.note || p.type || "a part") +
+          (pieces.length > 1 ? " (part of it)" : "") + " down " + drop.toFixed(1) +
+          " m to a " + (mainTop - drop).toFixed(1) + " m box";
+        if(MODEL_MASSED.indexOf(msg) < 0) MODEL_MASSED.push(msg);
+      }
+      var tg = {"building:part":"yes", "tf:part":"model"};
+      if(p.type) tg.building = p.type;           /* drives material and roof defaults */
+      if(p.height != null)     tg.height = String(Math.max(0.6, p.height - drop));
+      if(p.minHeight != null)  tg.min_height = String(Math.max(0, p.minHeight - drop));
+      if(p.roof)               tg["roof:shape"] = p.roof;
+      if(p.roofHeight != null) tg["roof:height"] = String(p.roofHeight);
+      if(p.material)           tg["building:material"] = p.material;
+      if(p.roofMaterial)       tg["roof:material"] = p.roofMaterial;
+      if(p.roofColour)         tg["roof:colour"] = p.roofColour;
+      if(p.colour)             tg["building:colour"] = p.colour;
+      out.push({type:"way", id:"md" + m.id + "_" + i + (pi ? "_" + pi : ""),
+                tags:tg, geometry:pc.g});
+    }
   }
   return out;
 }
@@ -2035,6 +2102,75 @@ function clipHalf(pts, nx, nz, d){        /* keep the side where n.p <= d */
   }
   return out;
 }
+/* Which of a footprint's measured boxes is this point standing in, and which
+   box is the building's main mass?
+
+   A landmark model takes ONE height from the laser — the biggest box on its
+   footprint — and until now every part of it was hung off that. Polesden
+   Lacey is a quadrangle and the surface says so: 86% of it at 10.8 m and a
+   strip at one end at 5.1, which is the low service range across the
+   courtyard. Drawing that range at 10.8 like the show front is drawing a
+   building that is not there.
+
+   These answer it in the SIM rather than in the model builder on purpose.
+   Mapping a part's at:[u,v] onto the measured axis needs orientedBox, and
+   orientedBox's u can come out either way round; get it backwards in a
+   separate tool and the low range appears at the wrong end of the house,
+   which is worse than not doing it. Here it is the same orientedBox call
+   that placed the part, so there is nothing to agree with. */
+function lidarBoxAt(rec, x, z){
+  var pk = rec && rec.p;
+  if(!pk || pk.length < 5) return 0;
+  var deg = pk[0]*Math.PI/180, ax = Math.sin(deg), az = Math.cos(deg), i, t;
+  var lo = Infinity, hi = -Infinity;
+  for(i=0;i<rec.r.length;i+=2){
+    t = rec.r[i]*ax + rec.r[i+1]*az;
+    if(t < lo) lo = t; if(t > hi) hi = t;
+  }
+  var ext = hi - lo;
+  if(!(ext > 1)) return 0;
+  var u = (x*ax + z*az - lo)/ext;
+  for(i=1;i<pk.length;i+=2){
+    var t0 = (pk[i] & 255)/255, t1 = ((pk[i] >> 8) & 255)/255;
+    if(u >= t0 - 0.002 && u <= t1 + 0.002) return pk[i+1];
+  }
+  return 0;
+}
+/* Every measured box on this footprint, as a half-plane pair in world metres
+   plus its height — the same numbers lidarParts cuts an ordinary building
+   with, handed over so a MODEL's ranges can be cut the same way. */
+function lidarBands(rec){
+  var pk = rec && rec.p;
+  if(!pk || pk.length < 5) return null;
+  var deg = pk[0]*Math.PI/180, ax = Math.sin(deg), az = Math.cos(deg), i, t;
+  var lo = Infinity, hi = -Infinity;
+  for(i=0;i<rec.r.length;i+=2){
+    t = rec.r[i]*ax + rec.r[i+1]*az;
+    if(t < lo) lo = t; if(t > hi) hi = t;
+  }
+  var ext = hi - lo;
+  if(!(ext > 1)) return null;
+  var out = [];
+  for(i=1;i<pk.length;i+=2){
+    if(!pk[i+1]) continue;
+    out.push({ax:ax, az:az,
+              t0:lo + (pk[i] & 255)/255*ext, t1:lo + ((pk[i] >> 8) & 255)/255*ext,
+              cut0:(pk[i] & 255) > 0, cut1:((pk[i] >> 8) & 255) < 255,
+              top:lidarTop(pk[i+1])});
+  }
+  return out.length > 1 ? out : null;
+}
+function lidarMainBox(rec){
+  var pk = rec && rec.p;
+  if(!pk || pk.length < 5) return 0;
+  var best = 0, span = 0;
+  for(var i=1;i<pk.length;i+=2){
+    var w = (((pk[i] >> 8) & 255) - (pk[i] & 255))/255;
+    if(w > span){ span = w; best = pk[i+1]; }
+  }
+  return best;
+}
+function lidarTop(v){ var m = lidarUnpack(v); return m.eaves + m.roofH; }
 function lidarParts(pts, rec){
   var pk = rec && rec.p;
   if(!pk || pk.length < 5) return null;
@@ -6192,7 +6328,7 @@ window.__sim = {
       x:Math.round(s.position.x), y:Math.round(s.position.y), z:Math.round(s.position.z)}; });
   },
   models: function(){ return {loaded:MODELS.length, matched:MODEL_HITS.slice(), missed:MODEL_MISS.slice(),
-                             fromPack:MODEL_FROMPACK.slice(),
+                             fromPack:MODEL_FROMPACK.slice(), massed:MODEL_MASSED.slice(),
                              names:MODELS.map(function(m){ return m.name; })}; },
   pack: function(){ return {state:packState(),
                             id:PACK.files.map(function(f){ return f.p.id; }).join(","),
