@@ -16,6 +16,12 @@ name: Measure building heights from lidar
 # takes seconds and is the cheap way to check the endpoints are alive before
 # committing to a download of a hundred million samples.
 #
+# size says 10000 rather than being blank for the whole tile, and that is not
+# cosmetic: an EMPTY workflow_dispatch input is replaced by its default, so a
+# run asking for the whole tile by clearing the box measured the middle two
+# kilometres instead and looked like a success. 10000 and blank mean the same
+# thing to plan-square.js; only one of them survives the round trip.
+#
 # England only. Scotland and Wales publish equivalent surfaces under the same
 # licence through different portals; see packs/README.md.
 #
@@ -34,9 +40,9 @@ on:
         required: false
         default: ''
       size:
-        description: 'Metres of square to measure, centred on the place. 2000 is about a minute. Blank measures the whole 10 km tile, which takes roughly half an hour.'
+        description: 'Metres of square to measure, centred on the place. 10000 is the whole 10 km tile, about four minutes; 2000 is under a minute.'
         required: false
-        default: '2000'
+        default: '10000'
       square:
         description: 'Optional exact E,N,size, if you would rather say where than let the postcode decide'
         required: false

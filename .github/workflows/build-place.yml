@@ -44,7 +44,7 @@ on:
         required: false
         default: '5200'
       square:
-        description: 'Metres of each tile to measure, centred. Blank measures the whole 10 km tile — about 11 minutes a tile. 2000 is about a minute.'
+        description: 'Metres of each tile to measure, centred. Blank measures the whole 10 km tile — about four minutes a tile. 2000 is under a minute.'
         required: false
         default: ''
       skip_heights:
@@ -138,11 +138,11 @@ jobs:
 
       # --- and the heights, one tile at a time ---
       #
-      # A whole tile is a hundred 1 km chunks a surface and about eleven
-      # minutes; four tiles is most of an hour. That is the honest cost of
-      # doing a place properly, and it is paid once — fly anywhere else in
-      # those tiles afterwards and it is free. Set square to measure only the
-      # middle of each tile if you would rather have it in a minute.
+      # A whole tile is a hundred 1 km chunks a surface, fetched eight at a
+      # time, and about four minutes; four tiles is a quarter of an hour. That
+      # is the honest cost of doing a place properly, and it is paid once —
+      # fly anywhere else in those tiles afterwards and it is free. Set square
+      # to measure only the middle of each tile if you want it sooner.
       #
       # One tile that will not download does not cost the others: the run
       # carries on and says which was lost.
