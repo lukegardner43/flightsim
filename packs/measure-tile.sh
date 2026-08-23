@@ -36,6 +36,15 @@ export CPL_VSIL_CURL_USE_HEAD=NO GDAL_CACHEMAX=1024
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 
+# This runs in the repository root, so everything it writes is litter that a
+# later `git add` could pick up. A trap rather than a tidy-up at the end,
+# because the tidy-up at the end is not reached when the coverage will not
+# open — which is exactly the run that left four files behind.
+scratch(){ rm -f dsm.img dtm.img dsm.hdr dtm.hdr dsm.xml dtm.xml \
+                 dsm.xml.aux.xml dtm.xml.aux.xml \
+                 dsm.info dtm.info dsm.err dtm.err; }
+trap scratch EXIT
+
 set -euo pipefail
 CHUNK=1000
 chunked() {   # $1 dsm|dtm   $2 source dataset
@@ -139,4 +148,3 @@ done
 args=(--tile "$TILE" --dsm dsm.img --dtm dtm.img --origin "$E0,$N0" --size "$SIZE")
 if [ -n "$PACK" ]; then args+=(--pack "$PACK"); fi
 node --max-old-space-size=6144 packs/make-heights.js "${args[@]}"
-rm -f dsm.img dtm.img dsm.hdr dtm.hdr dsm.xml dtm.xml dsm.xml.aux.xml dtm.xml.aux.xml
