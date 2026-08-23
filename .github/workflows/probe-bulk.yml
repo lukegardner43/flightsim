@@ -17,9 +17,9 @@ on:
         required: false
         default: 'TQ15'
       what:
-        description: 'sources | speed | both'
+        description: 'headers | sources | speed | both'
         required: false
-        default: 'both'
+        default: 'headers'
 
 permissions:
   contents: read
@@ -33,8 +33,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Ask what else is served
+      # Does it answer a browser and not us? Seconds, downloads nothing.
+      - name: Is it down, or refusing us
         if: inputs.what != 'speed'
+        run: packs/probe-ua.sh
+
+      - name: Ask what else is served
+        if: inputs.what == 'sources' || inputs.what == 'both'
         env:
           TILE: ${{ inputs.tile }}
         run: packs/find-bulk.sh "$TILE"
