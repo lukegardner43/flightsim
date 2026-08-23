@@ -127,9 +127,9 @@
   #ctl{position:fixed;inset:0;z-index:20;pointer-events:none;display:none}
   #ctl.on{display:block}
   #stick{position:absolute;left:calc(env(safe-area-inset-left) + 16px);bottom:calc(env(safe-area-inset-bottom) + 16px);
-    width:126px;height:126px;border-radius:50%;border:1px solid rgba(231,222,201,.3);
+    width:148px;height:148px;border-radius:50%;border:1px solid rgba(231,222,201,.3);
     background:rgba(12,18,28,.4);pointer-events:auto;touch-action:none}
-  #knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;
+  #knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
     background:rgba(194,42,107,.85);border:1px solid #f0d5e2}
   #thrpad{position:absolute;right:calc(env(safe-area-inset-right) + 16px);bottom:calc(env(safe-area-inset-bottom) + 16px);
     width:58px;height:146px;border:1px solid rgba(231,222,201,.3);background:rgba(12,18,28,.4);
@@ -147,7 +147,19 @@
   #bMenu{right:calc(env(safe-area-inset-right) + 16px);bottom:calc(env(safe-area-inset-bottom) + 292px)}
   #keys{position:absolute;left:12px;bottom:calc(env(safe-area-inset-bottom) + 14px);
     font:10px/1.7 ui-monospace,Menlo,monospace;color:rgba(231,222,201,.5);pointer-events:none}
-  @media (max-width:820px){#keys{display:none}}
+  /* Apple asks for 44 pt of tappable target and these were about 30 by 27,
+     stacked 40 apart — small enough that CAM and RST are one thumb apart on
+     a phone, which is how you end up respawning mid-approach. Touch only;
+     the desktop layout is left as it was. */
+  @media (max-width:820px){
+    #keys{display:none}
+    .btn{min-width:46px;min-height:46px;padding:0 12px;display:flex;align-items:center;justify-content:center}
+    #bCam{bottom:calc(env(safe-area-inset-bottom) + 176px)}
+    #bRst{bottom:calc(env(safe-area-inset-bottom) + 228px)}
+    #bHome{bottom:calc(env(safe-area-inset-bottom) + 280px)}
+    #bMenu{bottom:calc(env(safe-area-inset-bottom) + 332px)}
+    #thrpad{width:64px;height:160px}
+  }
   @media (min-width:821px){#stick,#thrpad{display:none}}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -5863,28 +5875,76 @@ addEventListener("keydown", function(e){
 addEventListener("keyup", function(e){ keys[e.code] = false; });
 
 var touch = {x:0, y:0, active:false};
+/* A thumb is not a joystick.
+
+   Straight off the screen the stick was linear from a dead centre with no
+   dead zone at all, saturating 46 px out on a 126 px ring — so the first
+   millimetre of movement was already an input, a third of the throw was full
+   deflection, and the knob overshot its own ring. On a phone that reads as
+   twitchy and vague at the same time, which is the worst of both.
+
+   A dead zone stops a resting thumb from flying the aeroplane, and a square
+   law puts fine control where the thumb actually lives — near the middle —
+   while keeping full authority at the edge. The radius comes off the element
+   now rather than being a number that was right for some earlier layout. */
+var STICK_DEAD = 0.12;
+function stickCurve(v){
+  var a = Math.abs(v);
+  if(a <= STICK_DEAD) return 0;
+  a = (a - STICK_DEAD) / (1 - STICK_DEAD);
+  return a * a;
+}
 (function(){
-  var stick = $("stick"), knob = $("knob"), id = null, rad = 46;
+  var stick = $("stick"), knob = $("knob"), id = null;
   function set(e){
     var r = stick.getBoundingClientRect();
-    var dx = e.clientX - (r.left+r.width/2), dy = e.clientY - (r.top+r.height/2);
-    var d = Math.sqrt(dx*dx+dy*dy); if(d > rad){ dx = dx/d*rad; dy = dy/d*rad; }
+    if(!r.width) return;
+    var rad = Math.max(1, r.width/2 - knob.offsetWidth/2);   /* the knob stays inside the ring */
+    var dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
+    var d = Math.sqrt(dx*dx + dy*dy);
+    if(d > rad){ dx = dx/d*rad; dy = dy/d*rad; d = rad; }
     knob.style.transform = "translate("+dx+"px,"+dy+"px)";
-    touch.x = dx/rad; touch.y = dy/rad; touch.active = true;
+    /* radially, so pushing diagonally is not quietly penalised on both axes */
+    var g = stickCurve(d/rad);
+    touch.x = d > 0 ? dx/d*g : 0;
+    touch.y = d > 0 ? dy/d*g : 0;
+    touch.active = true;
   }
-  stick.addEventListener("pointerdown", function(e){ id = e.pointerId; stick.setPointerCapture(id); set(e); });
+  function end(e){
+    if(id === null || (e && e.pointerId !== undefined && e.pointerId !== id)) return;
+    try{ stick.releasePointerCapture(id); }catch(err){}
+    id = null; touch.x = 0; touch.y = 0; touch.active = false;
+    knob.style.transform = "translate(0,0)";
+  }
+  stick.addEventListener("pointerdown", function(e){
+    id = e.pointerId; try{ stick.setPointerCapture(id); }catch(err){} set(e); });
   stick.addEventListener("pointermove", function(e){ if(e.pointerId === id) set(e); });
-  function end(e){ if(e.pointerId !== id) return; id = null; touch.x = 0; touch.y = 0;
-    touch.active = false; knob.style.transform = "translate(0,0)"; }
-  stick.addEventListener("pointerup", end); stick.addEventListener("pointercancel", end);
+  stick.addEventListener("pointerup", end);
+  stick.addEventListener("pointercancel", end);
+  /* iOS takes a pointer away without a pointerup whenever the system decides
+     it wants it — a notification, an edge swipe, a call. Without this the
+     stick stays stuck at whatever deflection it was last at. */
+  stick.addEventListener("lostpointercapture", end);
   var pad = $("thrpad"), fill = pad.querySelector("i"), pid = null;
   function setT(e){
     var r = pad.getBoundingClientRect();
+    if(!r.height) return;
     st.throttle = Math.max(0, Math.min(1, 1 - (e.clientY - r.top)/r.height));
   }
-  pad.addEventListener("pointerdown", function(e){ pid = e.pointerId; pad.setPointerCapture(pid); setT(e); });
+  function endT(e){
+    if(pid === null || (e && e.pointerId !== undefined && e.pointerId !== pid)) return;
+    try{ pad.releasePointerCapture(pid); }catch(err){}
+    pid = null;
+  }
+  pad.addEventListener("pointerdown", function(e){
+    pid = e.pointerId; try{ pad.setPointerCapture(pid); }catch(err){} setT(e); });
   pad.addEventListener("pointermove", function(e){ if(e.pointerId === pid) setT(e); });
-  pad.addEventListener("pointerup", function(){ pid = null; });
+  /* the throttle only listened for pointerup, so one cancelled pointer left
+     pid pointing at a finger that no longer exists and every later touch was
+     ignored — the throttle simply stopped working for the rest of the flight */
+  pad.addEventListener("pointerup", endT);
+  pad.addEventListener("pointercancel", endT);
+  pad.addEventListener("lostpointercapture", endT);
   window.__thrFill = fill;
 })();
 $("bCam").onclick = cycleCam; $("bRst").onclick = respawn; $("bHome").onclick = goHome;
@@ -5975,7 +6035,11 @@ function physics(dt){
   plane.quaternion.multiply(qTmp.setFromAxisAngle(AZ, st.rollIn*2.1*auth*dt));
   plane.quaternion.multiply(qTmp.setFromAxisAngle(AY, st.yawIn*0.7*auth*dt));
   plane.rotateOnWorldAxis(AY, -right.y*0.55*auth*dt);
-  if(Math.abs(r) < 0.05 && !touch.active) plane.rotateOnAxis(AZ, -right.y*0.5*dt);
+  /* Roll levelling asked whether a FINGER was down, not whether the pilot was
+     asking for roll — so on a phone, resting a thumb on a centred stick
+     switched it off and the aeroplane wandered. With a dead zone a centred
+     stick reads exactly zero, so the input itself is the right question. */
+  if(Math.abs(r) < 0.05) plane.rotateOnAxis(AZ, -right.y*0.5*dt);
 
   vel.copy(fwd).multiplyScalar(st.speed);
   vel.y -= Math.max(0, 1 - st.speed/44)*32;
@@ -6138,6 +6202,10 @@ window.__sim = {
                             chunks:PACK.chunks, chunkFail:PACK.chunkFail,
                             merged:packMerged}; },
   func: function(){ return FUNC_SEEN; },
+  /* what the touch controls are producing right now, so the response curve
+     and the dead zone can be tested rather than eyeballed on a phone */
+  controls: function(){ return {x:touch.x, y:touch.y, active:touch.active,
+                                throttle:st.throttle, dead:STICK_DEAD}; },
   bridges: function(){ return BRIDGES; },
   lidar: function(){ return {footprints:LIDAR.n, used:LIDAR.hit,
                              split:LIDAR.split, parts:LIDAR.parts}; },

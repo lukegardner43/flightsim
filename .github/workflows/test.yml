@@ -67,7 +67,7 @@ jobs:
         run: |
           set -uo pipefail
           fail=0
-          for t in gatetest overlaptest diagtest; do
+          for t in sticktest gatetest overlaptest diagtest; do
             echo "::group::$t"
             out=$(node "packs/test/$t.js" 2>&1); rc=$?
             echo "$out"

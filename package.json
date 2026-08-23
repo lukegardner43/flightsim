@@ -4,7 +4,7 @@
   "description": "A browser flight simulator built from Ordnance Survey footprints, OpenStreetMap and Environment Agency lidar. There is nothing to install to fly it \u2014 open index.html.",
   "scripts": {
     "test": "node packs/test/rooftest.js && node packs/test/partstest.js && node packs/test/edgetest.js && node packs/test/filltest.js && packs/test/tiletest.sh",
-    "test:browser": "node packs/test/gatetest.js && node packs/test/overlaptest.js && node packs/test/diagtest.js"
+    "test:browser": "node packs/test/sticktest.js && node packs/test/gatetest.js && node packs/test/overlaptest.js && node packs/test/diagtest.js"
   },
   "devDependencies": {
     "playwright": "^1.62.1",
