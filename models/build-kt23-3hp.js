@@ -162,102 +162,84 @@ models.push({
   const parts = [];
   const range = (u,v,wF,dF,note) => ({ at:[u,v], wF:wF, dF:dF, height:H, roof:'hipped', roofHeight:RH,
     type:'manor', material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate, note:note });
-  /* The courtyard is a LIGHT WELL, not a quadrangle yard.
-     
-     I had the ranges at 0.24 and 0.16 of the footprint, which leaves a
-     courtyard of 0.52 x 0.68 — thirty-five per cent of the plan — and
-     rendered, the house read as a hollow square rather than a building. The
-     reason I did not fix it the first time was the Historic England listing:
-     "in the form of a quadrangle around a large central courtyard". The
-     aerial photographs and the National Trust ground-floor plan both show
-     something quite different — rooms two deep on every side, a Picture
-     Corridor running round all four sides of the courtyard inside them, and
-     a yard nearer a fifth of the plan than a third.
-     
-     The brief's own rule is that the imagery governs where it and the text
-     disagree, and here it plainly does. 0.31 and 0.26 leave 0.38 x 0.48,
-     which is eighteen per cent.
-     
-     The centre of each range moves with its depth so the OUTER face stays on
-     the surveyed wall: a range spans its centre plus or minus its half-depth,
-     so the centre has to sit at 1 minus the depth. Getting that wrong pulls
-     the whole house in off its own footprint. */
-  /* And the four ranges are NOT the same depth. Read off the plan, as
-     fractions of it:
+  /* ---- the plan, followed ----
 
-       the colonnade side — Tea Room, Saloon, Library         0.34
-       opposite it — the Dining Room                          0.24
-       the entrance side — Picture Corridor, Central Hall     0.31
-       opposite it — the Billiard Room                        0.23
+     The Ordnance Survey footprint under this house is not a rectangle and
+     never was. It has TWELVE corners, its walls run at 13 and 103 degrees,
+     and it fills only 66% of its own bounding box. Read in the frame the
+     model's at[] actually uses, the surveyed outline is:
 
-     which leaves a courtyard of 0.42 x 0.46, nineteen per cent, and sitting
-     OFF CENTRE — nearer the Dining Room and the Billiard Room than the
-     Saloon and the Central Hall. Four equal ranges make a doughnut; these
-     make a house.
+        u -1.00..-0.65  v  0.64..1.00      a wing
+        u -1.00.. 0.15  v -0.64..0.64      the main block
+        u  0.15.. 0.66  v -1.00..0.64      the block beside it, running out
+        u  0.40.. 0.66  v  0.64..1.00      a wing
+        u  0.66.. 1.00  v  0.52..1.00      a wing
 
-     Each centre is 1 minus that range's own depth, so every outer face still
-     lands on the surveyed wall however unequal the depths are.
+     Against the National Trust plan, with its north arrow, +u is a bearing
+     of 13 degrees and +v is 90 degrees clockwise of that — so at[0] is the
+     plan's x and at[1] is the plan's y, and every one of those wings lands
+     on a room: the Study bottom-left, the Entrance Hall bottom-centre, the
+     Dining Room bottom-right. The survey and the drawing are the same
+     building.
 
-     Which of the two remaining sides is the entrance one is not settled by
-     anything I have: the photographs show the forecourt but not in a frame I
-     can tie to the footprint's own axes. 0.31 is on the west here, and if it
-     is the wrong way round the error is 0.08 of the plan. */
-  parts.push(range(0,  0.66, 1.00, 0.34, 'south range — the show front, ochre render, dark green shutters'));
-  parts.push(range(0, -0.76, 1.00, 0.24, 'north range across the courtyard'));
-  parts.push(range(-0.69, 0, 0.31, 1.00, 'west range — the entrance side, deepest of the four'));
-  parts.push(range( 0.77, 0, 0.23, 1.00, 'east range'));
+     I said twice that the footprint showed no wings and that inventing them
+     would pull the house off its own walls. Both times I had looked at the
+     bounding box rather than the outline. They were there all along.
 
-  /* The bows. Both are in the photograph and both are drawn on the plan: the
-     Dining Room's east end and the Study's, each a full-height rounded bay
-     standing proud of its wall under a flat leaded top rather than a slope.
-     A ring of sixteen sides centred ON the wall gives the half-round outside
-     and buries the other half in the range, which is what a bow is. */
+     So the ranges are laid out ON the outline, sliced round the courtyard
+     the plan puts at x 0.46..0.78, y 0.28..0.58. orient:'compass' is gone
+     with them — the walls run at 13 degrees, not north, and a compass frame
+     would have set the whole house askew inside a box a third too big. */
+  const blk = (u0,u1,v0,v1,h,rh,note) => ({
+    at:[(u0+u1)/2, (v0+v1)/2], wF:(u1-u0)/2, dF:(v1-v0)/2,
+    height:h, roof:rh > 0 ? 'hipped' : 'flat', roofHeight:rh > 0 ? rh : undefined,
+    type:'manor', material:'plaster', colour:C.ochre,
+    roofMaterial:'slate', roofColour:C.slate, note:note });
+
+  /* the main block, sliced either side of the courtyard */
+  parts.push(blk(-1.00, -0.08, -0.64,  0.64, H, RH, 'Tea Room, Saloon and Library — the garden front'));
+  parts.push(blk(-0.08,  0.15, -0.64, -0.44, H, RH, 'Picture Corridor, north of the courtyard'));
+  parts.push(blk(-0.08,  0.15,  0.16,  0.64, H, RH, 'Picture Corridor, south of the courtyard'));
+  /* and the block beside it, which runs out past the main block both ways */
+  parts.push(blk( 0.15,  0.56, -1.00, -0.44, H, RH, 'Billiard Room, Smoking Room and Gun Room'));
+  parts.push(blk( 0.15,  0.56,  0.16,  0.64, H, RH, 'Central Hall and Staircase Landing'));
+  parts.push(blk( 0.56,  0.66, -1.00,  0.64, H, RH, 'the east Picture Corridor'));
+  /* the three wings the outline actually has */
+  parts.push(blk(-1.00, -0.65,  0.64,  1.00, H - 1.0, RH*0.85, 'the Study, projecting'));
+  parts.push(blk( 0.40,  0.66,  0.64,  1.00, H,       RH*0.85, 'Entrance Hall, projecting'));
+  parts.push(blk( 0.66,  1.00,  0.52,  1.00, H,       RH*0.85, 'the Dining Room, projecting'));
+
+  /* the bows, each on the outer face of its own wing */
   const bow = (u,v,size,note) => ({ at:[u,v], w:size, d:size, sides:16,
     height:H, roof:'flat', type:'manor', material:'plaster', colour:C.ochre, note:note });
-  parts.push(bow(-0.15, -0.90, 10, 'bowed end of the Dining Room'));
-  parts.push(bow(-0.62,  0.92,  8, 'apsidal end of the Study'));
+  parts.push(bow( 1.00, 0.76, 10, 'bowed end of the Dining Room'));
+  parts.push(bow(-0.82, 1.00,  8, 'apsidal end of the Study'));
 
-  /* The Smoking Room and Gun Room block. On the plan it projects past the
-     Billiard Room's wall, and in the photograph it reads as a slightly lower
-     mass with a roof of its own at that corner.
+  /* the entrance, which the plan labels, on the outer face of its own wing */
+  parts.push({ at:[0.53, 1.02], w:5.0, d:2.4, height:5.2, roof:'flat', type:'manor',
+    material:'plaster', colour:C.whiteStuc, note:'entrance porch and steps — ENTRANCE AND EXIT on the plan' });
 
-     It is NOT built as a projection. The model's ranges are fractions of the
-     surveyed footprint's own bounding box, so making a corner stick out means
-     pulling every other range IN off that box — and neither the Ordnance
-     Survey outline nor the lidar shows a notch there. The plan is of the
-     house as it stands; the surveyed outline is generalised. Guessing a
-     projection would take the whole east wall a metre and a half off the
-     footprint to gain a corner nobody can see from the air.
-
-     What IS visible from the air is that the block is lower and roofed
-     separately, and that costs nothing to be wrong about. */
-  parts.push({ at:[0.72,-0.62], wF:0.21, dF:0.32, height:H - 1.3, roof:'hipped', roofHeight:RH*0.8,
-    type:'manor', material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate,
-    note:'Smoking Room and Gun Room, lower and separately roofed' });
-  /* centrepiece of the south front */
-  parts.push({ at:[0,0.90], wF:0.20, dF:0.10, height:11.6, roof:'hipped', roofHeight:2.6, type:'manor',
-    material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate,
-    note:'centre bay breaking forward, pedimented entrance below' });
-  parts.push({ at:[0,0.98], w:5.0, d:2.0, height:5.2, roof:'flat', type:'manor',
-    material:'plaster', colour:C.whiteStuc, note:'stone entrance surround and steps' });
-  /* the giant-order colonnade along the east half of the south front */
-  for (let i = 0; i < 7; i++) parts.push(column(0.16 + i*0.11, 0.93, 9.2));
-  parts.push({ at:[0.49,0.93], wF:0.44, d:1.1, minHeight:9.2, height:10.2, roof:'flat',
+  /* the giant-order colonnade, along the Saloon's garden front */
+  for (let i = 0; i < 7; i++) parts.push(column(-0.97, -0.34 + i*0.11, 9.2));
+  parts.push({ at:[-0.97,-0.01], w:1.4, dF:0.36, minHeight:9.2, height:10.2, roof:'flat',
     type:'manor', material:'plaster', colour:C.whiteStuc, note:'colonnade entablature' });
-  /* dormers along the south roof */
-  for (const u of [-0.62,-0.42,-0.22,0.22,0.42,0.62])
-    parts.push(dormer(u, 0.82, 1.9, H, H+1.9, C.ochre, 'slate', C.slate));
-  /* tall slim rendered stacks, evenly spread — the photograph shows about ten */
-  const stacks = [[-0.86,0.72],[-0.58,0.72],[-0.30,0.72],[0.30,0.72],[0.58,0.72],[0.86,0.72],
-                  [-0.70,-0.72],[0.00,-0.72],[0.70,-0.72],[-0.86,-0.20],[0.86,-0.20]];
-  /* 1.7 m read as a row of fence posts and 1.0 m disappeared altogether. The
-     aerial photograph settles it: the stacks are substantial rendered blocks,
-     clearly proud of the roof, wider than they are deep. 1.4 m. */
+  parts.push({ at:[-0.92,-0.16], wF:0.06, dF:0.16, height:11.6, roof:'hipped', roofHeight:2.6,
+    type:'manor', material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate,
+    note:'centre bay breaking forward on the garden front, pedimented' });
+
+  /* dormers in the garden-front roof */
+  for (const v of [-0.46,-0.30,-0.14,0.02,0.18,0.34])
+    parts.push(dormer(-0.86, v, 1.9, H, H+1.9, C.ochre, 'slate', C.slate));
+
+  /* the stacks, spread over the ranges the plan gives them */
+  const stacks = [[-0.90,-0.50],[-0.90,0.20],[-0.55,-0.55],[-0.55,0.45],[-0.20,-0.55],
+                  [-0.20,0.45],[0.30,-0.80],[0.30,0.40],[0.62,-0.70],[0.62,0.20],[0.85,0.80]];
   for (const s of stacks) parts.push(chim(s[0], s[1], 1.4, 17.4, H, C.ochre, 'tall stuccoed stack'));
-  /* the cupola: square white lantern, clock faces, dark domed lead roof */
-  parts.push({ at:[0,0.62], w:4.6, d:4.6, minHeight:H+RH-0.4, height:15.2, roof:'flat',
+
+  /* the cupola, over the Central Hall and its staircase */
+  parts.push({ at:[0.27,0.44], w:4.6, d:4.6, minHeight:H+RH-0.4, height:15.2, roof:'flat',
     type:'manor', material:'plaster', colour:C.whiteStuc, note:'cupola base' });
-  parts.push({ at:[0,0.62], w:4.0, d:4.0, minHeight:15.2, height:19.4, roof:'dome', roofHeight:3.2,
+  parts.push({ at:[0.27,0.44], w:4.0, d:4.0, minHeight:15.2, height:19.4, roof:'dome', roofHeight:3.2,
     type:'manor', material:'plaster', colour:C.whiteStuc, roofMaterial:'lead', roofColour:C.lead,
     note:'white lantern with clock faces under a dark domed lead roof and finial' });
   models.push({
@@ -279,7 +261,7 @@ models.push({
        the wrong side of it — and is Polesden Lacey Farm. */
     near:[51.257612,-0.373547], radius:300, packRadius:150,
     nearSource:'Historic England 1028665 (TQ 13591 52195); this one was already right, and lands on the same 2,078 m2 range',
-    orient:'compass', replaceOutline:true,
+    replaceOutline:true,
     confidence:'high — rebuilt from the uploaded brief and two reference photographs',
     sources:[
       'Uploaded brief, entry 4, with reference photograph "Polesden Lacey House by Dave Spicer, via Geograph/Wikimedia Commons, CC BY-SA 2.0" and a second oblique view of the same front.',
@@ -316,7 +298,7 @@ models.push({
   models.push({
     id:'thorncroft', name:'Thorncroft Manor, Leatherhead',
     match:['thorncroft'], near:[51.2899,-0.3337], radius:600,
-    orient:'compass', replaceOutline:true,
+    replaceOutline:true,
     confidence:'high — brief plus its reference photograph',
     sources:[
       'Uploaded brief, entry 5, with reference photograph "Thorncroft Manor by Ian Capper, via Geograph/Wikimedia Commons, CC BY-SA 2.0".',
@@ -431,7 +413,7 @@ models.push({
     id:'ralphscross', name:'Ralphs Cross, 1 and 2 Leatherhead Road',
     match:['ralphs cross',"ralph's cross"], near:[51.277262,-0.366487], radius:800,
     nearSource:'Historic England 1189115 (TQ 14035 54391); the coordinate was 528 m north of it, on nothing',
-    orient:'compass', replaceOutline:true,
+    replaceOutline:true,
     confidence:'medium — brief only, no photograph was embedded for this entry',
     sources:[
       'Uploaded brief, entry 9: "Grade II listed pair of cottages designed by William Butterfield and constructed in 1864-66"; "red brick incorporating contrasting blue-header brick diaper patterns"; "The central roof should be steeply pitched and hipped, with a very prominent large chimney stack positioned centrally along the building"; "At either end, create the projecting/set-back porch-and-stair-turret wings."',

@@ -474,7 +474,6 @@
    "radius": 300,
    "packRadius": 150,
    "nearSource": "Historic England 1028665 (TQ 13591 52195); this one was already right, and lands on the same 2,078 m2 range",
-   "orient": "compass",
    "replaceOutline": true,
    "confidence": "high — rebuilt from the uploaded brief and two reference photographs",
    "sources": [
@@ -487,11 +486,11 @@
    "parts": [
     {
      "at": [
-      0,
-      0.66
+      -0.54,
+      0
      ],
-     "wF": 1,
-     "dF": 0.34,
+     "wF": 0.46,
+     "dF": 0.64,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -500,7 +499,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "south range — the show front, ochre render, dark green shutters",
+     "note": "Tea Room, Saloon and Library — the garden front",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -508,10 +507,31 @@
     },
     {
      "at": [
-      0,
-      -0.76
+      0.034999999999999996,
+      -0.54
      ],
-     "wF": 1,
+     "wF": 0.11499999999999999,
+     "dF": 0.1,
+     "height": 10.8,
+     "roof": "hipped",
+     "roofHeight": 2.66,
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "Picture Corridor, north of the courtyard",
+     "authored": {
+      "h": 13.8,
+      "rh": 3.4
+     }
+    },
+    {
+     "at": [
+      0.034999999999999996,
+      0.4
+     ],
+     "wF": 0.11499999999999999,
      "dF": 0.24,
      "height": 10.8,
      "roof": "hipped",
@@ -521,7 +541,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "north range across the courtyard",
+     "note": "Picture Corridor, south of the courtyard",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -529,11 +549,11 @@
     },
     {
      "at": [
-      -0.69,
-      0
+      0.35500000000000004,
+      -0.72
      ],
-     "wF": 0.31,
-     "dF": 1,
+     "wF": 0.20500000000000002,
+     "dF": 0.28,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -542,7 +562,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "west range — the entrance side, deepest of the four",
+     "note": "Billiard Room, Smoking Room and Gun Room",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -550,11 +570,11 @@
     },
     {
      "at": [
-      0.77,
-      0
+      0.35500000000000004,
+      0.4
      ],
-     "wF": 0.23,
-     "dF": 1,
+     "wF": 0.20500000000000002,
+     "dF": 0.24,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -563,7 +583,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "east range",
+     "note": "Central Hall and Staircase Landing",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -571,8 +591,92 @@
     },
     {
      "at": [
-      -0.15,
-      -0.9
+      0.6100000000000001,
+      -0.18
+     ],
+     "wF": 0.04999999999999999,
+     "dF": 0.8200000000000001,
+     "height": 10.8,
+     "roof": "hipped",
+     "roofHeight": 2.66,
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "the east Picture Corridor",
+     "authored": {
+      "h": 13.8,
+      "rh": 3.4
+     }
+    },
+    {
+     "at": [
+      -0.825,
+      0.8200000000000001
+     ],
+     "wF": 0.175,
+     "dF": 0.18,
+     "height": 9.62,
+     "roof": "hipped",
+     "roofHeight": 2.26,
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "the Study, projecting",
+     "authored": {
+      "h": 12.29,
+      "rh": 2.8899999999999997
+     }
+    },
+    {
+     "at": [
+      0.53,
+      0.8200000000000001
+     ],
+     "wF": 0.13,
+     "dF": 0.18,
+     "height": 10.4,
+     "roof": "hipped",
+     "roofHeight": 2.26,
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "Entrance Hall, projecting",
+     "authored": {
+      "h": 13.29,
+      "rh": 2.8899999999999997
+     }
+    },
+    {
+     "at": [
+      0.8300000000000001,
+      0.76
+     ],
+     "wF": 0.16999999999999998,
+     "dF": 0.24,
+     "height": 10.4,
+     "roof": "hipped",
+     "roofHeight": 2.26,
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "the Dining Room, projecting",
+     "authored": {
+      "h": 13.29,
+      "rh": 2.8899999999999997
+     }
+    },
+    {
+     "at": [
+      1,
+      0.76
      ],
      "w": 10,
      "d": 10,
@@ -589,8 +693,8 @@
     },
     {
      "at": [
-      -0.62,
-      0.92
+      -0.82,
+      1
      ],
      "w": 8,
      "d": 8,
@@ -607,67 +711,25 @@
     },
     {
      "at": [
-      0.72,
-      -0.62
-     ],
-     "wF": 0.21,
-     "dF": 0.32,
-     "height": 9.25,
-     "roof": "hipped",
-     "roofHeight": 2.13,
-     "type": "manor",
-     "material": "plaster",
-     "colour": "#d9b874",
-     "roofMaterial": "slate",
-     "roofColour": "#565c64",
-     "note": "Smoking Room and Gun Room, lower and separately roofed",
-     "authored": {
-      "h": 11.82,
-      "rh": 2.72
-     }
-    },
-    {
-     "at": [
-      0,
-      0.9
-     ],
-     "wF": 0.2,
-     "dF": 0.1,
-     "height": 11.11,
-     "roof": "hipped",
-     "roofHeight": 2.03,
-     "type": "manor",
-     "material": "plaster",
-     "colour": "#d9b874",
-     "roofMaterial": "slate",
-     "roofColour": "#565c64",
-     "note": "centre bay breaking forward, pedimented entrance below",
-     "authored": {
-      "h": 14.2,
-      "rh": 2.6
-     }
-    },
-    {
-     "at": [
-      0,
-      0.98
+      0.53,
+      1.02
      ],
      "w": 5,
-     "d": 2,
+     "d": 2.4,
      "height": 4.07,
      "roof": "flat",
      "type": "manor",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "stone entrance surround and steps",
+     "note": "entrance porch and steps — ENTRANCE AND EXIT on the plan",
      "authored": {
       "h": 5.2
      }
     },
     {
      "at": [
-      0.16,
-      0.93
+      -0.97,
+      -0.34
      ],
      "w": 1.25,
      "d": 1.25,
@@ -683,8 +745,8 @@
     },
     {
      "at": [
-      0.27,
-      0.93
+      -0.97,
+      -0.23000000000000004
      ],
      "w": 1.25,
      "d": 1.25,
@@ -700,8 +762,8 @@
     },
     {
      "at": [
-      0.38,
-      0.93
+      -0.97,
+      -0.12000000000000002
      ],
      "w": 1.25,
      "d": 1.25,
@@ -717,8 +779,8 @@
     },
     {
      "at": [
-      0.49,
-      0.93
+      -0.97,
+      -0.010000000000000009
      ],
      "w": 1.25,
      "d": 1.25,
@@ -734,8 +796,8 @@
     },
     {
      "at": [
-      0.6,
-      0.93
+      -0.97,
+      0.09999999999999998
      ],
      "w": 1.25,
      "d": 1.25,
@@ -751,8 +813,8 @@
     },
     {
      "at": [
-      0.7100000000000001,
-      0.93
+      -0.97,
+      0.21000000000000002
      ],
      "w": 1.25,
      "d": 1.25,
@@ -768,8 +830,8 @@
     },
     {
      "at": [
-      0.8200000000000001,
-      0.93
+      -0.97,
+      0.32
      ],
      "w": 1.25,
      "d": 1.25,
@@ -785,11 +847,11 @@
     },
     {
      "at": [
-      0.49,
-      0.93
+      -0.97,
+      -0.01
      ],
-     "wF": 0.44,
-     "d": 1.1,
+     "w": 1.4,
+     "dF": 0.36,
      "minHeight": 7.2,
      "height": 7.98,
      "roof": "flat",
@@ -804,118 +866,29 @@
     },
     {
      "at": [
-      -0.62,
-      0.82
+      -0.92,
+      -0.16
      ],
-     "w": 1.9,
-     "d": 1.71,
-     "minHeight": 8.14,
-     "height": 10.94,
-     "roof": "gabled",
-     "roofHeight": 0.9,
-     "material": "wood",
-     "colour": "#efece4",
+     "wF": 0.06,
+     "dF": 0.16,
+     "height": 11.11,
+     "roof": "hipped",
+     "roofHeight": 2.03,
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "dormer",
+     "note": "centre bay breaking forward on the garden front, pedimented",
      "authored": {
-      "h": 13.2,
-      "mh": 10.4,
-      "rh": 0.9
+      "h": 14.2,
+      "rh": 2.6
      }
     },
     {
      "at": [
-      -0.42,
-      0.82
-     ],
-     "w": 1.9,
-     "d": 1.71,
-     "minHeight": 8.14,
-     "height": 10.94,
-     "roof": "gabled",
-     "roofHeight": 0.9,
-     "material": "wood",
-     "colour": "#efece4",
-     "roofMaterial": "slate",
-     "roofColour": "#565c64",
-     "note": "dormer",
-     "authored": {
-      "h": 13.2,
-      "mh": 10.4,
-      "rh": 0.9
-     }
-    },
-    {
-     "at": [
-      -0.22,
-      0.82
-     ],
-     "w": 1.9,
-     "d": 1.71,
-     "minHeight": 8.14,
-     "height": 10.94,
-     "roof": "gabled",
-     "roofHeight": 0.9,
-     "material": "wood",
-     "colour": "#efece4",
-     "roofMaterial": "slate",
-     "roofColour": "#565c64",
-     "note": "dormer",
-     "authored": {
-      "h": 13.2,
-      "mh": 10.4,
-      "rh": 0.9
-     }
-    },
-    {
-     "at": [
-      0.22,
-      0.82
-     ],
-     "w": 1.9,
-     "d": 1.71,
-     "minHeight": 8.14,
-     "height": 10.94,
-     "roof": "gabled",
-     "roofHeight": 0.9,
-     "material": "wood",
-     "colour": "#efece4",
-     "roofMaterial": "slate",
-     "roofColour": "#565c64",
-     "note": "dormer",
-     "authored": {
-      "h": 13.2,
-      "mh": 10.4,
-      "rh": 0.9
-     }
-    },
-    {
-     "at": [
-      0.42,
-      0.82
-     ],
-     "w": 1.9,
-     "d": 1.71,
-     "minHeight": 8.14,
-     "height": 10.94,
-     "roof": "gabled",
-     "roofHeight": 0.9,
-     "material": "wood",
-     "colour": "#efece4",
-     "roofMaterial": "slate",
-     "roofColour": "#565c64",
-     "note": "dormer",
-     "authored": {
-      "h": 13.2,
-      "mh": 10.4,
-      "rh": 0.9
-     }
-    },
-    {
-     "at": [
-      0.62,
-      0.82
+      -0.86,
+      -0.46
      ],
      "w": 1.9,
      "d": 1.71,
@@ -937,7 +910,117 @@
     {
      "at": [
       -0.86,
-      0.72
+      -0.3
+     ],
+     "w": 1.9,
+     "d": 1.71,
+     "minHeight": 8.14,
+     "height": 10.94,
+     "roof": "gabled",
+     "roofHeight": 0.9,
+     "material": "wood",
+     "colour": "#efece4",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
+    },
+    {
+     "at": [
+      -0.86,
+      -0.14
+     ],
+     "w": 1.9,
+     "d": 1.71,
+     "minHeight": 8.14,
+     "height": 10.94,
+     "roof": "gabled",
+     "roofHeight": 0.9,
+     "material": "wood",
+     "colour": "#efece4",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
+    },
+    {
+     "at": [
+      -0.86,
+      0.02
+     ],
+     "w": 1.9,
+     "d": 1.71,
+     "minHeight": 8.14,
+     "height": 10.94,
+     "roof": "gabled",
+     "roofHeight": 0.9,
+     "material": "wood",
+     "colour": "#efece4",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
+    },
+    {
+     "at": [
+      -0.86,
+      0.18
+     ],
+     "w": 1.9,
+     "d": 1.71,
+     "minHeight": 8.14,
+     "height": 10.94,
+     "roof": "gabled",
+     "roofHeight": 0.9,
+     "material": "wood",
+     "colour": "#efece4",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
+    },
+    {
+     "at": [
+      -0.86,
+      0.34
+     ],
+     "w": 1.9,
+     "d": 1.71,
+     "minHeight": 8.14,
+     "height": 10.94,
+     "roof": "gabled",
+     "roofHeight": 0.9,
+     "material": "wood",
+     "colour": "#efece4",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "dormer",
+     "authored": {
+      "h": 13.2,
+      "mh": 10.4,
+      "rh": 0.9
+     }
+    },
+    {
+     "at": [
+      -0.9,
+      -0.5
      ],
      "w": 1.4,
      "d": 0.868,
@@ -954,8 +1037,8 @@
     },
     {
      "at": [
-      -0.58,
-      0.72
+      -0.9,
+      0.2
      ],
      "w": 1.4,
      "d": 0.868,
@@ -972,8 +1055,62 @@
     },
     {
      "at": [
-      -0.3,
-      0.72
+      -0.55,
+      -0.55
+     ],
+     "w": 1.4,
+     "d": 0.868,
+     "minHeight": 8.14,
+     "height": 15.14,
+     "roof": "flat",
+     "material": "brick",
+     "colour": "#d9b874",
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
+    },
+    {
+     "at": [
+      -0.55,
+      0.45
+     ],
+     "w": 1.4,
+     "d": 0.868,
+     "minHeight": 8.14,
+     "height": 15.14,
+     "roof": "flat",
+     "material": "brick",
+     "colour": "#d9b874",
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
+    },
+    {
+     "at": [
+      -0.2,
+      -0.55
+     ],
+     "w": 1.4,
+     "d": 0.868,
+     "minHeight": 8.14,
+     "height": 15.14,
+     "roof": "flat",
+     "material": "brick",
+     "colour": "#d9b874",
+     "note": "tall stuccoed stack",
+     "authored": {
+      "h": 17.4,
+      "mh": 10.4
+     }
+    },
+    {
+     "at": [
+      -0.2,
+      0.45
      ],
      "w": 1.4,
      "d": 0.868,
@@ -991,7 +1128,7 @@
     {
      "at": [
       0.3,
-      0.72
+      -0.8
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1008,8 +1145,8 @@
     },
     {
      "at": [
-      0.58,
-      0.72
+      0.3,
+      0.4
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1026,8 +1163,8 @@
     },
     {
      "at": [
-      0.86,
-      0.72
+      0.62,
+      -0.7
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1044,8 +1181,8 @@
     },
     {
      "at": [
-      -0.7,
-      -0.72
+      0.62,
+      0.2
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1062,8 +1199,8 @@
     },
     {
      "at": [
-      0,
-      -0.72
+      0.85,
+      0.8
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1080,62 +1217,8 @@
     },
     {
      "at": [
-      0.7,
-      -0.72
-     ],
-     "w": 1.4,
-     "d": 0.868,
-     "minHeight": 8.14,
-     "height": 15.14,
-     "roof": "flat",
-     "material": "brick",
-     "colour": "#d9b874",
-     "note": "tall stuccoed stack",
-     "authored": {
-      "h": 17.4,
-      "mh": 10.4
-     }
-    },
-    {
-     "at": [
-      -0.86,
-      -0.2
-     ],
-     "w": 1.4,
-     "d": 0.868,
-     "minHeight": 8.14,
-     "height": 15.14,
-     "roof": "flat",
-     "material": "brick",
-     "colour": "#d9b874",
-     "note": "tall stuccoed stack",
-     "authored": {
-      "h": 17.4,
-      "mh": 10.4
-     }
-    },
-    {
-     "at": [
-      0.86,
-      -0.2
-     ],
-     "w": 1.4,
-     "d": 0.868,
-     "minHeight": 8.14,
-     "height": 15.14,
-     "roof": "flat",
-     "material": "brick",
-     "colour": "#d9b874",
-     "note": "tall stuccoed stack",
-     "authored": {
-      "h": 17.4,
-      "mh": 10.4
-     }
-    },
-    {
-     "at": [
-      0,
-      0.62
+      0.27,
+      0.44
      ],
      "w": 4.6,
      "d": 4.6,
@@ -1153,8 +1236,8 @@
     },
     {
      "at": [
-      0,
-      0.62
+      0.27,
+      0.44
      ],
      "w": 4,
      "d": 4,
@@ -1181,7 +1264,7 @@
     "eavesShift": -2.26,
     "authoredFabric": 13.8,
     "measuredFabric": 10.8,
-    "scaledParts": 17,
+    "scaledParts": 21,
     "movedParts": 19,
     "fabric": "largest measured box on a 2078 m2 footprint it stands on",
     "source": "Environment Agency LIDAR Composite DSM/DTM 1 m. The fabric scales to it; what stands on the fabric moves with it and keeps its own size."
@@ -1198,7 +1281,6 @@
     -0.3337
    ],
    "radius": 600,
-   "orient": "compass",
    "replaceOutline": true,
    "confidence": "high — brief plus its reference photograph",
    "sources": [
@@ -1792,7 +1874,6 @@
    ],
    "radius": 800,
    "nearSource": "Historic England 1189115 (TQ 14035 54391); the coordinate was 528 m north of it, on nothing",
-   "orient": "compass",
    "replaceOutline": true,
    "confidence": "medium — brief only, no photograph was embedded for this entry",
    "sources": [
