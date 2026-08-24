@@ -186,3 +186,49 @@ loop, and `modelClaims` does the same for every bridge. At sixteen models that
 is free. At two hundred, against every unnamed building in a cell, it is not —
 so a spatial index is a two-hour job that wants doing at fifty models, not at
 two hundred.
+
+## Can this run on a Pro subscription?
+
+Partly, and not in the shape costed above. The three things that decide it:
+
+**Pro is a Sonnet plan.** Claude Code's `default` model resolves to Sonnet 5 on
+Pro, Team Standard and Enterprise seats, and to Opus 5 on Max, Team Premium,
+Enterprise pay-as-you-go and the API. Session and weekly limits are shared
+across models, and Opus carries a separate limit of its own on top.
+
+That is survivable, because the work splits cleanly along the same line. The
+tier A landmarks — find published dimensions, fill in the template, check it
+renders — are Sonnet work, and they are the bulk by count: about 45 buildings
+and 55 bridges. What wants Opus is the framework: the `on:"span"` frame, the
+arch and catenary primitives, the screenshot job, and the class of problem the
+existing log is made of — a frame decided by 1.3 m of rounding, a model that
+cannot attach to a multipolygon relation. That is 50–60 hours of the 345.
+
+**345 agent-hours is not a subscription-shaped amount of work.** For scale, the
+published enterprise average is about $13 per developer per active day and
+$150–250 per month. This is roughly fifty active developer-days in one project.
+Whatever the Pro weekly ceiling is, `/usage` on your own machine is the
+authority, and this will not fit inside a month of it.
+
+**Usage credits are the escape hatch, and they have a trap in them.** Turning
+credits on (`/usage-credits`, or Settings → Usage on claude.ai) lets the work
+continue past the plan limit, billed at API rates — which is where the ~$3,800
+figure lands — with a monthly spend limit you set as the hard cap. The trap:
+prompt cache lifetime is one hour on a subscription and drops to **five
+minutes** once you are drawing on credits. Every estimate above assumes cache
+reads at a tenth of the input rate, which is exactly what a five-minute cache
+throws away on long iterative sessions. Set `ENABLE_PROMPT_CACHING_1H=1` before
+running any of this on credits.
+
+Two more things that do not change with the plan:
+
+- **Parallelism buys wall clock, not quota.** Eight agents against one weekly
+  limit exhaust it eight times faster. The one-week wall-clock figure assumes
+  headroom that a Pro plan does not have.
+- **GitHub Actions is a separate budget.** The pack builds are hours of runner
+  time and the screenshot job adds more — free on a public repository, 2,000
+  minutes a month on a private one.
+
+So: on Pro alone, the tier A half of both lists is genuinely doable, spread
+over months. The framework, and therefore the bridges at all, is Max-shaped or
+credit-shaped work.
