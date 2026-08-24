@@ -835,7 +835,7 @@ function hash(a,b){ var s = Math.sin(a*12.9898 + b*78.233)*43758.5453; return s 
    own confidence. See models/README.md.
    ------------------------------------------------------------------ */
 /* MODELS-START */
-var MODELS = [], MODEL_FILES = ["kt23-3hp.js"];
+var MODELS = [], MODEL_FILES = ["kt23-3hp.js","london.js"];
 /* MODELS-END */
 var MODEL_HITS = [], modelSeen = {};
 window.TF_MODELS = function(d){
@@ -989,6 +989,27 @@ function modelParts(e, m){
     pcx = box.cx; pcz = box.cz; world = null;
     if(p.on === "footprint"){
       geom = e.geometry;
+      /* plan shrinks the mapped outline about its own middle, so a tower can
+         be written as a stack of footprint-shaped pieces and keep the shape
+         of the polygon somebody actually surveyed instead of becoming a
+         rectangle guessed in metres. The Shard's upper shards are the
+         building's own plan at a third of its size. */
+      if(p.plan != null && p.plan > 0 && Math.abs(p.plan - 1) > 1e-3){
+        var gw = [], gq;
+        for(gq=0;gq<geom.length;gq++){ var gt = toWorld(geom[gq].lon, geom[gq].lat); gw.push(gt); }
+        if(gw.length > 1 &&
+           Math.abs(gw[0].x - gw[gw.length-1].x) < 1e-6 &&
+           Math.abs(gw[0].z - gw[gw.length-1].z) < 1e-6) gw.pop();
+        if(gw.length >= 3){
+          var gcx = 0, gcz = 0;
+          for(gq=0;gq<gw.length;gq++){ gcx += gw[gq].x; gcz += gw[gq].z; }
+          gcx /= gw.length; gcz /= gw.length;
+          for(gq=0;gq<gw.length;gq++)
+            gw[gq] = {x:gcx + (gw[gq].x-gcx)*p.plan, z:gcz + (gw[gq].z-gcz)*p.plan};
+          world = gw;
+          geom = ringFromWorld(gw);
+        }
+      }
     }else{
       /* placed in fractions of the footprint's own half-extents, so it scales
          and rotates with the building actually on the map */
@@ -1074,6 +1095,7 @@ function modelParts(e, m){
       if(p.minHeight != null)  tg.min_height = String(Math.max(0, p.minHeight - drop));
       if(p.roof)               tg["roof:shape"] = p.roof;
       if(p.roofHeight != null) tg["roof:height"] = String(p.roofHeight);
+      if(p.taper != null && p.taper > 0 && p.taper < 1) tg["tf:taper"] = String(p.taper);
       if(p.material)           tg["building:material"] = p.material;
       if(p.roofMaterial)       tg["roof:material"] = p.roofMaterial;
       if(p.roofColour)         tg["roof:colour"] = p.roofColour;
@@ -1653,6 +1675,83 @@ function addExtrusion(g, wallCol, roofCol, dy, walls, roofs){
     }
   }
   g.dispose();
+}
+/* A building whose plan shrinks as it rises.
+
+   Everything else here is a straight vertical extrusion, which is right for
+   almost every building in Britain and wrong for the handful that are famous
+   for not being one. The Shard is 310 m of rectangular slab without this: its
+   whole shape is the taper, and OSM records its height and not its profile.
+
+   The ring is lofted in bands rather than one tall quad so the shading ramp
+   in addExtrusion has something to ramp over, and so the wall does not depend
+   on Gouraud interpolation across three hundred metres. UVs are the running
+   perimeter in metres against height in metres, which is what the facade
+   textures are scaled for. */
+function taperGeom(pts, h, s, levels){
+  var n = pts.length, i, k;
+  if(n < 3 || !(h > 0) || !(s > 0)) return null;
+  var ring = signedArea(pts) < 0 ? pts.slice().reverse() : pts.slice();
+  var cx = 0, cz = 0;
+  for(i=0;i<n;i++){ cx += ring[i].x; cz += ring[i].z; }
+  cx /= n; cz /= n;
+  var run = [0];
+  for(i=0;i<n;i++){
+    var a0 = ring[i], b0 = ring[(i+1)%n];
+    run.push(run[i] + Math.sqrt((b0.x-a0.x)*(b0.x-a0.x) + (b0.z-a0.z)*(b0.z-a0.z)));
+  }
+  var P = [], N = [], U = [];
+  function at(j, t){
+    var f = 1 + (s - 1)*t, p = ring[j%n];
+    return {x:cx + (p.x-cx)*f, y:h*t, z:cz + (p.z-cz)*f};
+  }
+  /* Winding is decided per triangle against the middle of the building rather
+     than argued about: a wall faces away from the centre, a lid faces up. */
+  function tri(a, b, c, ua, ub, uc, up){
+    var ux=b.x-a.x, uy=b.y-a.y, uz=b.z-a.z, vx=c.x-a.x, vy=c.y-a.y, vz=c.z-a.z;
+    var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    var flip = up ? ny < 0
+                  : (nx*((a.x+b.x+c.x)/3-cx) + nz*((a.z+b.z+c.z)/3-cz)) < 0;
+    if(flip){ var t2=b; b=c; c=t2; var q2=ub; ub=uc; uc=q2; nx=-nx; ny=-ny; nz=-nz; }
+    var l = Math.sqrt(nx*nx+ny*ny+nz*nz) || 1;
+    var t3=[a,b,c], q3=[ua,ub,uc];
+    for(var j=0;j<3;j++){
+      P.push(t3[j].x, t3[j].y, t3[j].z);
+      N.push(nx/l, ny/l, nz/l);
+      U.push(q3[j][0], q3[j][1]);
+    }
+  }
+  levels = Math.max(1, Math.min(40, levels|0));
+  for(k=0;k<levels;k++){
+    var t0 = k/levels, t1 = (k+1)/levels;
+    for(i=0;i<n;i++){
+      var A = at(i,t0), B = at(i+1,t0), C = at(i+1,t1), D = at(i,t1);
+      tri(A, B, C, [run[i],-A.y], [run[i+1],-B.y], [run[i+1],-C.y], false);
+      tri(A, C, D, [run[i],-A.y], [run[i+1],-C.y], [run[i],-D.y], false);
+    }
+  }
+  /* the lid, at whatever the plan has shrunk to */
+  var top = [];
+  for(i=0;i<n;i++){ var q = at(i,1); top.push({x:q.x, z:q.z}); }
+  var cg = null;
+  try{ cg = new THREE.ShapeGeometry(makeShape(top, null)); }catch(err){ cg = null; }
+  if(cg){
+    if(cg.index) cg = cg.toNonIndexed();
+    var ca = cg.attributes.position.array, ct = cg.attributes.position.count;
+    for(i=0;i+2<ct;i+=3){
+      /* ShapeGeometry works in the shape's own plane, which is x against -z */
+      var v0={x:ca[i*3],     y:h, z:-ca[i*3+1]};
+      var v1={x:ca[i*3+3],   y:h, z:-ca[i*3+4]};
+      var v2={x:ca[i*3+6],   y:h, z:-ca[i*3+7]};
+      tri(v0, v1, v2, [0,0], [0,0], [0,0], true);
+    }
+    cg.dispose();
+  }
+  var g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(P),3));
+  g.setAttribute("normal",   new THREE.BufferAttribute(new Float32Array(N),3));
+  g.setAttribute("uv",       new THREE.BufferAttribute(new Float32Array(U),2));
+  return g;
 }
 /* drape: lift every vertex onto the terrain instead of by a flat offset,
    which is what keeps parks, water and fields lying on the hillside. */
@@ -3945,7 +4044,12 @@ function addBuildings(list, parts, group, cell){
       if(!isNaN(rd)) box = orientedBox(b.pts, (90 - rd)*Math.PI/180 + Math.PI/2);
     }
     var plan = roofPlan(b.tags, b.pts, box, b.area, house, v.roofH, cls, seed);
-    var roofH = Math.min(plan.h, Math.max(0, h - minH - 1.2));
+    /* A tapered shell has no roof to speak of and no parapet either: both are
+       built from the box of the BASE ring, and on a spire that is a lid the
+       size of the ground floor hanging in the air at the top. */
+    var tap = parseFloat(b.tags["tf:taper"]);
+    var tapered = isFinite(tap) && tap > 0.005 && tap < 0.995;
+    var roofH = tapered ? 0 : Math.min(plan.h, Math.max(0, h - minH - 1.2));
     var wallTop = h - roofH;
     if(wallTop < minH + 1.2) wallTop = minH + 1.2;
 
@@ -3956,9 +4060,14 @@ function addBuildings(list, parts, group, cell){
     var shape, geo;
     if(!isFinite(pad) || !isFinite(wallTop) || !isFinite(minH)) return;
     try{ shape = makeShape(b.pts, b.holes); }catch(err){ return; }
-    try{ geo = new THREE.ExtrudeGeometry(shape, {depth:wallTop-minH, bevelEnabled:false, curveSegments:1}); }
-    catch(err){ return; }
-    geo.rotateX(-Math.PI/2);
+    if(tapered){
+      geo = taperGeom(b.pts, wallTop-minH, tap, Math.max(4, Math.min(24, Math.round((wallTop-minH)/14))));
+      if(!geo) return;
+    }else{
+      try{ geo = new THREE.ExtrudeGeometry(shape, {depth:wallTop-minH, bevelEnabled:false, curveSegments:1}); }
+      catch(err){ return; }
+      geo.rotateX(-Math.PI/2);
+    }
     var wc = osmColour(b.tags["building:colour"]) || matColour(WALL_MAT, b.tags["building:material"]);
     if(!wc){
       var wm = String(b.tags["ai:wallmat"] || "").trim().toLowerCase();
@@ -3987,7 +4096,7 @@ function addBuildings(list, parts, group, cell){
       }else if(plan.shape === "skillion") roofSkillion(roofs, box, top, roofH, rc);
       else if(plan.shape === "dome" || plan.shape === "onion") roofDome(roofs, b.pts, box, top, roofH, plan.shape === "onion", rc);
       else if(b.pts.length < 40) roofPyramid(roofs, b.pts, top, roofH, rc);   /* pyramidal, cone, spire */
-    }else if(plan.shape === "flat" && cls !== "shed" && b.area > 260 && b.dist < 3500 && b.pts.length < 26){
+    }else if(!tapered && plan.shape === "flat" && cls !== "shed" && b.area > 260 && b.dist < 3500 && b.pts.length < 26){
       /* A parapet is the difference between a roof and the top of a box. */
       var ph = 0.7 + Math.min(1.4, b.area/2600), pc = rc.clone().offsetHSL(0, 0, -0.06);
       for(var e2=0;e2<b.pts.length;e2++){
