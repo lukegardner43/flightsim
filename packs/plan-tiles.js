@@ -33,6 +33,17 @@ const HAVE = new Set(String(OPTS.have || '').split(',').map(t => t.trim().toUppe
 async function resolve(place) {
   const nums = place.split(/[\s,]+/).map(Number);
   if (nums.length === 2 && nums.every(v => !isNaN(v))) return { lat: nums[0], lon: nums[1], label: place };
+  /* a 10 km tile names itself. The England build walks the grid rather than a
+     list of postcodes, and asking postcodes.io where TQ15 is would be both
+     wrong and a network round trip per tile. */
+  const t = place.replace(/\s+/g, '').toUpperCase();
+  if (/^[A-Z]{2}\d{2}$/.test(t)) {
+    const o = tileOrigin(t);
+    if (o) {
+      const w = bngToWgs84(o.E + 5000, o.N + 5000);
+      return { lat: w.lat, lon: w.lon, label: t + ' (the tile itself)' };
+    }
+  }
   const r = await fetch('https://api.postcodes.io/postcodes/' +
                         encodeURIComponent(place.replace(/\s+/g, '')));
   const j = await r.json().catch(() => ({}));

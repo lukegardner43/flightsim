@@ -1,0 +1,215 @@
+name: Build England
+
+# The Environment Agency's 1 m lidar, over the whole of England, a 100 km
+# grid square at a time.
+#
+#   Actions tab  ->  "Build England"  ->  Run workflow
+#
+# WHAT THIS COSTS, because it is not small. England is 25 Ordnance Survey
+# 100 km squares and 2,500 tiles of 10 km. A tile with buildings on it takes
+# about four minutes — a hundred 1 km chunks a surface, fetched eight at a
+# time, measured 3.2x faster than one at a time because most of that time was
+# the server thinking rather than the wire. Most of the 2,500 are sea and
+# cost seconds, because no Ordnance Survey buildings come back and nothing is
+# downloaded. The packs themselves are the real cost: London's four tiles are
+# 12.5 MB, Bookham's one is 1.3 MB, and England will land somewhere around
+# half a gigabyte in the repository.
+#
+# RESUMABLE, and it has to be. Each runner works its square until its time
+# budget is spent, then stops with whatever it finished. packs/tile-status.js
+# is what decides — "does any pack hold ground inside this tile, and how much
+# of it is measured" — so a second run picks up exactly where the first left
+# off and a finished tile is never rebuilt.
+#
+# NOBODY COMMITS BUT THE LAST JOB. make-pack.js rewrites index.html's PACKS
+# list as a side effect of building a pack, which is right for one machine
+# building one place and impossible for eight at once — they would each
+# rewrite the same block and every one would conflict. So the runners produce
+# pack files and nothing else, upload them, and one job at the end puts them
+# together and rebuilds the list with packs/relist.js.
+#
+# Data: Ordnance Survey OpenMap Local and Environment Agency LIDAR Composite
+# DSM/DTM 1 m, both under the Open Government Licence v3.
+
+on:
+  workflow_dispatch:
+    inputs:
+      squares:
+        description: 'Which 100 km squares, space separated. Blank is all of England.'
+        required: false
+        default: ''
+      hours:
+        description: 'How long each runner measures before stopping with what it has.'
+        required: false
+        default: '4'
+      parallel:
+        description: 'How many squares at once.'
+        required: false
+        default: '6'
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      squares: ${{ steps.p.outputs.squares }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - id: p
+        env:
+          SQUARES: ${{ inputs.squares }}
+        run: |
+          set -euo pipefail
+          node packs/plan-england.js $SQUARES
+          echo "squares=$(node packs/plan-england.js $SQUARES --json)" >> "$GITHUB_OUTPUT"
+
+  measure:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJson(inputs.parallel || '6') }}
+      matrix:
+        square: ${{ fromJson(needs.plan.outputs.squares) }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install GDAL
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gdal-bin
+          gdalinfo --version
+
+      - name: Find the lidar services
+        id: wcs
+        run: packs/find-lidar.sh
+
+      - name: Build and measure ${{ matrix.square }}
+        env:
+          SQ: ${{ matrix.square }}
+          HOURS: ${{ inputs.hours }}
+          DSM_SLUG: ${{ steps.wcs.outputs.dsm_slug }}
+          DSM_COV: ${{ steps.wcs.outputs.dsm_cov }}
+          DTM_SLUG: ${{ steps.wcs.outputs.dtm_slug }}
+          DTM_COV: ${{ steps.wcs.outputs.dtm_cov }}
+        run: |
+          set -uo pipefail
+          BUDGET=$(( ${HOURS:-4} * 3600 ))
+          START=$SECONDS
+          DONE=0; SKIPPED=0; EMPTY=0; LOST=0
+          for e in 0 1 2 3 4 5 6 7 8 9; do
+            for n in 0 1 2 3 4 5 6 7 8 9; do
+              TILE="$SQ$e$n"
+              if [ $(( SECONDS - START )) -gt "$BUDGET" ]; then
+                echo "::notice::time budget spent — stopping $SQ with $DONE tiles done; re-run to continue"
+                break 2
+              fi
+              # already measured? tile-status answers it properly: not "is
+              # there a file called tq15.js" but "does any pack hold this
+              # ground, and how much of it is measured"
+              node packs/tile-status.js "$TILE" > st.txt 2>/dev/null || true
+              if ! grep -q "^heights=.*$TILE" st.txt; then SKIPPED=$((SKIPPED+1)); continue; fi
+              echo "::group::$TILE"
+              if grep -q "^footprints=.*$TILE" st.txt; then
+                # plan-tiles takes places; a 10 km tile now names itself, so
+                # there is no postcode lookup per tile and no guessing
+                node packs/plan-tiles.js "$TILE" --radius 1 > tiles.tsv 2>/dev/null || true
+                if [ -s tiles.tsv ]; then packs/build-tiles.sh tiles.tsv || true; fi
+              fi
+              # nothing surveyed here — sea, or moor with no buildings on it
+              if ! node packs/tile-status.js "$TILE" 2>/dev/null | grep -q "^heights=.*$TILE"; then
+                echo "no surveyed buildings in $TILE"; EMPTY=$((EMPTY+1)); echo "::endgroup::"; continue
+              fi
+              if node packs/plan-square.js "$TILE" --size 10000 > sq.txt 2>/dev/null; then
+                e0=$(sed -n 's/^e0=//p' sq.txt); n0=$(sed -n 's/^n0=//p' sq.txt)
+                e1=$(sed -n 's/^e1=//p' sq.txt); n1=$(sed -n 's/^n1=//p' sq.txt)
+                if packs/measure-tile.sh "$TILE" "$e0" "$n0" "$e1" "$n1" 10000; then
+                  DONE=$((DONE+1))
+                else
+                  echo "::warning::$TILE could not be measured"; LOST=$((LOST+1))
+                fi
+              else
+                echo "::warning::$TILE is not a tile"; LOST=$((LOST+1))
+              fi
+              echo "::endgroup::"
+            done
+          done
+          echo "::notice::$SQ — $DONE measured, $SKIPPED already done, $EMPTY with nothing surveyed, $LOST lost"
+          # index.html is NOT an output of this job: one job rebuilds the list
+          git checkout -- index.html 2>/dev/null || true
+
+      - name: Hand the packs on
+        uses: actions/upload-artifact@v4
+        with:
+          name: packs-${{ matrix.square }}
+          path: packs/*.js
+          if-no-files-found: ignore
+          retention-days: 3
+
+  collect:
+    needs: measure
+    if: always()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packs-*
+          path: incoming
+          merge-multiple: false
+
+      - name: Put them together and rebuild the list
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          NEW=0
+          for d in incoming/packs-*; do
+            for f in "$d"/*.js; do
+              b=$(basename "$f")
+              # a pack starts with TF_PACK( — everything else in there is a
+              # tool that came along with the upload
+              head -c 8 "$f" | grep -q 'TF_PACK(' || continue
+              if [ ! -f "packs/$b" ] || ! cmp -s "$f" "packs/$b"; then
+                cp "$f" "packs/$b"; NEW=$((NEW+1))
+              fi
+            done
+          done
+          echo "::notice::$NEW pack file(s) new or changed"
+          node packs/relist.js
+
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packs/ index.html
+          if git diff --cached --quiet; then
+            echo "::notice::nothing new — every tile in this run was already built."
+            exit 0
+          fi
+          git commit -m "Measured England from Environment Agency lidar" \
+                     -m "Contains OS data (c) Crown copyright and database right, and public sector information licensed under the Open Government Licence v3. Built by .github/workflows/build-england.yml."
+          for i in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "::notice::push rejected — rebasing onto what landed"
+            git pull --rebase origin "${GITHUB_REF_NAME}" || { git rebase --abort || true; exit 1; }
+          done
+          exit 1
