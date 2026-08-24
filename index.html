@@ -961,6 +961,41 @@ function modelParts(e, m){
   if(!outer) return [];
   var box = orientedBox(outer, null);
   if(!box) return [];
+  /* Which of the four ways round is the model's own u axis?
+
+     orientedBox takes the longest edge and then swaps so u is the longer
+     half. On a long building that is decisive. Polesden Lacey is 58.9 m east
+     to west by 59.5 m north to south, and the swap turns on 1.3 m — so the
+     frame the whole model is written in was being chosen by rounding, and
+     came out ninety degrees from the plan it was drawn from.
+
+     uBearing is the model saying where its own +u points, as a compass
+     bearing. The building's REAL axes are kept — Polesden's ranges run at 13
+     and 103 degrees and squaring them to north would be its own error — and
+     the bearing only decides which of the four is u and which way along it. */
+  if(m.uBearing != null && m.orient !== "compass"){
+    var cands = [[box.ux, box.uz], [-box.uz, box.ux],
+                 [-box.ux, -box.uz], [box.uz, -box.ux]];
+    var want = ((+m.uBearing % 360) + 360) % 360, bi, bestI = 0, bestD = 1e9;
+    for(bi=0;bi<4;bi++){
+      /* world z runs south, so a bearing is atan2(east, -z) */
+      var bg = Math.atan2(cands[bi][0], -cands[bi][1])*180/Math.PI;
+      var dd = Math.abs(((bg - want) % 360 + 540) % 360 - 180);
+      if(dd < bestD){ bestD = dd; bestI = bi; }
+    }
+    var nux = cands[bestI][0], nuz = cands[bestI][1];
+    var u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9, oi;
+    for(oi=0;oi<outer.length;oi++){
+      var dx = outer[oi].x - box.cx, dz = outer[oi].z - box.cz;
+      var uu = dx*nux + dz*nuz, vv = -dx*nuz + dz*nux;
+      if(uu < u0) u0 = uu; if(uu > u1) u1 = uu;
+      if(vv < v0) v0 = vv; if(vv > v1) v1 = vv;
+    }
+    box = {cx:box.cx + (u0+u1)/2*nux - (v0+v1)/2*nuz,
+           cz:box.cz + (u0+u1)/2*nuz + (v0+v1)/2*nux,
+           ux:nux, uz:nuz, hu:(u1-u0)/2, hv:(v1-v0)/2};
+    box.area = 4*box.hu*box.hv;
+  }
   if(m.orient === "compass"){
     /* A country house has an east front and a garden front, and which is
        which is a fact about the compass, not about whichever edge of the
@@ -994,6 +1029,8 @@ function modelParts(e, m){
     if(g.length) g.push(g[0]);
     return g;
   }
+  /* a test hook: which frame did this model actually end up in */
+  if(typeof window !== "undefined" && m && m.id === "polesden") window.__polbox = box;
   var out = [], pcx = box.cx, pcz = box.cz, world = null;
   for(i=0;i<(m.parts||[]).length;i++){
     var p = m.parts[i], geom;
