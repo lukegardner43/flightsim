@@ -111,6 +111,20 @@ Copy `kt23-3hp.json`. A model is:
   is `u`. `packs/test/orienttest.js` rasterises a model's ground plan against
   the surveyed outline and fails if any of the eight placements (four
   rotations, each mirrored) fits better than the pinned one.
+- `atM: [u, v]` places a part in METRES from the model's centre instead of in
+  fractions of the outline. Use `at` for a building — its outline IS the
+  building, so fractions adapt to whatever polygon was surveyed. Use `atM` for
+  a bridge: the outline is whatever somebody drew around it, and may stop at
+  the abutments or run on down the approach roads, while the span and the
+  tower spacing are published in metres. Fractions of an unknown length put
+  Tower Bridge's towers wherever the mapper's rectangle happened to end.
+- `datum: "anchor"` pads every part of the model from one point — the anchor —
+  instead of each part taking the ground directly under itself. Heights are
+  then metres above that one datum. Only a model that SPANS something needs
+  this, and it needs it absolutely: Clifton's deck is 75 m over the Avon and
+  its chains hang between two clifftops, so padded part by part the chain
+  would sag into the gorge and climb back out, following the terrain instead
+  of crossing it.
 - `maxArea` / `minArea`, in square metres, say how big the building is. Only
   the anchor uses them, and only when a building is unnamed — but that is the
   case that matters, because standing inside a ring stops being evidence when
@@ -177,3 +191,37 @@ A chimney stack is about two metres square, and the collector rejects parts
 under 6 m² because that is what multipolygon slivers look like. Model parts
 carry `tf:part=model` and get a 0.8 m² floor instead, so a stack, a colonnade
 column or a stair turret survives while a degenerate ring still does not.
+
+## Bridges
+
+A bridge model supplies the superstructure and never the deck.
+
+The procedural bridge code in `index.html` already draws a deck, eases it onto
+both abutments, gives it parapets and sets the height the traffic drives at.
+What it refuses to do is guess the thing above the deck — and on a suspension
+or a cantilever bridge that is the whole of what the bridge looks like.
+
+So a named bridge keeps its deck and loses only its piers, which would
+otherwise march straight through the towers the model brings. `modelClaims`
+is what decides, and it honours `exclude`: "Tower Bridge Approach" and "Tower
+Bridge Road" both contain "tower bridge", and claiming them would take the
+piers out from under two ordinary viaducts that need them.
+
+The earlier rule was that a claimed bridge was "left entirely to that model",
+which sounded right and was not: with no model ever written against it,
+nothing had tested what it did. It skipped the deck as well as the piers, so
+the road lay flat on the water with the towers standing over it.
+
+A model attaches to the `man_made=bridge` AREA, not to the `bridge=yes` way.
+Most bridges have only the way, so most bridges cannot carry a model at all
+yet — and when the area is missing the model simply does not appear, the deck
+draws as it always did, and the report says so. That is the same rule the
+buildings follow: a model can be wrong about what something looks like, but it
+can never put one where nothing is.
+
+`packs/check-model-sites.js` cannot check a bridge. It holds a model's
+coordinate against Ordnance Survey building footprints, and OS does not survey
+bridges as buildings — so both bridges report "nothing under this coordinate",
+which is the expected answer and not a fault. `packs/test/bridgetest.js` is
+the check that applies: it runs the real `modelParts` against a synthetic
+bridge outline and looks at where the parts actually landed.

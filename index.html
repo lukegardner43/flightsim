@@ -329,7 +329,7 @@ function reportText(){
     : BRIDGES.drawn + " built" +
       (BRIDGES.deckOnly ? ", " + BRIDGES.deckOnly + " deck only (the span is carried by " +
         "something this does not draw)" : "") +
-      (BRIDGES.model ? ", " + BRIDGES.model + " left to a landmark model" : "") +
+      (BRIDGES.model ? ", " + BRIDGES.model + " carrying a landmark model" : "") +
       (BRIDGES.named ? ", " + BRIDGES.named + " named on the horizon" : "")));
   L.push("pack     " + (PACK.files.length
     ? PACK.files.length + " tile" + (PACK.files.length > 1 ? "s" : "") + " (" + packName() + ") " +
@@ -835,7 +835,7 @@ function hash(a,b){ var s = Math.sin(a*12.9898 + b*78.233)*43758.5453; return s 
    own confidence. See models/README.md.
    ------------------------------------------------------------------ */
 /* MODELS-START */
-var MODELS = [], MODEL_FILES = ["kt23-3hp.js","london.js"];
+var MODELS = [], MODEL_FILES = ["bridges.js","kt23-3hp.js","london.js"];
 /* MODELS-END */
 var MODEL_HITS = [], modelSeen = {};
 window.TF_MODELS = function(d){
@@ -1061,7 +1061,16 @@ function modelParts(e, m){
     }else{
       /* placed in fractions of the footprint's own half-extents, so it scales
          and rotates with the building actually on the map */
-      var cu = (p.at ? p.at[0] : 0)*box.hu, cv = (p.at ? p.at[1] : 0)*box.hv;
+      /* atM places a part in METRES from the model's centre instead of in
+         fractions of the outline. A building's outline IS the building, so
+         fractions are right there and adapt to whatever polygon was surveyed.
+         A bridge's outline is whatever somebody drew around it — it may stop
+         at the abutments or run on down the approach roads — while the span,
+         the tower spacing and the sag are all published in metres. Fractions
+         of an unknown length would put Tower Bridge's towers wherever the
+         mapper's rectangle happened to end. */
+      var cu = p.atM ? p.atM[0] : (p.at ? p.at[0] : 0)*box.hu,
+          cv = p.atM ? p.atM[1] : (p.at ? p.at[1] : 0)*box.hv;
       var cx = box.cx + cu*box.ux - cv*box.uz;
       var cz = box.cz + cu*box.uz + cv*box.ux;
       pcx = cx; pcz = cz;
@@ -1138,6 +1147,18 @@ function modelParts(e, m){
         if(MODEL_MASSED.indexOf(msg) < 0) MODEL_MASSED.push(msg);
       }
       var tg = {"building:part":"yes", "tf:part":"model"};
+      /* Every part normally takes its own ground height, which is right for a
+         building: each range of a house stands on the ground under it. A
+         bridge does not stand on the ground it crosses. Clifton's deck is 75 m
+         over the Avon and its chains hang between two clifftops, so parts
+         padded individually would have the chain sagging into the gorge and
+         climbing back out — following the terrain instead of spanning it.
+         datum:"anchor" pads every part of the model from one point, the
+         anchor, and the heights below are then metres above THAT. */
+      if(m.datum === "anchor"){
+        tg["tf:padx"] = String(box.cx.toFixed(2));
+        tg["tf:padz"] = String(box.cz.toFixed(2));
+      }
       if(p.type) tg.building = p.type;           /* drives material and roof defaults */
       if(p.height != null)     tg.height = String(Math.max(0.6, p.height - drop));
       if(p.minHeight != null)  tg.min_height = String(Math.max(0, p.minHeight - drop));
@@ -4144,8 +4165,12 @@ function addBuildings(list, parts, group, cell){
     if(wallTop < minH + 1.2) wallTop = minH + 1.2;
 
     /* One ground height per building: a building sits on a level pad, it
-       doesn't shear to follow the hillside. */
-    var pad = terrainY(b.pts[0].x, b.pts[0].z);
+       doesn't shear to follow the hillside. A model that spans a valley sets
+       tf:padx/tf:padz so every one of its parts shares the anchor's pad
+       rather than taking the ground directly underneath itself. */
+    var pad = (b.tags && b.tags["tf:padx"] !== undefined)
+      ? terrainY(parseFloat(b.tags["tf:padx"]), parseFloat(b.tags["tf:padz"]))
+      : terrainY(b.pts[0].x, b.pts[0].z);
 
     var shape, geo;
     if(!isFinite(pad) || !isFinite(wallTop) || !isFinite(minH)) return;
@@ -4228,8 +4253,15 @@ function addBuildings(list, parts, group, cell){
 
    What this deliberately does NOT do is guess the superstructure of a famous
    bridge. A suspension or cable-stayed or cantilever bridge gets its deck and
-   nothing else — no invented masonry piers marching across the Forth — and
-   any bridge a landmark model claims by name is left entirely to that model.
+   nothing else — no invented masonry piers marching across the Forth.
+
+   A bridge a landmark model claims by name keeps its deck and loses only its
+   piers. "Left entirely to the model" was the earlier rule and it was wrong:
+   the deck is the half the procedural code does WELL — it eases up off both
+   abutments, carries its parapets, and sets the height the cars drive at —
+   while the towers and the chains are the half it cannot do at all. A model
+   that claimed the whole bridge got no deck, so the road lay flat on the
+   water with the towers standing over it.
    ------------------------------------------------------------------ */
 var BRIDGES = {drawn:0, deckOnly:0, model:0, named:0};
 function isBridge(t){
@@ -4242,7 +4274,13 @@ function modelClaims(t){
   if(!MODELS.length || !t.name) return false;
   var n = String(t.name).toLowerCase(), i, j;
   for(i=0;i<MODELS.length;i++){
-    var m = MODELS[i];
+    var m = MODELS[i], no = false;
+    /* exclude has to apply here too. "Tower Bridge Approach" and "Tower
+       Bridge Road" both contain "tower bridge", and claiming them would take
+       the piers out from under two ordinary viaducts that need them. */
+    for(j=0;j<(m.exclude||[]).length;j++)
+      if(n.indexOf(String(m.exclude[j]).toLowerCase()) >= 0){ no = true; break; }
+    if(no) continue;
     for(j=0;j<(m.match||[]).length;j++)
       if(n.indexOf(String(m.match[j]).toLowerCase()) >= 0) return true;
   }
@@ -4316,14 +4354,16 @@ function deckBox(b, ax, az, cx, cz, ya, yc, half, h, off, col){
 }
 var BR_CONC = new THREE.Color(0x9b9891), BR_STONE = new THREE.Color(0x8d8377),
     BR_PARA = new THREE.Color(0xa9a69e);
-function bridgeStruct(b, pts, ys, half, t, cell, rail){
+function bridgeStruct(b, pts, ys, half, t, cell, rail, claimed){
   var i, n = pts.length;
   var stone = rail || t.bridge === "viaduct" || t.bridge === "aqueduct" ||
               /brick|stone|masonry/.test(t["bridge:structure"] || t.material || "");
   var col = stone ? BR_STONE : BR_CONC;
   var thick = rail ? 1.9 : 1.2;
   var dh = half + (rail ? 1.1 : 0.8);              /* the deck oversails a little */
-  var piers = !NO_PIERS.test(String(t["bridge:structure"] || "").toLowerCase());
+  /* A model brings its own towers, so procedural piers would march straight
+     through them. */
+  var piers = !claimed && !NO_PIERS.test(String(t["bridge:structure"] || "").toLowerCase());
   for(i=0;i<n-1;i++){
     var a = pts[i], c = pts[i+1];
     if(inSkip((a.x+c.x)/2, (a.z+c.z)/2, cell)) continue;
@@ -4331,7 +4371,7 @@ function bridgeStruct(b, pts, ys, half, t, cell, rail){
     for(var s=-1;s<=1;s+=2)                        /* parapets, both sides */
       deckBox(b, a.x, a.z, c.x, c.z, ys[i]+1.0, ys[i+1]+1.0, 0.22, 1.0, s*(dh-0.24), BR_PARA);
   }
-  if(!piers){ BRIDGES.deckOnly++; return; }
+  if(!piers){ if(!claimed) BRIDGES.deckOnly++; return; }
   /* Piers where they are needed, at a spacing that suits the span. */
   var space = rail ? 26 : 34, run = 0;
   for(i=1;i<n-1;i++){
@@ -4375,15 +4415,13 @@ function oneRoad(e, b, sb, cell){
     var pts = ringToPts(e.geometry);
     var ys = null;
     if(isBridge(tg) && pts.length > 1){
-      if(modelClaims(tg)) BRIDGES.model++;
-      else{
-        pts = resample(pts, 9);
-        ys = deckLine(pts, 4.6, 3.0);
-        if(ys){
-          bridgeStruct(sb, pts, ys, w, tg, cell, false);
-          BRIDGES.drawn++;
-          for(var k=0;k<pts.length;k++) pts[k].by = ys[k];   /* so cars ride it */
-        }
+      var claimed = modelClaims(tg);
+      pts = resample(pts, 9);
+      ys = deckLine(pts, 4.6, 3.0);
+      if(ys){
+        bridgeStruct(sb, pts, ys, w, tg, cell, false, claimed);
+        if(claimed) BRIDGES.model++; else BRIDGES.drawn++;
+        for(var k=0;k<pts.length;k++) pts[k].by = ys[k];   /* so cars ride it */
       }
     }
     for(var j=0;j<pts.length-1;j++){
@@ -4897,16 +4935,14 @@ function addRails(list, group, cell){
       var half = narrow ? 1.7 : 2.9, gauge = narrow ? 0.5 : 0.72;
       var ys = null;
       if(isBridge(t) && pts.length > 1){
-        if(modelClaims(t)) BRIDGES.model++;
-        else{
-          pts = resample(pts, 9);
-          /* a railway keeps its own level: it clears more and rises less */
-          ys = deckLine(pts, 6.0, 4.0);
-          if(ys){
-            bridgeStruct(sb, pts, ys, half, t, cell, true);
-            BRIDGES.drawn++;
-            for(var k=0;k<pts.length;k++) pts[k].by = ys[k];
-          }
+        var claimed = modelClaims(t);
+        pts = resample(pts, 9);
+        /* a railway keeps its own level: it clears more and rises less */
+        ys = deckLine(pts, 6.0, 4.0);
+        if(ys){
+          bridgeStruct(sb, pts, ys, half, t, cell, true, claimed);
+          if(claimed) BRIDGES.model++; else BRIDGES.drawn++;
+          for(var k=0;k<pts.length;k++) pts[k].by = ys[k];
         }
       }
       for(var j=0;j<pts.length-1;j++){
