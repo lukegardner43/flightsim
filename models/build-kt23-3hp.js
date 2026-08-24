@@ -182,10 +182,30 @@ models.push({
      the surveyed wall: a range spans its centre plus or minus its half-depth,
      so the centre has to sit at 1 minus the depth. Getting that wrong pulls
      the whole house in off its own footprint. */
-  parts.push(range(0, 0.69, 1.00, 0.31, 'south range — the show front, ochre render, dark green shutters'));
-  parts.push(range(0,-0.69, 1.00, 0.31, 'north range across the courtyard'));
-  parts.push(range(-0.74, 0, 0.26, 1.00, 'west range'));
-  parts.push(range( 0.74, 0, 0.26, 1.00, 'east range'));
+  /* And the four ranges are NOT the same depth. Read off the plan, as
+     fractions of it:
+
+       the colonnade side — Tea Room, Saloon, Library         0.34
+       opposite it — the Dining Room                          0.24
+       the entrance side — Picture Corridor, Central Hall     0.31
+       opposite it — the Billiard Room                        0.23
+
+     which leaves a courtyard of 0.42 x 0.46, nineteen per cent, and sitting
+     OFF CENTRE — nearer the Dining Room and the Billiard Room than the
+     Saloon and the Central Hall. Four equal ranges make a doughnut; these
+     make a house.
+
+     Each centre is 1 minus that range's own depth, so every outer face still
+     lands on the surveyed wall however unequal the depths are.
+
+     Which of the two remaining sides is the entrance one is not settled by
+     anything I have: the photographs show the forecourt but not in a frame I
+     can tie to the footprint's own axes. 0.31 is on the west here, and if it
+     is the wrong way round the error is 0.08 of the plan. */
+  parts.push(range(0,  0.66, 1.00, 0.34, 'south range — the show front, ochre render, dark green shutters'));
+  parts.push(range(0, -0.76, 1.00, 0.24, 'north range across the courtyard'));
+  parts.push(range(-0.69, 0, 0.31, 1.00, 'west range — the entrance side, deepest of the four'));
+  parts.push(range( 0.77, 0, 0.23, 1.00, 'east range'));
   /* centrepiece of the south front */
   parts.push({ at:[0,0.90], wF:0.20, dF:0.10, height:11.6, roof:'hipped', roofHeight:2.6, type:'manor',
     material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate,

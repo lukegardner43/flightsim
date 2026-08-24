@@ -488,10 +488,10 @@
     {
      "at": [
       0,
-      0.69
+      0.66
      ],
      "wF": 1,
-     "dF": 0.31,
+     "dF": 0.34,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -509,10 +509,10 @@
     {
      "at": [
       0,
-      -0.69
+      -0.76
      ],
      "wF": 1,
-     "dF": 0.31,
+     "dF": 0.24,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -529,10 +529,10 @@
     },
     {
      "at": [
-      -0.74,
+      -0.69,
       0
      ],
-     "wF": 0.26,
+     "wF": 0.31,
      "dF": 1,
      "height": 10.8,
      "roof": "hipped",
@@ -542,7 +542,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "west range",
+     "note": "west range — the entrance side, deepest of the four",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -550,10 +550,10 @@
     },
     {
      "at": [
-      0.74,
+      0.77,
       0
      ],
-     "wF": 0.26,
+     "wF": 0.23,
      "dF": 1,
      "height": 10.8,
      "roof": "hipped",
