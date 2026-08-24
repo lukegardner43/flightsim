@@ -162,10 +162,30 @@ models.push({
   const parts = [];
   const range = (u,v,wF,dF,note) => ({ at:[u,v], wF:wF, dF:dF, height:H, roof:'hipped', roofHeight:RH,
     type:'manor', material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate, note:note });
-  parts.push(range(0, 0.76, 1.00, 0.24, 'south range — the show front, ochre render, dark green shutters'));
-  parts.push(range(0,-0.76, 1.00, 0.24, 'north range across the courtyard'));
-  parts.push(range(-0.84, 0, 0.16, 1.00, 'west range'));
-  parts.push(range( 0.84, 0, 0.16, 1.00, 'east range'));
+  /* The courtyard is a LIGHT WELL, not a quadrangle yard.
+     
+     I had the ranges at 0.24 and 0.16 of the footprint, which leaves a
+     courtyard of 0.52 x 0.68 — thirty-five per cent of the plan — and
+     rendered, the house read as a hollow square rather than a building. The
+     reason I did not fix it the first time was the Historic England listing:
+     "in the form of a quadrangle around a large central courtyard". The
+     aerial photographs and the National Trust ground-floor plan both show
+     something quite different — rooms two deep on every side, a Picture
+     Corridor running round all four sides of the courtyard inside them, and
+     a yard nearer a fifth of the plan than a third.
+     
+     The brief's own rule is that the imagery governs where it and the text
+     disagree, and here it plainly does. 0.31 and 0.26 leave 0.38 x 0.48,
+     which is eighteen per cent.
+     
+     The centre of each range moves with its depth so the OUTER face stays on
+     the surveyed wall: a range spans its centre plus or minus its half-depth,
+     so the centre has to sit at 1 minus the depth. Getting that wrong pulls
+     the whole house in off its own footprint. */
+  parts.push(range(0, 0.69, 1.00, 0.31, 'south range — the show front, ochre render, dark green shutters'));
+  parts.push(range(0,-0.69, 1.00, 0.31, 'north range across the courtyard'));
+  parts.push(range(-0.74, 0, 0.26, 1.00, 'west range'));
+  parts.push(range( 0.74, 0, 0.26, 1.00, 'east range'));
   /* centrepiece of the south front */
   parts.push({ at:[0,0.90], wF:0.20, dF:0.10, height:11.6, roof:'hipped', roofHeight:2.6, type:'manor',
     material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate,
@@ -182,11 +202,10 @@ models.push({
   /* tall slim rendered stacks, evenly spread — the photograph shows about ten */
   const stacks = [[-0.86,0.72],[-0.58,0.72],[-0.30,0.72],[0.30,0.72],[0.58,0.72],[0.86,0.72],
                   [-0.70,-0.72],[0.00,-0.72],[0.70,-0.72],[-0.86,-0.20],[0.86,-0.20]];
-  /* "about ten tall SLIM stuccoed stacks" is what the photograph shows, and
-     1.7 m square is not slim — rendered, they read as a row of fence posts
-     along the ridge rather than as chimneys. 1.0 m, which is a stack of two
-     flues rather than four. */
-  for (const s of stacks) parts.push(chim(s[0], s[1], 1.0, 17.4, H, C.ochre, 'tall stuccoed stack'));
+  /* 1.7 m read as a row of fence posts and 1.0 m disappeared altogether. The
+     aerial photograph settles it: the stacks are substantial rendered blocks,
+     clearly proud of the roof, wider than they are deep. 1.4 m. */
+  for (const s of stacks) parts.push(chim(s[0], s[1], 1.4, 17.4, H, C.ochre, 'tall stuccoed stack'));
   /* the cupola: square white lantern, clock faces, dark domed lead roof */
   parts.push({ at:[0,0.62], w:4.6, d:4.6, minHeight:H+RH-0.4, height:15.2, roof:'flat',
     type:'manor', material:'plaster', colour:C.whiteStuc, note:'cupola base' });
