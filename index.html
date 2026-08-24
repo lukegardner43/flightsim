@@ -2167,7 +2167,7 @@ var statStreamed = 0, statTrees = 0, statLandmarks = 0, drawnIds = {};
    It fills where OSM said nothing at all, the same rule everything else
    here follows. A building carrying height= or building:levels= keeps them.
    ------------------------------------------------------------------ */
-var LIDAR = {ready:false, packs:-1, n:0, hit:0, split:0, parts:0, cell:64, map:{}};
+var LIDAR = {ready:false, packs:-1, n:0, hit:0, split:0, parts:0, flattened:0, cell:64, map:{}};
 function lidarUnpack(v){
   /* bit 29 says these are HALF-METRES, which is how a 310 m tower fits in
      ten bits that otherwise stop at 102.3 m. Clear on every pack built
@@ -3466,6 +3466,13 @@ function roofKind(t, cls, shape){
   if(shape === "flat") return "flat";
   if(cls === "shed")   return "metal";
   if(cls === "grand" || cls === "masonry") return "slate";
+  /* Clay tile is a DOMESTIC roof. Handing it to everything else made inner
+     London terracotta from the river to the horizon, and put a pantile roof
+     on Battersea Power Station. A pitched roof on anything bigger than a
+     house is slate in this country — the mansion blocks, the mills, the
+     warehouses and the terraces of every city are slate, and clay pantile
+     is a house in the shires. */
+  if(cls === "block") return "slate";
   return "tile";
 }
 /* Profiled steel: vertical ribs, a high clerestory strip, and no glazing
@@ -4059,6 +4066,7 @@ function addBuildings(list, parts, group, cell){
       var pc = pieces[i], tg = {};
       for(var k in b.tags) tg[k] = b.tags[k];
       if(!lidarWrite(tg, pc.v)) continue;
+      sliceRoof(tg, pc.pts);
       var a = Math.abs(signedArea(pc.pts));
       var cc = centroid(pc.pts);
       LIDAR.parts++;
@@ -4066,6 +4074,40 @@ function addBuildings(list, parts, group, cell){
              part:false, lidarPiece:true});
     }
     LIDAR.hit++;
+  }
+  /* A piece is a SLICE, and a slice's shape is an artefact of where the
+     surface stepped, not of where the building narrows.
+
+     Battersea Power Station is the case that shows it. The surface steps
+     twelve times across it, so it is cut into twelve strips seven to
+     thirty-four metres wide and a hundred and fifty long — and the fitter
+     then gives each strip a ridge running along the SHORT way, which is a
+     seven metre ridge with seventy-five metres of slope falling off each
+     side. Twelve of those is a fan of gabled planks, which is exactly what
+     it looked like. Worse, the chimney — real, measured, 103 m — was fitted
+     as a 39.5 m roof on a 12 m strip and drawn as a false ridge the whole
+     length of the building.
+
+     So: a roof the piece could not physically carry is not a roof. British
+     pitches put a ridge at roughly a fifth of the span it crosses; even a
+     steep 45 degrees is a quarter. Anything over 0.6 of the piece's narrow
+     dimension is the fit describing something that is not a roof, and the
+     honest answer is a flat top at the eaves. That loses the chimney, which
+     no fit over a strip could have placed anyway, and stops it being drawn
+     across a hundred and fifty metres of building that has no such thing. */
+  function sliceRoof(tg, pts){
+    var rh = parseFloat(tg["roof:height"]);
+    if(!(rh > 0)) return;
+    var bx = orientedBox(pts, null);
+    if(!bx) return;
+    var span = 2*Math.min(bx.hu, bx.hv);
+    if(rh <= Math.max(2.0, span*0.6)) return;
+    var h = parseFloat(tg.height);
+    if(isFinite(h)) tg.height = String(Math.round((h - rh)*10)/10);
+    delete tg["roof:height"];
+    delete tg["roof:direction"];
+    tg["roof:shape"] = "flat";
+    LIDAR.flattened++;
   }
   function raise(b){
     var seed = Math.round(b.pts[0].x*3.7 + b.pts[0].z*1.9);
@@ -5609,7 +5651,7 @@ $("go").onclick = function(){
   AI.on = !!(AI.p && $("aiuse").checked);
   AI.applied = AI.dressed = 0; AI.walls = []; AI.roofs = []; FUNC_SEEN = {};
   BRIDGES = {drawn:0, deckOnly:0, model:0, named:0}; bridgeNamed = {};
-  LIDAR.hit = 0; LIDAR.split = 0; LIDAR.parts = 0; LIDAR.packs = -1;
+  LIDAR.hit = 0; LIDAR.split = 0; LIDAR.parts = 0; LIDAR.flattened = 0; LIDAR.packs = -1;
   $("setup").style.display = "none"; $("load").classList.add("on");
   $("here").textContent = chosen.name + " · " + (gridRef(LAT0, LON0) || "outside the OS grid") +
                          (AI.on ? " · AI interpretation: " + AI.p.place : "") +
@@ -6505,7 +6547,7 @@ window.__sim = {
                                 throttle:st.throttle, dead:STICK_DEAD}; },
   bridges: function(){ return BRIDGES; },
   lidar: function(){ return {footprints:LIDAR.n, used:LIDAR.hit,
-                             split:LIDAR.split, parts:LIDAR.parts}; },
+                             split:LIDAR.split, parts:LIDAR.parts, flattened:LIDAR.flattened}; },
   ai: function(){ return {on:AI.on, id:AI.p ? AI.p.id : null,
                           applied:AI.applied, dressed:AI.dressed,
                           walls:AI.walls, roofs:AI.roofs,
