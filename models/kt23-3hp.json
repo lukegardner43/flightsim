@@ -485,7 +485,7 @@
     "Historic England list entry 1028665 (Grade II*): \"in the form of a quadrangle around a large central courtyard\"; \"stucco on brick, slate roofs, and stuccoed chimneys\"; \"two storeys, with a prominent cornice carried round\".",
     "Position: National Trust visitor information gives grid reference TQ 133524 for the car park (nationaltrust.org.uk/visit/surrey/polesden-lacey), and the OS OpenMap Local pack holds a 2,078 m2 twelve-cornered quadrangle 360 m south-east of it at TQ 1358 5218."
    ],
-   "note": "Rebuilt from the 1906 conduit drawing, which is a measured plan and is the first source here. It corrects two things the previous version had badly wrong. The courtyard is SQUARE, about sixteen metres each way and central; it had been a slot sixteen metres by six, which forced the south range to twenty-six metres deep, nearly half the house. And the block projecting north-east is the SERVICE COURT, the kitchen and its offices, not the Dining Room, which is why the Environment Agency lidar measures its north end at 5.1 m against 10.8 m for the rest: the drawing and the surface agree about that, and both disagreed with what was here. From the photographs, kept because the drawing says nothing about elevation: ochre render rather than brick, a square white cupola with clock faces under a dark domed lead roof, a run of dormers over the garden front, tall slim stuccoed stacks, and the giant-order colonnade along the garden front.",
+   "note": "Rebuilt from the 1906 conduit drawing, which is a measured plan and is the first source here. It corrects two things the previous version had badly wrong. The courtyard is SQUARE, about sixteen metres each way and central; it had been a slot sixteen metres by six, which forced the south range to twenty-six metres deep, nearly half the house. And the block projecting north-east is the SERVICE COURT, the kitchen and its offices, not the Dining Room, which is why the Environment Agency lidar measures its north end at 5.1 m against 10.8 m for the rest: the drawing and the surface agree about that, and both disagreed with what was here. From the photographs, kept because the drawing says nothing about elevation: ochre render rather than brick, a square white cupola with clock faces under a dark domed lead roof, which stands over the entrance, a run of dormers over the garden front, tall slim stuccoed stacks, and the giant-order colonnade along the garden front.",
    "parts": [
     {
      "at": [
@@ -1199,8 +1199,8 @@
     },
     {
      "at": [
-      0.2682926829268293,
-      0.4384057971014492
+      -0.13937282229965156,
+      0.4021739130434782
      ],
      "w": 4.6,
      "d": 4.6,
@@ -1210,7 +1210,7 @@
      "type": "manor",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "cupola base",
+     "note": "cupola base, over the Entrance Hall",
      "authored": {
       "h": 15.2,
       "mh": 13.4
@@ -1218,8 +1218,8 @@
     },
     {
      "at": [
-      0.2682926829268293,
-      0.4384057971014492
+      -0.13937282229965156,
+      0.4021739130434782
      ],
      "w": 4,
      "d": 4,
@@ -1232,7 +1232,7 @@
      "colour": "#e8e5dc",
      "roofMaterial": "lead",
      "roofColour": "#5a5f64",
-     "note": "white lantern with clock faces under a dark domed lead roof and finial",
+     "note": "white lantern with clock faces under a dark domed lead roof and finial, over the entrance",
      "authored": {
       "h": 22.6,
       "mh": 15.2,

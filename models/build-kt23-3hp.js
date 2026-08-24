@@ -272,12 +272,17 @@ models.push({
                   [6,-20],[6,3],[13,-18],[13,1],[20,14]];
   for (const s of stacks) parts.push(chim(U(s[0]), V(s[1]), 1.4, 17.4, H, C.ochre, 'tall stuccoed stack'));
 
-  /* the cupola, over the Central Hall and its staircase */
-  parts.push({ at:[U(4.7), V(5.6)], w:4.6, d:4.6, minHeight:H+RH-0.4, height:15.2, roof:'flat',
-    type:'manor', material:'plaster', colour:C.whiteStuc, note:'cupola base' });
-  parts.push({ at:[U(4.7), V(5.6)], w:4.0, d:4.0, minHeight:15.2, height:19.4, roof:'dome', roofHeight:3.2,
+  /* the cupola, over the ENTRANCE. It had been put over the north-east
+     corner of the quadrangle on the reasoning that a clock lantern belongs
+     over the central hall and its staircase; on this house it belongs over
+     the way in, which the drawing labels on the east front. So it sits on
+     the east range above the Entrance Hall, set back from the bow. */
+  const CUP_N = -7.0, CUP_E = 4.6;
+  parts.push({ at:[U(CUP_N), V(CUP_E)], w:4.6, d:4.6, minHeight:H+RH-0.4, height:15.2, roof:'flat',
+    type:'manor', material:'plaster', colour:C.whiteStuc, note:'cupola base, over the Entrance Hall' });
+  parts.push({ at:[U(CUP_N), V(CUP_E)], w:4.0, d:4.0, minHeight:15.2, height:19.4, roof:'dome', roofHeight:3.2,
     type:'manor', material:'plaster', colour:C.whiteStuc, roofMaterial:'lead', roofColour:C.lead,
-    note:'white lantern with clock faces under a dark domed lead roof and finial' });
+    note:'white lantern with clock faces under a dark domed lead roof and finial, over the entrance' });
   models.push({
     id:'polesden', name:'Polesden Lacey',
     match:['polesden lacey'],
@@ -317,7 +322,7 @@ models.push({
       'Historic England list entry 1028665 (Grade II*): "in the form of a quadrangle around a large central courtyard"; "stucco on brick, slate roofs, and stuccoed chimneys"; "two storeys, with a prominent cornice carried round".',
       'Position: National Trust visitor information gives grid reference TQ 133524 for the car park (nationaltrust.org.uk/visit/surrey/polesden-lacey), and the OS OpenMap Local pack holds a 2,078 m2 twelve-cornered quadrangle 360 m south-east of it at TQ 1358 5218.'
     ],
-    note:'Rebuilt from the 1906 conduit drawing, which is a measured plan and is the first source here. It corrects two things the previous version had badly wrong. The courtyard is SQUARE, about sixteen metres each way and central; it had been a slot sixteen metres by six, which forced the south range to twenty-six metres deep, nearly half the house. And the block projecting north-east is the SERVICE COURT, the kitchen and its offices, not the Dining Room, which is why the Environment Agency lidar measures its north end at 5.1 m against 10.8 m for the rest: the drawing and the surface agree about that, and both disagreed with what was here. From the photographs, kept because the drawing says nothing about elevation: ochre render rather than brick, a square white cupola with clock faces under a dark domed lead roof, a run of dormers over the garden front, tall slim stuccoed stacks, and the giant-order colonnade along the garden front.',
+    note:'Rebuilt from the 1906 conduit drawing, which is a measured plan and is the first source here. It corrects two things the previous version had badly wrong. The courtyard is SQUARE, about sixteen metres each way and central; it had been a slot sixteen metres by six, which forced the south range to twenty-six metres deep, nearly half the house. And the block projecting north-east is the SERVICE COURT, the kitchen and its offices, not the Dining Room, which is why the Environment Agency lidar measures its north end at 5.1 m against 10.8 m for the rest: the drawing and the surface agree about that, and both disagreed with what was here. From the photographs, kept because the drawing says nothing about elevation: ochre render rather than brick, a square white cupola with clock faces under a dark domed lead roof, which stands over the entrance, a run of dormers over the garden front, tall slim stuccoed stacks, and the giant-order colonnade along the garden front.',
     parts:parts
   });
 })();
