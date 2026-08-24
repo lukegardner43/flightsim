@@ -472,27 +472,28 @@
     -0.373547
    ],
    "radius": 300,
-   "uBearing": 0,
-   "uBearingSource": "The footprint is 58.9 m east-west by 59.5 m north-south, so orientedBox's 'longest edge, then swap so u is the longer half' turns on 1.3 m and the frame the whole model is written in was being decided by rounding. Pinned by scoring the model's ground plan against the surveyed outline all eight ways round (four rotations, each with its mirror): u at 15 deg gives 84.6% overlap, the next best 64.4%. packs/test/orienttest.js keeps it that way. The building's own axes are 13 and 103 degrees and are kept; uBearing only says which of the four is u. Confirmed against the National Trust plan: the entrance front is the +v side. That fixes the compass for the whole model — +u is north, +v is east — so the garden front at -u is the south front, as the house is always described. Several part notes claimed the opposite and were wrong; they are corrected. The building being turned 13 degrees off the compass is why 'north' here means NNE and 'east' means ESE.",
    "packRadius": 150,
+   "uBearing": 0,
    "nearSource": "Historic England 1028665 (TQ 13591 52195); this one was already right, and lands on the same 2,078 m2 range",
+   "uBearingSource": "Pinned by scoring the ground plan against the surveyed outline all eight ways round (four rotations, each mirrored). Confirmed against the 1906 plan: the entrance front is the +v side, which fixes the compass for the whole model — +u is north, +v is east — so the garden front at -u is the south front, as the house is always described.",
    "replaceOutline": true,
    "confidence": "high — rebuilt from the uploaded brief and two reference photographs",
    "sources": [
+    "FIRST SOURCE FOR THE MASSING, at the owner's instruction: H. Lithgow & Griffiths Ltd, Electrical Engineers, 21 Orchard Street, London — \"POLESDEN LACEY - DORKING - SURREY. For the Honourable Mrs Ronald Greville. Scale 1/8 inch to one foot. Runs of Conduit for Lighting Installation. GROUND FLOOR PLAN\", December 1906. A measured drawing of the house as Mewes and Davis had just rebuilt it, uploaded by the owner. Where it and anything else disagree, it wins.",
     "Uploaded brief, entry 4, with reference photograph \"Polesden Lacey House by Dave Spicer, via Geograph/Wikimedia Commons, CC BY-SA 2.0\" and a second oblique view of the same front.",
     "Brief: \"large symmetrical central composition with projecting side wings and multiple interconnected volumes\"; \"warm honey-coloured/red-brown brick with extensive pale stone or rendered architectural detailing\"; \"Model the small square cupola/turret rising above the main roof, with windows, projecting cornice and dark domed roof\"; \"numerous brick chimney stacks, dormer windows\".",
     "Historic England list entry 1028665 (Grade II*): \"in the form of a quadrangle around a large central courtyard\"; \"stucco on brick, slate roofs, and stuccoed chimneys\"; \"two storeys, with a prominent cornice carried round\".",
     "Position: National Trust visitor information gives grid reference TQ 133524 for the car park (nationaltrust.org.uk/visit/surrey/polesden-lacey), and the OS OpenMap Local pack holds a 2,078 m2 twelve-cornered quadrangle 360 m south-east of it at TQ 1358 5218."
    ],
-   "note": "The photographs overturn most of what I had built from the list entry. The walls are a strong ochre-yellow RENDER, not brick. The cupola is SQUARE and white with clock faces under a dark domed lead roof, not the tall octagon the listing describes — the listing and the photograph disagree and the photograph wins, as the brief instructs. The show front is long, flat and shallow-centred rather than deeply E-planned, it carries a run of dormers, about ten tall slim stuccoed stacks, and a giant-order colonnade along its eastern half. The quadrangle plan is kept from the listing because it is not visible in either photograph and is not contradicted by them.",
+   "note": "Rebuilt from the 1906 conduit drawing, which is a measured plan and is the first source here. It corrects two things the previous version had badly wrong. The courtyard is SQUARE, about sixteen metres each way and central; it had been a slot sixteen metres by six, which forced the south range to twenty-six metres deep, nearly half the house. And the block projecting north-east is the SERVICE COURT, the kitchen and its offices, not the Dining Room, which is why the Environment Agency lidar measures its north end at 5.1 m against 10.8 m for the rest: the drawing and the surface agree about that, and both disagreed with what was here. From the photographs, kept because the drawing says nothing about elevation: ochre render rather than brick, a square white cupola with clock faces under a dark domed lead roof, a run of dormers over the garden front, tall slim stuccoed stacks, and the giant-order colonnade along the garden front.",
    "parts": [
     {
      "at": [
-      -0.54,
-      0
+      -0.6968641114982578,
+      -0.02898550724637683
      ],
-     "wF": 0.46,
-     "dF": 0.64,
+     "wF": 0.2578397212543554,
+     "dF": 0.6159420289855072,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -501,7 +502,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "Tea Room, Saloon and Library — the garden front, which is the south front",
+     "note": "the south range — Saloon, Library and the garden front",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -509,11 +510,11 @@
     },
     {
      "at": [
-      0.034999999999999996,
-      -0.54
+      0.38675958188153314,
+      -0.02898550724637683
      ],
-     "wF": 0.11499999999999999,
-     "dF": 0.1,
+     "wF": 0.2682926829268293,
+     "dF": 0.6159420289855072,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -522,7 +523,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "Picture Corridor, west of the courtyard",
+     "note": "the north range",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -530,11 +531,11 @@
     },
     {
      "at": [
-      0.034999999999999996,
-      0.4
+      -0.16027874564459932,
+      -0.5018115942028984
      ],
-     "wF": 0.11499999999999999,
-     "dF": 0.24,
+     "wF": 0.2787456445993031,
+     "dF": 0.14311594202898553,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -543,7 +544,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "Picture Corridor, east of the courtyard",
+     "note": "the west range, along the courtyard",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -551,11 +552,11 @@
     },
     {
      "at": [
-      0.35500000000000004,
-      -0.72
+      -0.16027874564459932,
+      0.4039855072463768
      ],
-     "wF": 0.20500000000000002,
-     "dF": 0.28,
+     "wF": 0.2787456445993031,
+     "dF": 0.1829710144927536,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -564,7 +565,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "Billiard Room, Smoking Room and Gun Room",
+     "note": "the east range — Entrance Hall and Dining Room",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -572,11 +573,11 @@
     },
     {
      "at": [
-      0.35500000000000004,
-      0.4
+      0.4494773519163763,
+      -0.822463768115942
      ],
-     "wF": 0.20500000000000002,
-     "dF": 0.24,
+     "wF": 0.25435540069686413,
+     "dF": 0.17753623188405798,
      "height": 10.8,
      "roof": "hipped",
      "roofHeight": 2.66,
@@ -585,7 +586,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "Central Hall and Staircase Landing",
+     "note": "the west wing — Billiard Room and Smoking Room",
      "authored": {
       "h": 13.8,
       "rh": 3.4
@@ -593,53 +594,11 @@
     },
     {
      "at": [
-      0.6100000000000001,
-      -0.18
+      -0.8275261324041812,
+      0.7663043478260869
      ],
-     "wF": 0.04999999999999999,
-     "dF": 0.8200000000000001,
-     "height": 10.8,
-     "roof": "hipped",
-     "roofHeight": 2.66,
-     "type": "manor",
-     "material": "plaster",
-     "colour": "#d9b874",
-     "roofMaterial": "slate",
-     "roofColour": "#565c64",
-     "note": "the north Picture Corridor",
-     "authored": {
-      "h": 13.8,
-      "rh": 3.4
-     }
-    },
-    {
-     "at": [
-      -0.825,
-      0.8200000000000001
-     ],
-     "wF": 0.175,
-     "dF": 0.18,
-     "height": 9.62,
-     "roof": "hipped",
-     "roofHeight": 2.26,
-     "type": "manor",
-     "material": "plaster",
-     "colour": "#d9b874",
-     "roofMaterial": "slate",
-     "roofColour": "#565c64",
-     "note": "the Study, projecting",
-     "authored": {
-      "h": 12.29,
-      "rh": 2.8899999999999997
-     }
-    },
-    {
-     "at": [
-      0.53,
-      0.8200000000000001
-     ],
-     "wF": 0.13,
-     "dF": 0.18,
+     "wF": 0.1724738675958188,
+     "dF": 0.17934782608695654,
      "height": 10.4,
      "roof": "hipped",
      "roofHeight": 2.26,
@@ -648,7 +607,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "Entrance Hall, projecting",
+     "note": "the south-east wing — the Study",
      "authored": {
       "h": 13.29,
       "rh": 2.8899999999999997
@@ -656,11 +615,11 @@
     },
     {
      "at": [
-      0.8300000000000001,
-      0.76
+      0.5557491289198606,
+      0.7681159420289856
      ],
-     "wF": 0.16999999999999998,
-     "dF": 0.24,
+     "wF": 0.16550522648083624,
+     "dF": 0.23188405797101447,
      "height": 10.4,
      "roof": "hipped",
      "roofHeight": 2.26,
@@ -669,7 +628,7 @@
      "colour": "#d9b874",
      "roofMaterial": "slate",
      "roofColour": "#565c64",
-     "note": "the Dining Room, projecting",
+     "note": "the service court — kitchen and offices",
      "authored": {
       "h": 13.29,
       "rh": 2.8899999999999997
@@ -677,29 +636,32 @@
     },
     {
      "at": [
-      1,
-      0.76
+      0.8606271777003485,
+      0.7681159420289856
      ],
-     "w": 10,
-     "d": 10,
-     "sides": 16,
-     "height": 8.14,
-     "roof": "flat",
+     "wF": 0.1393728222996516,
+     "dF": 0.23188405797101447,
+     "height": 5.1,
+     "roof": "hipped",
+     "roofHeight": 1.26,
      "type": "manor",
      "material": "plaster",
      "colour": "#d9b874",
-     "note": "bowed end of the Dining Room",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "the north end of the service court, single storey",
      "authored": {
-      "h": 10.4
+      "h": 6.52,
+      "rh": 1.6055555555555552
      }
     },
     {
      "at": [
-      -0.82,
-      1
+      -0.8257839721254355,
+      0.9456521739130435
      ],
-     "w": 8,
-     "d": 8,
+     "w": 9,
+     "d": 9,
      "sides": 16,
      "height": 8.14,
      "roof": "flat",
@@ -713,8 +675,26 @@
     },
     {
      "at": [
-      0.53,
-      1.02
+      -0.13937282229965156,
+      0.5869565217391304
+     ],
+     "w": 9,
+     "d": 9,
+     "sides": 16,
+     "height": 8.14,
+     "roof": "flat",
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "note": "the bow on the east front, at the Entrance Hall",
+     "authored": {
+      "h": 10.4
+     }
+    },
+    {
+     "at": [
+      -0.13937282229965156,
+      0.6847826086956521
      ],
      "w": 5,
      "d": 2.4,
@@ -723,15 +703,15 @@
      "type": "manor",
      "material": "plaster",
      "colour": "#e8e5dc",
-     "note": "entrance porch and steps — ENTRANCE AND EXIT on the plan",
+     "note": "entrance porch and steps, on the east front",
      "authored": {
       "h": 5.2
      }
     },
     {
      "at": [
-      -0.97,
-      -0.34
+      -0.9616724738675959,
+      -0.34057971014492755
      ],
      "w": 1.25,
      "d": 1.25,
@@ -747,8 +727,8 @@
     },
     {
      "at": [
-      -0.97,
-      -0.23000000000000004
+      -0.9616724738675959,
+      -0.2318840579710145
      ],
      "w": 1.25,
      "d": 1.25,
@@ -764,8 +744,8 @@
     },
     {
      "at": [
-      -0.97,
-      -0.12000000000000002
+      -0.9616724738675959,
+      -0.12318840579710146
      ],
      "w": 1.25,
      "d": 1.25,
@@ -781,8 +761,8 @@
     },
     {
      "at": [
-      -0.97,
-      -0.010000000000000009
+      -0.9616724738675959,
+      -0.014492753623188418
      ],
      "w": 1.25,
      "d": 1.25,
@@ -798,8 +778,8 @@
     },
     {
      "at": [
-      -0.97,
-      0.09999999999999998
+      -0.9616724738675959,
+      0.09420289855072463
      ],
      "w": 1.25,
      "d": 1.25,
@@ -815,8 +795,8 @@
     },
     {
      "at": [
-      -0.97,
-      0.21000000000000002
+      -0.9616724738675959,
+      0.20289855072463767
      ],
      "w": 1.25,
      "d": 1.25,
@@ -832,8 +812,8 @@
     },
     {
      "at": [
-      -0.97,
-      0.32
+      -0.9616724738675959,
+      0.3115942028985507
      ],
      "w": 1.25,
      "d": 1.25,
@@ -849,8 +829,8 @@
     },
     {
      "at": [
-      -0.97,
-      -0.01
+      -0.9616724738675959,
+      -0.014492753623188418
      ],
      "w": 1.4,
      "dF": 0.36,
@@ -868,8 +848,8 @@
     },
     {
      "at": [
-      -0.92,
-      -0.16
+      -0.9128919860627178,
+      -0.16304347826086957
      ],
      "wF": 0.06,
      "dF": 0.16,
@@ -889,8 +869,8 @@
     },
     {
      "at": [
-      -0.86,
-      -0.46
+      -0.8536585365853658,
+      -0.5253623188405797
      ],
      "w": 1.9,
      "d": 1.71,
@@ -911,8 +891,8 @@
     },
     {
      "at": [
-      -0.86,
-      -0.3
+      -0.8536585365853658,
+      -0.3442028985507246
      ],
      "w": 1.9,
      "d": 1.71,
@@ -933,8 +913,8 @@
     },
     {
      "at": [
-      -0.86,
-      -0.14
+      -0.8536585365853658,
+      -0.16304347826086957
      ],
      "w": 1.9,
      "d": 1.71,
@@ -955,8 +935,8 @@
     },
     {
      "at": [
-      -0.86,
-      0.02
+      -0.8536585365853658,
+      0.018115942028985508
      ],
      "w": 1.9,
      "d": 1.71,
@@ -977,8 +957,8 @@
     },
     {
      "at": [
-      -0.86,
-      0.18
+      -0.8536585365853658,
+      0.19927536231884058
      ],
      "w": 1.9,
      "d": 1.71,
@@ -999,8 +979,8 @@
     },
     {
      "at": [
-      -0.86,
-      0.34
+      -0.8536585365853658,
+      0.3804347826086956
      ],
      "w": 1.9,
      "d": 1.71,
@@ -1021,8 +1001,8 @@
     },
     {
      "at": [
-      -0.9,
-      -0.5
+      -0.8710801393728224,
+      -0.5253623188405797
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1039,8 +1019,8 @@
     },
     {
      "at": [
-      -0.9,
-      0.2
+      -0.8710801393728224,
+      0.3079710144927536
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1057,8 +1037,8 @@
     },
     {
      "at": [
-      -0.55,
-      -0.55
+      -0.5574912891986062,
+      -0.5615942028985507
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1075,8 +1055,8 @@
     },
     {
      "at": [
-      -0.55,
-      0.45
+      -0.5574912891986062,
+      0.3804347826086956
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1093,8 +1073,8 @@
     },
     {
      "at": [
-      -0.2,
-      -0.55
+      -0.17421602787456447,
+      -0.5615942028985507
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1111,8 +1091,8 @@
     },
     {
      "at": [
-      -0.2,
-      0.45
+      -0.17421602787456447,
+      0.3804347826086956
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1129,8 +1109,8 @@
     },
     {
      "at": [
-      0.3,
-      -0.8
+      0.31358885017421606,
+      -0.48913043478260865
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1147,8 +1127,8 @@
     },
     {
      "at": [
-      0.3,
-      0.4
+      0.31358885017421606,
+      0.3442028985507246
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1165,8 +1145,8 @@
     },
     {
      "at": [
-      0.62,
-      -0.7
+      0.5574912891986062,
+      -0.41666666666666663
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1183,8 +1163,8 @@
     },
     {
      "at": [
-      0.62,
-      0.2
+      0.5574912891986062,
+      0.2717391304347826
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1201,8 +1181,8 @@
     },
     {
      "at": [
-      0.85,
-      0.8
+      0.8013937282229965,
+      0.7427536231884058
      ],
      "w": 1.4,
      "d": 0.868,
@@ -1219,8 +1199,8 @@
     },
     {
      "at": [
-      0.27,
-      0.44
+      0.2682926829268293,
+      0.4384057971014492
      ],
      "w": 4.6,
      "d": 4.6,
@@ -1238,8 +1218,8 @@
     },
     {
      "at": [
-      0.27,
-      0.44
+      0.2682926829268293,
+      0.4384057971014492
      ],
      "w": 4,
      "d": 4,
@@ -1266,7 +1246,7 @@
     "eavesShift": -2.26,
     "authoredFabric": 13.8,
     "measuredFabric": 10.8,
-    "scaledParts": 21,
+    "scaledParts": 20,
     "movedParts": 19,
     "fabric": "largest measured box on a 2078 m2 footprint it stands on",
     "source": "Environment Agency LIDAR Composite DSM/DTM 1 m. The fabric scales to it; what stands on the fabric moves with it and keeps its own size."

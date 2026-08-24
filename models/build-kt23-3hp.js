@@ -196,50 +196,86 @@ models.push({
     type:'manor', material:'plaster', colour:C.ochre,
     roofMaterial:'slate', roofColour:C.slate, note:note });
 
-  /* the main block, sliced either side of the courtyard */
-  parts.push(blk(-1.00, -0.08, -0.64,  0.64, H, RH, 'Tea Room, Saloon and Library — the garden front'));
-  parts.push(blk(-0.08,  0.15, -0.64, -0.44, H, RH, 'Picture Corridor, north of the courtyard'));
-  parts.push(blk(-0.08,  0.15,  0.16,  0.64, H, RH, 'Picture Corridor, south of the courtyard'));
-  /* and the block beside it, which runs out past the main block both ways */
-  parts.push(blk( 0.15,  0.56, -1.00, -0.44, H, RH, 'Billiard Room, Smoking Room and Gun Room'));
-  parts.push(blk( 0.15,  0.56,  0.16,  0.64, H, RH, 'Central Hall and Staircase Landing'));
-  parts.push(blk( 0.56,  0.66, -1.00,  0.64, H, RH, 'the east Picture Corridor'));
-  /* the three wings the outline actually has */
-  parts.push(blk(-1.00, -0.65,  0.64,  1.00, H - 1.0, RH*0.85, 'the Study, projecting'));
-  parts.push(blk( 0.40,  0.66,  0.64,  1.00, H,       RH*0.85, 'Entrance Hall, projecting'));
-  parts.push(blk( 0.66,  1.00,  0.52,  1.00, H,       RH*0.85, 'the Dining Room, projecting'));
+  /* ---- the 1906 drawing, read in metres ----
 
-  /* the bows, each on the outer face of its own wing */
-  const bow = (u,v,size,note) => ({ at:[u,v], w:size, d:size, sides:16,
-    height:H, roof:'flat', type:'manor', material:'plaster', colour:C.ochre, note:note });
-  parts.push(bow( 1.00, 0.76, 10, 'bowed end of the Dining Room'));
-  parts.push(bow(-0.82, 1.00,  8, 'apsidal end of the Study'));
+     H. Lithgow & Griffiths Ltd, Electrical Engineers, 21 Orchard Street,
+     London: "POLESDEN LACEY - DORKING - SURREY. For the Honourable Mrs
+     Ronald Greville. Scale 1/8 inch to one foot. Runs of Conduit for
+     Lighting Installation. GROUND FLOOR PLAN", December 1906 — a measured
+     survey of the house as Mewes and Davis had just finished rebuilding it,
+     and the first source for this massing.
 
-  /* the entrance, which the plan labels, on the outer face of its own wing */
-  parts.push({ at:[0.53, 1.02], w:5.0, d:2.4, height:5.2, roof:'flat', type:'manor',
-    material:'plaster', colour:C.whiteStuc, note:'entrance porch and steps — ENTRANCE AND EXIT on the plan' });
+     Working in fractions of a bounding box is how the last version went
+     wrong, so everything here is METRES east and north of the middle of the
+     surveyed bounding box. The drawing and the Ordnance Survey outline can
+     then be laid over each other and read line by line, and they agree —
+     every wing on the drawing is a corner on the survey:
 
-  /* the giant-order colonnade, along the Saloon's garden front */
-  for (let i = 0; i < 7; i++) parts.push(column(-0.97, -0.34 + i*0.11, 9.2));
-  parts.push({ at:[-0.97,-0.01], w:1.4, dF:0.36, minHeight:9.2, height:10.2, roof:'flat',
+       survey bbox     55.2 m east-west by 57.4 m north-south
+       quadrangle      east -24.3.. 9.7   north -30.4.. 15.8
+       west wing       east -34.1..-24.3  north   2.6.. 17.2   Billiard Room
+       service court   east   8.3.. 21.1  north   8.2.. 25.7   kitchen, offices
+       study wing      east   9.7.. 19.6  north -31.7..-21.8   the Study
+       courtyard       east -16.4.. -0.4  north -15.6..  0.4   about 16 m square
+
+     Two things the drawing corrects. The courtyard is SQUARE, about sixteen
+     metres each way and central; the version before this had it as a slot
+     sixteen metres by six, which forced the south range to twenty-six metres
+     deep — nearly half the house. And the block projecting north-east is the
+     SERVICE COURT, the kitchen and its offices, not the Dining Room: which
+     is why the lidar measures its north end at 5.1 m against 10.8 for
+     everything else. The drawing and the surface agree about that, and both
+     disagree with what was here. */
+  const E0 = -6.5, N0 = -3.0, HV = 27.6, HU = 28.7;   /* the surveyed bbox */
+  const U = n => (n - N0)/HU, V = e => (e - E0)/HV;
+  const rng = (e0,e1,n0,n1,h,rh,note) => parts.push(blk(U(n0),U(n1),V(e0),V(e1),h,rh,note));
+  /* the service court's north end, as a fraction of the main fabric: the
+     surface measures 5.1 m there and 10.8 m over the rest, and writing it as
+     a ratio keeps it right when fitToLidar rescales everything below. */
+  const LOW = 5.1/10.8;
+
+  /* the quadrangle: four ranges round the courtyard */
+  rng(-24.3,   9.7, -30.4, -15.6, H, RH, 'the south range — Saloon, Library and the garden front');
+  rng(-24.3,   9.7,   0.4,  15.8, H, RH, 'the north range');
+  rng(-24.3, -16.4, -15.6,   0.4, H, RH, 'the west range, along the courtyard');
+  rng( -0.4,   9.7, -15.6,   0.4, H, RH, 'the east range — Entrance Hall and Dining Room');
+  /* the three wings, which are corners on the survey and rooms on the plan */
+  rng(-34.1, -24.3,   2.6,  17.2, H, RH, 'the west wing — Billiard Room and Smoking Room');
+  rng(  9.7,  19.6, -31.7, -21.8, H, RH*0.85, 'the south-east wing — the Study');
+  rng(  8.3,  21.1,   8.2,  17.7, H, RH*0.85, 'the service court — kitchen and offices');
+  rng(  8.3,  21.1,  17.7,  25.7, H*LOW, RH*LOW, 'the north end of the service court, single storey');
+
+  /* the bows, each on the outer face of its own range */
+  const bow = (e,n,size,h,note) => parts.push({ at:[U(n),V(e)], w:size, d:size, sides:16,
+    height:h, roof:'flat', type:'manor', material:'plaster', colour:C.ochre, note:note });
+  bow( 19.6, -26.7, 9.0, H, 'apsidal end of the Study');
+  bow(  9.7,  -7.0, 9.0, H, 'the bow on the east front, at the Entrance Hall');
+
+  /* the entrance, which the drawing labels, on the east front */
+  parts.push({ at:[U(-7.0), V(12.4)], w:5.0, d:2.4, height:5.2, roof:'flat', type:'manor',
+    material:'plaster', colour:C.whiteStuc, note:'entrance porch and steps, on the east front' });
+
+  /* the giant-order colonnade, along the garden front */
+  for (let i = 0; i < 7; i++) parts.push(column(U(-30.6), V(-15.9 + i*3.0), 9.2));
+  parts.push({ at:[U(-30.6), V(-6.9)], w:1.4, dF:0.36, minHeight:9.2, height:10.2, roof:'flat',
     type:'manor', material:'plaster', colour:C.whiteStuc, note:'colonnade entablature' });
-  parts.push({ at:[-0.92,-0.16], wF:0.06, dF:0.16, height:11.6, roof:'hipped', roofHeight:2.6,
+  parts.push({ at:[U(-29.2), V(-11.0)], wF:0.06, dF:0.16, height:11.6, roof:'hipped', roofHeight:2.6,
     type:'manor', material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate,
     note:'centre bay breaking forward on the garden front, pedimented' });
 
   /* dormers in the garden-front roof */
-  for (const v of [-0.46,-0.30,-0.14,0.02,0.18,0.34])
-    parts.push(dormer(-0.86, v, 1.9, H, H+1.9, C.ochre, 'slate', C.slate));
+  for (const e of [-21,-16,-11,-6,-1,4])
+    parts.push(dormer(U(-27.5), V(e), 1.9, H, H+1.9, C.ochre, 'slate', C.slate));
 
-  /* the stacks, spread over the ranges the plan gives them */
-  const stacks = [[-0.90,-0.50],[-0.90,0.20],[-0.55,-0.55],[-0.55,0.45],[-0.20,-0.55],
-                  [-0.20,0.45],[0.30,-0.80],[0.30,0.40],[0.62,-0.70],[0.62,0.20],[0.85,0.80]];
-  for (const s of stacks) parts.push(chim(s[0], s[1], 1.4, 17.4, H, C.ochre, 'tall stuccoed stack'));
+  /* the stacks, on the ranges the drawing gives them */
+  const stacks = [[-28,-21],[-28,2],[-19,-22],[-19,4],[-8,-22],[-8,4],
+                  [6,-20],[6,3],[13,-18],[13,1],[20,14]];
+  for (const s of stacks) parts.push(chim(U(s[0]), V(s[1]), 1.4, 17.4, H, C.ochre, 'tall stuccoed stack'));
 
   /* the cupola, over the Central Hall and its staircase */
-  parts.push({ at:[0.27,0.44], w:4.6, d:4.6, minHeight:H+RH-0.4, height:15.2, roof:'flat',
+  parts.push({ at:[U(4.7), V(5.6)], w:4.6, d:4.6, minHeight:H+RH-0.4, height:15.2, roof:'flat',
     type:'manor', material:'plaster', colour:C.whiteStuc, note:'cupola base' });
-  parts.push({ at:[0.27,0.44], w:4.0, d:4.0, minHeight:15.2, height:19.4, roof:'dome', roofHeight:3.2,
+  parts.push({ at:[U(4.7), V(5.6)], w:4.0, d:4.0, minHeight:15.2, height:19.4, roof:'dome', roofHeight:3.2,
     type:'manor', material:'plaster', colour:C.whiteStuc, roofMaterial:'lead', roofColour:C.lead,
     note:'white lantern with clock faces under a dark domed lead roof and finial' });
   models.push({
@@ -260,16 +296,28 @@ models.push({
        What was here before, TQ 1350 5298, is 580 m NORTH of the car park —
        the wrong side of it — and is Polesden Lacey Farm. */
     near:[51.257612,-0.373547], radius:300, packRadius:150,
+    /* The footprint is 58.9 m east-west by 59.5 m north-south, so
+       orientedBox's "longest edge, then swap so u is the longer half" turns
+       on 1.3 m: the frame every part of this house is written in was being
+       chosen by rounding. uBearing pins it. The building's own axes are kept
+       — the walls run at 13 and 103 degrees, and squaring them to north
+       would be its own error — so this only says which of the four is u.
+       packs/test/orienttest.js scores the ground plan against the surveyed
+       outline all eight ways round and fails if another one ever fits
+       better. */
+    uBearing:0,
     nearSource:'Historic England 1028665 (TQ 13591 52195); this one was already right, and lands on the same 2,078 m2 range',
+    uBearingSource:'Pinned by scoring the ground plan against the surveyed outline all eight ways round (four rotations, each mirrored). Confirmed against the 1906 plan: the entrance front is the +v side, which fixes the compass for the whole model — +u is north, +v is east — so the garden front at -u is the south front, as the house is always described.',
     replaceOutline:true,
     confidence:'high — rebuilt from the uploaded brief and two reference photographs',
     sources:[
+      'FIRST SOURCE FOR THE MASSING, at the owner\'s instruction: H. Lithgow & Griffiths Ltd, Electrical Engineers, 21 Orchard Street, London — "POLESDEN LACEY - DORKING - SURREY. For the Honourable Mrs Ronald Greville. Scale 1/8 inch to one foot. Runs of Conduit for Lighting Installation. GROUND FLOOR PLAN", December 1906. A measured drawing of the house as Mewes and Davis had just rebuilt it, uploaded by the owner. Where it and anything else disagree, it wins.',
       'Uploaded brief, entry 4, with reference photograph "Polesden Lacey House by Dave Spicer, via Geograph/Wikimedia Commons, CC BY-SA 2.0" and a second oblique view of the same front.',
       'Brief: "large symmetrical central composition with projecting side wings and multiple interconnected volumes"; "warm honey-coloured/red-brown brick with extensive pale stone or rendered architectural detailing"; "Model the small square cupola/turret rising above the main roof, with windows, projecting cornice and dark domed roof"; "numerous brick chimney stacks, dormer windows".',
       'Historic England list entry 1028665 (Grade II*): "in the form of a quadrangle around a large central courtyard"; "stucco on brick, slate roofs, and stuccoed chimneys"; "two storeys, with a prominent cornice carried round".',
       'Position: National Trust visitor information gives grid reference TQ 133524 for the car park (nationaltrust.org.uk/visit/surrey/polesden-lacey), and the OS OpenMap Local pack holds a 2,078 m2 twelve-cornered quadrangle 360 m south-east of it at TQ 1358 5218.'
     ],
-    note:'The photographs overturn most of what I had built from the list entry. The walls are a strong ochre-yellow RENDER, not brick. The cupola is SQUARE and white with clock faces under a dark domed lead roof, not the tall octagon the listing describes — the listing and the photograph disagree and the photograph wins, as the brief instructs. The show front is long, flat and shallow-centred rather than deeply E-planned, it carries a run of dormers, about ten tall slim stuccoed stacks, and a giant-order colonnade along its eastern half. The quadrangle plan is kept from the listing because it is not visible in either photograph and is not contradicted by them.',
+    note:'Rebuilt from the 1906 conduit drawing, which is a measured plan and is the first source here. It corrects two things the previous version had badly wrong. The courtyard is SQUARE, about sixteen metres each way and central; it had been a slot sixteen metres by six, which forced the south range to twenty-six metres deep, nearly half the house. And the block projecting north-east is the SERVICE COURT, the kitchen and its offices, not the Dining Room, which is why the Environment Agency lidar measures its north end at 5.1 m against 10.8 m for the rest: the drawing and the surface agree about that, and both disagreed with what was here. From the photographs, kept because the drawing says nothing about elevation: ochre render rather than brick, a square white cupola with clock faces under a dark domed lead roof, a run of dormers over the garden front, tall slim stuccoed stacks, and the giant-order colonnade along the garden front.',
     parts:parts
   });
 })();
@@ -537,12 +585,19 @@ for (const m of OLD.models) if (!REPLACED.has(m.id)) models.push(m);
   const rings = [];
   global.TF_PACK = d => {
     const q = d.q || 1e6;
+    /* heights are indexed WITHIN the pack, and rings.length counts every
+       pack loaded so far. One pack made those the same number; thirty-six
+       do not, and every pack after the first would take its heights from
+       whichever pack came before it. kt233hp still sorts first, so the one
+       model file this fits was never actually wrong — but it was one new
+       pack away from being silently wrong, and England is adding hundreds. */
+    const base = rings.length;
     for (const a of d.buildings) {
       const pts = []; let lat = a[0], lon = a[1];
       pts.push([lat / q, lon / q]);
       for (let i = 2; i < a.length; i += 2) { lat += a[i]; lon += a[i+1]; pts.push([lat/q, lon/q]); }
-      rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0,
-                   p: (d.parts && d.parts[rings.length]) || null });
+      rings.push({ pts: pts, h: (d.heights && d.heights[rings.length - base]) || 0,
+                   p: (d.parts && d.parts[rings.length - base]) || null });
     }
   };
   /* A pack starts with TF_PACK(. Anything else here is a tool, and requiring
