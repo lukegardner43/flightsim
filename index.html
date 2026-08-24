@@ -5989,6 +5989,17 @@ function claimPackFootprints(els, dropped){
     var cc = centroid(pts), area = Math.abs(signedArea(pts));
     for(j=0;j<want.length;j++){
       var w = want[j];
+      /* The same size guard modelHere uses, and for a sharper reason here.
+         modelHere is asked about OSM buildings; this is asked about SURVEYED
+         footprints, where Ordnance Survey merges everything structurally
+         joined into one polygon. The Shard's coordinate is inside a 23,071 m2
+         block that is mostly London Bridge station, and with no size to check
+         against, the model took it: a 310 m tapered tower stretched over a
+         372 by 310 m base, which is to say a glass pyramid the size of
+         Southwark. Standing inside a ring stops being evidence when the ring
+         is two hectares. */
+      if((w.m.maxArea && area > w.m.maxArea) ||
+         (w.m.minArea && area < w.m.minArea)) continue;
       var dx = cc.x - w.x, dz = cc.z - w.z, d = Math.sqrt(dx*dx + dz*dz);
       /* Standing INSIDE a footprint is not a guess, and the rules below are
          all about guessing well. Eleven of these coordinates have now been

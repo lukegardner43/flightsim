@@ -22,10 +22,11 @@
     -0.0865
    ],
    "radius": 300,
+   "packRadius": 40,
    "maxArea": 6000,
    "minArea": 350,
-   "areaSource": "The tower stands on about 1,400 m2 at ground level; the guard is set wide enough for whatever polygon OSM holds and far below the 23,071 m2 of the station block it sits inside.",
- "nearSource": "The tower's own coordinate. It falls inside OSM's building way for the Shard; it also falls inside the 23,071 m2 OS OpenMap Local footprint of the whole London Bridge station block, which is a separate building and stays as it is.",
+   "areaSource": "The tower stands on about 1,400 m2 at ground level; the guard is set wide enough for whatever polygon OSM holds and far below the 23,071 m2 of the station block it sits inside. packRadius is 40 m because OS OpenMap Local has no footprint for this tower at all: with the size guard alone the model stopped taking the station block and started guessing at a 4,805 m2 neighbour 109 m away instead. There is nothing here for it to stand on, so it must stand on nothing and wait for OpenStreetMap, which does have the tower and names it.",
+   "nearSource": "The tower's own coordinate. It falls inside OSM's building way for the Shard; it also falls inside the 23,071 m2 OS OpenMap Local footprint of the whole London Bridge station block, which is a separate building and stays as it is.",
    "confidence": "medium — the three published heights are firm, the taper between them is read off elevations",
    "note": "Two things defeat the ordinary pipeline here. OS OpenMap Local has no footprint for the tower at all: the Shard is inside a 372 by 310 m block that also holds London Bridge station, and that block measures 67.5 m to its highest band, so lidar can only ever say 'station'. And nothing else in the sim tapers, so even with OSM's height=309.6 the tower came out as 310 m of rectangular slab, which is the whole of what is wrong with it — the Shard's shape IS the taper. The pieces below are cut from whatever polygon OSM holds for the tower, scaled about its middle, so they sit on the real outline rather than a rectangle guessed in metres.",
    "sources": [

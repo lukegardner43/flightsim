@@ -37,7 +37,7 @@ const STATION = { type:'way', id:2,
   geometry:[[LAT-bLat,LON-bLon],[LAT-bLat,LON+bLon],[LAT+bLat,LON+bLon],
             [LAT+bLat,LON-bLon],[LAT-bLat,LON-bLon]].map(p=>({lat:p[0],lon:p[1]})),
   tags:{ building:'train_station' } };
-let STATION_ONLY = false;
+let STATION_ONLY = false, PACKS_ONLY = false;
 
 async function run() {
   const browser = await chromium.launch(launchOpts({
@@ -49,7 +49,7 @@ async function run() {
        dozen neighbours inside fifty metres of the tower — at fifty and sixty
        metres up, which is exactly where the taper wants measuring. So the
        packs come back empty and the Shard is the only building for a mile. */
-    if (/packs\/[a-z0-9-]+\.js$/.test(url))
+    if (!PACKS_ONLY && /packs\/[a-z0-9-]+\.js$/.test(url))
       return route.fulfill({ status:200, contentType:'application/javascript',
         body: 'TF_PACK({"id":"empty","q":1000000,"bbox":[51.4,-0.2,51.6,0.0],"buildings":[]});' });
     if (url.startsWith('file://')) return route.continue();
@@ -64,7 +64,7 @@ async function run() {
       const wants = /"building"/.test(body) || /\[building\]/.test(body) || /building/.test(body);
       return route.fulfill({ status:200, contentType:'application/json',
         body: JSON.stringify({ version:0.6,
-          elements: wants ? (STATION_ONLY ? [STATION] : [SHARD]) : [] }) });
+          elements: (wants && !PACKS_ONLY) ? (STATION_ONLY ? [STATION] : [SHARD]) : [] }) });
     }
     if (/postcodes\.io/.test(url)) return route.fulfill({ status:200, contentType:'application/json',
       body: JSON.stringify({ status:200, result:{ postcode:'SE1 9SG', latitude:LAT, longitude:LON } }) });
@@ -85,7 +85,7 @@ async function run() {
   await page.click('#go');
   await page.waitForTimeout(20000);
 
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate((RADIUS) => {
     const s = window.__sim; if (!s) return null;
     const c = s.world(51.5045, -0.0865);
     const pad = s.terrainY(c.x, c.z);
@@ -101,13 +101,13 @@ async function run() {
       for (let i = 0; i < p.count; i++) {
         v.set(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(o.matrixWorld);
         const dx = v.x - c.x, dz = v.z - c.z, d = Math.sqrt(dx*dx + dz*dz);
-        if (d > 50) continue;
+        if (d > RADIUS) continue;
         const k = Math.floor((v.y - pad) / 10);
         if (k >= 0 && k < band.length && d > band[k]) band[k] = d;
       }
     });
     return { pad: pad, band: band, models: s.models() };
-  });
+  }, PACKS_ONLY ? 200 : 50);
   await browser.close();
   if (!r) { console.log('FAIL  the sim never came up'); return 1; }
 
@@ -134,6 +134,16 @@ async function run() {
   function check(name, ok, saw) {
     console.log((ok ? 'PASS  ' : 'FAIL  ') + name + '   ' + saw);
     if (!ok) fail++;
+  }
+  if (PACKS_ONLY) {
+    const top = r.band.reduce((t, w, k) => w ? k : t, -1);
+    check('with no OSM, the model does not take a surveyed footprint',
+          r.models.matched.indexOf('The Shard') < 0,
+          'matched ' + (r.models.matched.join(', ') || 'nothing') +
+          (r.models.fromPack.length ? '; fromPack ' + r.models.fromPack.join(' | ') : ''));
+    check('and nothing here is drawn three hundred metres tall', top >= 0 && top < 15,
+          'tallest geometry in the ' + (top*10) + '-' + (top*10+10) + ' m band, the real ones reach about 100');
+    return fail;
   }
   if (STATION_ONLY) {
     const top = r.band.reduce((t, w, k) => w ? k : t, -1);
@@ -169,9 +179,12 @@ async function run() {
    the sim refuse it? */
 (async () => {
   let fail = 0;
-  for (const st of [false, true]) {
-    STATION_ONLY = st;
-    console.log('\n=== ' + (st ? 'the station block on its own' : 'the tower') + ' ===');
+  for (const mode of ['tower', 'station', 'packs']) {
+    STATION_ONLY = mode === 'station';
+    PACKS_ONLY   = mode === 'packs';
+    console.log('\n=== ' + (mode === 'tower' ? 'the tower'
+                : mode === 'station' ? 'the station block on its own'
+                : 'nothing but the surveyed packs — OSM absent') + ' ===');
     fail += await run();
   }
   console.log('\n' + (fail ? fail + ' failed' : 'all passed'));
