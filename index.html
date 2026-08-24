@@ -893,6 +893,17 @@ function modelHere(e){
     if(modelSeen[m.id] && modelSeen[m.id] !== key) continue;
     var c = toWorld(m.near[1], m.near[0]);
     if(Math.abs(c.x) > 1e7 || Math.abs(c.z) > 1e7) continue;
+    /* Standing inside a ring is strong evidence, but it is not proof, and it
+       gets weaker the bigger the ring is. A point inside the Shard is also
+       inside London Bridge station, which OSM may hold as one polygon of two
+       hectares; without a size to check against, an unnamed station would be
+       handed a 310 m tower and drawn as one. maxArea and minArea are the
+       model saying how big the thing it describes is. */
+    if(m.maxArea || m.minArea){
+      var ar = Math.abs(signedArea(outer));
+      if(m.maxArea && ar > m.maxArea) continue;
+      if(m.minArea && ar < m.minArea) continue;
+    }
     if(pointInPoly({x:c.x, z:c.z}, outer)) return m;
   }
   return null;

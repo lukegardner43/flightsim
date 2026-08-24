@@ -27,8 +27,19 @@ const RING = [[LAT-dLat,LON-dLon],[LAT-dLat,LON+dLon],[LAT+dLat,LON+dLon],
 const SHARD = { type:'way', id:1, geometry:RING,
                 tags:{ building:'commercial', name:'The Shard', height:'309.6',
                        'building:levels':'72' } };
+/* The tower's coordinate is inside the station block as well — that is the
+   whole reason the lidar cannot see it — so a model anchored on a point has
+   to be able to say how big the thing it describes is. Run with --station
+   the tower is absent and only the block is served: nothing should attach to
+   it, and certainly not a 310 m spire. */
+const BIG = 200, bLat = BIG/mLat, bLon = BIG/mLon;
+const STATION = { type:'way', id:2,
+  geometry:[[LAT-bLat,LON-bLon],[LAT-bLat,LON+bLon],[LAT+bLat,LON+bLon],
+            [LAT+bLat,LON-bLon],[LAT-bLat,LON-bLon]].map(p=>({lat:p[0],lon:p[1]})),
+  tags:{ building:'train_station' } };
+let STATION_ONLY = false;
 
-(async () => {
+async function run() {
   const browser = await chromium.launch(launchOpts({
     args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox'] }));
   const page = await browser.newPage({ viewport: { width: 900, height: 640 } });
@@ -52,7 +63,8 @@ const SHARD = { type:'way', id:1, geometry:RING,
       /* only the buildings query gets the tower; the rest get nothing */
       const wants = /"building"/.test(body) || /\[building\]/.test(body) || /building/.test(body);
       return route.fulfill({ status:200, contentType:'application/json',
-        body: JSON.stringify({ version:0.6, elements: wants ? [SHARD] : [] }) });
+        body: JSON.stringify({ version:0.6,
+          elements: wants ? (STATION_ONLY ? [STATION] : [SHARD]) : [] }) });
     }
     if (/postcodes\.io/.test(url)) return route.fulfill({ status:200, contentType:'application/json',
       body: JSON.stringify({ status:200, result:{ postcode:'SE1 9SG', latitude:LAT, longitude:LON } }) });
@@ -97,7 +109,7 @@ const SHARD = { type:'way', id:1, geometry:RING,
     return { pad: pad, band: band, models: s.models() };
   });
   await browser.close();
-  if (!r) { console.log('FAIL  the sim never came up'); process.exit(1); }
+  if (!r) { console.log('FAIL  the sim never came up'); return 1; }
 
   console.log('models loaded ' + r.models.loaded + ', matched ' +
               (r.models.matched.join(', ') || 'nothing'));
@@ -123,6 +135,15 @@ const SHARD = { type:'way', id:1, geometry:RING,
     console.log((ok ? 'PASS  ' : 'FAIL  ') + name + '   ' + saw);
     if (!ok) fail++;
   }
+  if (STATION_ONLY) {
+    const top = r.band.reduce((t, w, k) => w ? k : t, -1);
+    check('a 160,000 m2 block does not become the Shard',
+          r.models.matched.indexOf('The Shard') < 0,
+          'matched ' + (r.models.matched.join(', ') || 'nothing'));
+    check('and nothing near it reaches three hundred metres', top < 12,
+          'highest geometry in the ' + (top*10) + '-' + (top*10+10) + ' m band');
+    return fail;
+  }
   const top = r.band.reduce((t, w, k) => w ? k : t, -1);
   check('it reaches the architectural height', top >= 30,
         'highest geometry in the ' + (top*10) + '-' + (top*10+10) + ' m band, want 300+');
@@ -140,6 +161,19 @@ const SHARD = { type:'way', id:1, geometry:RING,
   check('the base still stands on the mapped outline', low > 36 && low < 44,
         'corner reach near the bottom is ' + low.toFixed(1) + ' m, the square way reaches 42.4');
 
+  return fail;
+}
+
+/* Two runs, because the two halves are different failures. With the tower
+   served, does it taper? With only the block it stands inside served, does
+   the sim refuse it? */
+(async () => {
+  let fail = 0;
+  for (const st of [false, true]) {
+    STATION_ONLY = st;
+    console.log('\n=== ' + (st ? 'the station block on its own' : 'the tower') + ' ===');
+    fail += await run();
+  }
   console.log('\n' + (fail ? fail + ' failed' : 'all passed'));
   process.exit(fail ? 1 : 0);
 })();
