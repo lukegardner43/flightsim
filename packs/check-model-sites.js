@@ -25,16 +25,22 @@ for (const f of fs.readdirSync(path.join(root, 'models')).filter(f => f.endsWith
   for (const m of JSON.parse(fs.readFileSync(path.join(root, 'models', f), 'utf8')).models || [])
     if (m.near) models.push(m);
 
+/* Heights are indexed WITHIN a pack, and this loader concatenates several.
+   Using rings.length as the index worked while there was one pack in the
+   repository and silently read the wrong pack's heights the moment there
+   were five — the Shard came back "no reading" because it was being handed
+   a Bookham footprint's number. */
 const rings = [];
 global.TF_PACK = d => {
   const q = d.q || 1e6;
+  const base = rings.length;
   for (const a of d.buildings) {
     const pts = [];
     let lat = a[0], lon = a[1];
     pts.push([lat / q, lon / q]);
     for (let i = 2; i < a.length; i += 2) { lat += a[i]; lon += a[i + 1]; pts.push([lat / q, lon / q]); }
-    rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0,
-                 p: (d.parts && d.parts[rings.length]) || null });
+    rings.push({ pts: pts, h: (d.heights && d.heights[rings.length - base]) || 0,
+                 p: (d.parts && d.parts[rings.length - base]) || null });
   }
 };
 /* The tallest box the surface was split into, which is the number to hold a

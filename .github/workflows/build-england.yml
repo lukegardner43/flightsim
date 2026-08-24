@@ -26,7 +26,7 @@ name: Build England
 # building one place and impossible for eight at once — they would each
 # rewrite the same block and every one would conflict. So the runners produce
 # pack files and nothing else, upload them, and one job at the end puts them
-# together and rebuilds the list with packs/relist.js.
+# together and rebuilds the list with packs/list-packs.js.
 #
 # Data: Ordnance Survey OpenMap Local and Environment Agency LIDAR Composite
 # DSM/DTM 1 m, both under the Open Government Licence v3.
@@ -193,7 +193,7 @@ jobs:
             done
           done
           echo "::notice::$NEW pack file(s) new or changed"
-          node packs/relist.js
+          node packs/list-packs.js
 
       - name: Commit
         run: |

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Rebuild index.html's PACKS list from whatever packs are actually on disk.
 
-     node packs/relist.js
+     node packs/list-packs.js
 
    make-pack.js rewrites that list as a side effect of building a pack, which
    is right when one machine builds one place. It is wrong the moment several
@@ -15,7 +15,14 @@
    ended up in it, pointing at a test fixture that no longer existed.
 
    A pack is a file that starts with TF_PACK(. Everything else in packs/ is a
-   tool, and requiring a tool RUNS it. */
+   tool, and requiring a tool RUNS it.
+
+   Which is why this file has a hyphen in its name. Called relist.js it was
+   picked up by show-boxes.js's loader, which matched packs by filename shape
+   — two letters and digits, no hyphen — and so required this tool and ran
+   it, rewriting index.html on the way past. Filename shape is not a type;
+   every loader reads the first eight bytes now. The hyphen is the belt to
+   that brace. */
 'use strict';
 const fs = require('fs');
 const path = require('path');

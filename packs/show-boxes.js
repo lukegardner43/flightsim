@@ -38,20 +38,39 @@
 const fs = require('fs'), path = require('path');
 const { bng } = require('./grid-square.js');
 
+/* Heights are indexed WITHIN a pack, and this loader concatenates several.
+   Using rings.length as the index worked while there was one pack in the
+   repository and silently read the wrong pack's heights the moment there
+   were five — the Shard came back "no reading" because it was being handed
+   a Bookham footprint's number. */
 const rings = [];
 global.TF_PACK = d => {
   const q = d.q || 1e6;
+  const base = rings.length;
   for (const a of d.buildings) {
     const pts = []; let lat = a[0], lon = a[1];
     pts.push([lat/q, lon/q]);
     for (let i = 2; i < a.length; i += 2) { lat += a[i]; lon += a[i+1]; pts.push([lat/q, lon/q]); }
-    rings.push({ pts: pts, h: (d.heights && d.heights[rings.length]) || 0,
-                 p: (d.parts && d.parts[rings.length]) || null });
+    rings.push({ pts: pts, h: (d.heights && d.heights[rings.length - base]) || 0,
+                 p: (d.parts && d.parts[rings.length - base]) || null });
   }
 };
+/* A pack starts with TF_PACK(. Everything else in here is a tool, and
+   requiring a tool RUNS it — this loader matched by filename shape and so
+   loaded packs/relist.js as a pack, which rewrote index.html on its way
+   past. Filename shape is not a type. */
+const isPack = file => {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const b = Buffer.alloc(8);
+    return fs.readSync(fd, b, 0, 8, 0) === 8 && b.toString('utf8') === 'TF_PACK(';
+  } catch (e) { return false; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch (e) {} }
+};
 const dir = __dirname;
-for (const f of fs.readdirSync(dir).filter(f => /^[a-z0-9]+\.js$/.test(f)))
-  { try { require(path.join(dir, f)); } catch (e) {} }
+for (const f of fs.readdirSync(dir))
+  if (f.endsWith('.js') && isPack(path.join(dir, f)))
+    { try { require(path.join(dir, f)); } catch (e) {} }
 if (!rings.length) { console.error('no packs to read'); process.exit(1); }
 
 let models = [];
