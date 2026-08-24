@@ -571,6 +571,63 @@
     },
     {
      "at": [
+      -0.15,
+      -0.9
+     ],
+     "w": 10,
+     "d": 10,
+     "sides": 16,
+     "height": 8.14,
+     "roof": "flat",
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "note": "bowed end of the Dining Room",
+     "authored": {
+      "h": 10.4
+     }
+    },
+    {
+     "at": [
+      -0.62,
+      0.92
+     ],
+     "w": 8,
+     "d": 8,
+     "sides": 16,
+     "height": 8.14,
+     "roof": "flat",
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "note": "apsidal end of the Study",
+     "authored": {
+      "h": 10.4
+     }
+    },
+    {
+     "at": [
+      0.72,
+      -0.62
+     ],
+     "wF": 0.21,
+     "dF": 0.32,
+     "height": 9.25,
+     "roof": "hipped",
+     "roofHeight": 2.13,
+     "type": "manor",
+     "material": "plaster",
+     "colour": "#d9b874",
+     "roofMaterial": "slate",
+     "roofColour": "#565c64",
+     "note": "Smoking Room and Gun Room, lower and separately roofed",
+     "authored": {
+      "h": 11.82,
+      "rh": 2.72
+     }
+    },
+    {
+     "at": [
       0,
       0.9
      ],
@@ -1124,7 +1181,7 @@
     "eavesShift": -2.26,
     "authoredFabric": 13.8,
     "measuredFabric": 10.8,
-    "scaledParts": 14,
+    "scaledParts": 17,
     "movedParts": 19,
     "fabric": "largest measured box on a 2078 m2 footprint it stands on",
     "source": "Environment Agency LIDAR Composite DSM/DTM 1 m. The fabric scales to it; what stands on the fabric moves with it and keeps its own size."

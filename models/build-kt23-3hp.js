@@ -206,6 +206,34 @@ models.push({
   parts.push(range(0, -0.76, 1.00, 0.24, 'north range across the courtyard'));
   parts.push(range(-0.69, 0, 0.31, 1.00, 'west range — the entrance side, deepest of the four'));
   parts.push(range( 0.77, 0, 0.23, 1.00, 'east range'));
+
+  /* The bows. Both are in the photograph and both are drawn on the plan: the
+     Dining Room's east end and the Study's, each a full-height rounded bay
+     standing proud of its wall under a flat leaded top rather than a slope.
+     A ring of sixteen sides centred ON the wall gives the half-round outside
+     and buries the other half in the range, which is what a bow is. */
+  const bow = (u,v,size,note) => ({ at:[u,v], w:size, d:size, sides:16,
+    height:H, roof:'flat', type:'manor', material:'plaster', colour:C.ochre, note:note });
+  parts.push(bow(-0.15, -0.90, 10, 'bowed end of the Dining Room'));
+  parts.push(bow(-0.62,  0.92,  8, 'apsidal end of the Study'));
+
+  /* The Smoking Room and Gun Room block. On the plan it projects past the
+     Billiard Room's wall, and in the photograph it reads as a slightly lower
+     mass with a roof of its own at that corner.
+
+     It is NOT built as a projection. The model's ranges are fractions of the
+     surveyed footprint's own bounding box, so making a corner stick out means
+     pulling every other range IN off that box — and neither the Ordnance
+     Survey outline nor the lidar shows a notch there. The plan is of the
+     house as it stands; the surveyed outline is generalised. Guessing a
+     projection would take the whole east wall a metre and a half off the
+     footprint to gain a corner nobody can see from the air.
+
+     What IS visible from the air is that the block is lower and roofed
+     separately, and that costs nothing to be wrong about. */
+  parts.push({ at:[0.72,-0.62], wF:0.21, dF:0.32, height:H - 1.3, roof:'hipped', roofHeight:RH*0.8,
+    type:'manor', material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate,
+    note:'Smoking Room and Gun Room, lower and separately roofed' });
   /* centrepiece of the south front */
   parts.push({ at:[0,0.90], wF:0.20, dF:0.10, height:11.6, roof:'hipped', roofHeight:2.6, type:'manor',
     material:'plaster', colour:C.ochre, roofMaterial:'slate', roofColour:C.slate,
