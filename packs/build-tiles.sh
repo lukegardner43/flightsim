@@ -14,16 +14,27 @@ set -uo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 PLAN=${1:?give the plan file from plan-tiles.js}
 FAILED=0
+HAVE=''
 
 while IFS=$'\t' read -r SQ TILES BOX; do
   [ -n "${SQ:-}" ] || continue
   echo "::group::$SQ  ($TILES)"
   read -r W S E N <<< "$BOX"
 
-  rm -rf work/os
-  if ! bash "$ROOT/packs/os-download.sh" "$SQ" work/os; then
-    echo "::warning::could not download OS grid square $SQ — its tiles are not in this run"
-    FAILED=$((FAILED+1)); echo "::endgroup::"; continue
+  # One download per SQUARE, not per line. A plan may hold several lines for
+  # the same square — England hands over a row of ten tiles at a time so that
+  # make-pack is never asked to hold a hundred kilometres of Yorkshire in
+  # memory at once — and re-fetching the same fifty megabytes ten times over
+  # is most of a runner's afternoon.
+  if [ "$HAVE" != "$SQ" ]; then
+    rm -rf work/os
+    if ! bash "$ROOT/packs/os-download.sh" "$SQ" work/os; then
+      echo "::warning::could not download OS grid square $SQ — its tiles are not in this run"
+      FAILED=$((FAILED+1)); echo "::endgroup::"; continue
+    fi
+    HAVE=$SQ
+  else
+    echo "using the copy of $SQ already downloaded"
   fi
 
   # One clip for the whole square: the bounding box of everything wanted from
@@ -38,7 +49,7 @@ while IFS=$'\t' read -r SQ TILES BOX; do
   node "$ROOT/packs/make-pack.js" --in "$FILES" --tiles "$TILES" \
     || { echo "::warning::$SQ — pack build failed"; FAILED=$((FAILED+1)); }
 
-  rm -rf work/os "work/$SQ"-*.geojson
+  rm -rf "work/$SQ"-*.geojson
   echo "::endgroup::"
 done < "$PLAN"
 

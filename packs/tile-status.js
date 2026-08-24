@@ -89,10 +89,18 @@ function main() {
                 (share >= DONE ? '' : ' — heights needed'));
     if (share < DONE) needHeight.push(tile);
   }
-  const emit = process.env.GITHUB_OUTPUT
-    ? l => fs.appendFileSync(process.env.GITHUB_OUTPUT, l + '\n')
-    : l => console.log(l);
-  emit('footprints=' + needFoot.join(','));
-  emit('heights=' + needHeight.join(','));
+  /* Always on stdout, and ALSO into GITHUB_OUTPUT when there is one.
+
+     It used to be one or the other, and that quietly cost a whole England
+     run. The workflow loops over a hundred tiles and reads these two lines
+     off stdout; on a runner GITHUB_OUTPUT is set, so stdout got nothing, so
+     the grep for "heights=...SE00" found nothing, so every tile in Yorkshire
+     was counted as already measured and the job finished in a minute
+     reporting "100 already done". A tool that stops printing depending on an
+     environment variable is a trap. Printing twice costs two lines. */
+  const out = ['footprints=' + needFoot.join(','), 'heights=' + needHeight.join(',')];
+  for (const l of out) console.log(l);
+  if (process.env.GITHUB_OUTPUT)
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, out.join('\n') + '\n');
 }
 main();

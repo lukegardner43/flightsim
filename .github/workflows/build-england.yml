@@ -96,7 +96,42 @@ jobs:
         id: wcs
         run: packs/find-lidar.sh
 
-      - name: Build and measure ${{ matrix.square }}
+      - name: Footprints for ${{ matrix.square }}
+        env:
+          SQ: ${{ matrix.square }}
+        run: |
+          set -uo pipefail
+          echo "T0=$(date +%s)" >> "$GITHUB_ENV"
+          ALL=''
+          for e in 0 1 2 3 4 5 6 7 8 9; do
+            for n in 0 1 2 3 4 5 6 7 8 9; do ALL="$ALL $SQ$e$n"; done
+          done
+          node packs/tile-status.js $ALL > st.txt 2>&1 || true
+          if ! grep -q '^footprints=' st.txt; then
+            echo "::error::tile-status said nothing about $SQ"; sed -n 1,20p st.txt; exit 1
+          fi
+          NEED=$(sed -n 's/^footprints=//p' st.txt)
+          if [ -z "$NEED" ]; then echo "::notice::$SQ already has footprints for every tile"; exit 0; fi
+          echo "$SQ needs footprints for: $NEED"
+          # A row of ten tiles at a time. One line per row rather than one for
+          # the whole square, because make-pack.js reads the clipped GeoJSON
+          # into memory in one piece and a hundred kilometres of Leeds and
+          # Sheffield will not fit. build-tiles.sh downloads the square once
+          # whatever the plan says.
+          : > tiles.tsv
+          for e in 0 1 2 3 4 5 6 7 8 9; do
+            ROW=$(printf '%s' "$NEED" | tr ',' '\n' | grep "^$SQ$e" | paste -sd, -)
+            [ -n "$ROW" ] || continue
+            node packs/plan-tiles.js "$ROW" --radius 1 >> tiles.tsv 2>/dev/null || true
+          done
+          if [ ! -s tiles.tsv ]; then echo "::warning::nothing to plan for $SQ"; exit 0; fi
+          wc -l < tiles.tsv | sed 's/^/rows of tiles to build: /'
+          packs/build-tiles.sh tiles.tsv || echo "::warning::$SQ — some footprints did not build"
+          # index.html is NOT an output of this job: one job rebuilds the list
+          git checkout -- index.html 2>/dev/null || true
+          node packs/tile-status.js $ALL 2>&1 | tail -3
+
+      - name: Measure ${{ matrix.square }}
         env:
           SQ: ${{ matrix.square }}
           HOURS: ${{ inputs.hours }}
@@ -107,31 +142,30 @@ jobs:
         run: |
           set -uo pipefail
           BUDGET=$(( ${HOURS:-4} * 3600 ))
-          START=$SECONDS
+          START=${T0:-$(date +%s)}
           DONE=0; SKIPPED=0; EMPTY=0; LOST=0
           for e in 0 1 2 3 4 5 6 7 8 9; do
             for n in 0 1 2 3 4 5 6 7 8 9; do
               TILE="$SQ$e$n"
-              if [ $(( SECONDS - START )) -gt "$BUDGET" ]; then
+              if [ $(( $(date +%s) - START )) -gt "$BUDGET" ]; then
                 echo "::notice::time budget spent — stopping $SQ with $DONE tiles done; re-run to continue"
                 break 2
               fi
-              # already measured? tile-status answers it properly: not "is
-              # there a file called tq15.js" but "does any pack hold this
-              # ground, and how much of it is measured"
-              node packs/tile-status.js "$TILE" > st.txt 2>/dev/null || true
+              node packs/tile-status.js "$TILE" > st.txt 2>&1 || true
+              # No answer at all is not "already done". Reading silence as a
+              # skip is how the first England run finished in eight minutes
+              # claiming every tile in the country was built.
+              if ! grep -q "^heights=" st.txt; then
+                echo "::error::tile-status said nothing about $TILE"; sed -n 1,5p st.txt
+                LOST=$((LOST+1)); continue
+              fi
+              # No pack covers it even after the footprint step: nothing is
+              # surveyed here. Sea, or moor. Measuring it would fetch a
+              # hundred square kilometres of lidar to fit to no buildings.
+              if grep -q "^footprints=.*$TILE" st.txt; then EMPTY=$((EMPTY+1)); continue; fi
+              # Footprints, and already measured.
               if ! grep -q "^heights=.*$TILE" st.txt; then SKIPPED=$((SKIPPED+1)); continue; fi
               echo "::group::$TILE"
-              if grep -q "^footprints=.*$TILE" st.txt; then
-                # plan-tiles takes places; a 10 km tile now names itself, so
-                # there is no postcode lookup per tile and no guessing
-                node packs/plan-tiles.js "$TILE" --radius 1 > tiles.tsv 2>/dev/null || true
-                if [ -s tiles.tsv ]; then packs/build-tiles.sh tiles.tsv || true; fi
-              fi
-              # nothing surveyed here — sea, or moor with no buildings on it
-              if ! node packs/tile-status.js "$TILE" 2>/dev/null | grep -q "^heights=.*$TILE"; then
-                echo "no surveyed buildings in $TILE"; EMPTY=$((EMPTY+1)); echo "::endgroup::"; continue
-              fi
               if node packs/plan-square.js "$TILE" --size 10000 > sq.txt 2>/dev/null; then
                 e0=$(sed -n 's/^e0=//p' sq.txt); n0=$(sed -n 's/^n0=//p' sq.txt)
                 e1=$(sed -n 's/^e1=//p' sq.txt); n1=$(sed -n 's/^n1=//p' sq.txt)
@@ -147,10 +181,12 @@ jobs:
             done
           done
           echo "::notice::$SQ — $DONE measured, $SKIPPED already done, $EMPTY with nothing surveyed, $LOST lost"
-          # index.html is NOT an output of this job: one job rebuilds the list
           git checkout -- index.html 2>/dev/null || true
 
+      # Even if a step above gave up: four hours of measuring is not worth
+      # losing because the tile after it went wrong.
       - name: Hand the packs on
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: packs-${{ matrix.square }}
