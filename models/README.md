@@ -150,6 +150,30 @@ in `index.html`. `node models/embed.js --check` fails if they are out of sync.
 
 ## Judging them
 
+Fly the place and look. That is still the test, and `window.__sim.models()` in
+the console lists what was loaded and what matched.
+
+When you cannot fly — the sim takes its buildings from Overpass at runtime, so
+a machine that cannot reach Overpass cannot look at any model at all — draw the
+silhouette instead:
+
+```
+node models/elevation.js shard                 an SVG elevation, in /tmp
+node models/elevation.js clifton --span 260    a bridge, on a 260 m outline
+```
+
+It runs the real `modelParts` out of `index.html` against a stand-in footprint
+and draws every part it returns as the prism the renderer will extrude, tapers
+included. So the silhouette it draws is the silhouette the sim will build. It
+says nothing about materials, light or the roof shapes on untapered parts — it
+answers "what shape is this", which is the question a model gets wrong first.
+
+The Shard is why it exists. It was written blind, and it was a smooth cone
+converging to a needle: 0.306 of its base width at the top occupied floor where
+the published floor area says 0.54, and then a solid point on top of a building
+whose whole name is that its shards do not meet. Nobody could see that from the
+JSON, and every number in the JSON was internally consistent.
+
 Fly the place and look. `window.__sim.models()` in the console lists what was
 loaded and what matched. If a model does not appear, in order of likelihood:
 OSM has no footprint for it; OSM spells the name differently from `match`; or
