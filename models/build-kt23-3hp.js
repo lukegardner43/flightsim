@@ -182,7 +182,11 @@ models.push({
   /* tall slim rendered stacks, evenly spread — the photograph shows about ten */
   const stacks = [[-0.86,0.72],[-0.58,0.72],[-0.30,0.72],[0.30,0.72],[0.58,0.72],[0.86,0.72],
                   [-0.70,-0.72],[0.00,-0.72],[0.70,-0.72],[-0.86,-0.20],[0.86,-0.20]];
-  for (const s of stacks) parts.push(chim(s[0], s[1], 1.7, 17.4, H, C.ochre, 'tall stuccoed stack'));
+  /* "about ten tall SLIM stuccoed stacks" is what the photograph shows, and
+     1.7 m square is not slim — rendered, they read as a row of fence posts
+     along the ridge rather than as chimneys. 1.0 m, which is a stack of two
+     flues rather than four. */
+  for (const s of stacks) parts.push(chim(s[0], s[1], 1.0, 17.4, H, C.ochre, 'tall stuccoed stack'));
   /* the cupola: square white lantern, clock faces, dark domed lead roof */
   parts.push({ at:[0,0.62], w:4.6, d:4.6, minHeight:H+RH-0.4, height:15.2, roof:'flat',
     type:'manor', material:'plaster', colour:C.whiteStuc, note:'cupola base' });
