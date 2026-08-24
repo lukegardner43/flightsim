@@ -205,7 +205,14 @@ const models = [];
  * and the chains would follow the gorge.
  */
 {
-  const deck = 75.0;             /* 245 ft above high water */
+  /* Heights here are metres above the ground at the Clifton tower — the
+     clifftop — and NOT above the water 75 m below. The deck runs level from
+     clifftop to clifftop, so every number below is small, and none of them
+     depends on how deep the terrain thinks the Avon Gorge is. That matters:
+     the terrain is a DEM at about 22 m a sample, which part-fills a gorge
+     250 m wide, and anchoring at mid-span would have floated the whole model
+     above the deck by however much of the gorge the DEM had filled in. */
+  const deck = 3.0;              /* the deck, above the ground at the tower */
   const halfSpan = 107.02;       /* 702 ft 3 in between the towers */
   const sag = 21.34;             /* 70 ft */
   const yMid = deck + 0.91;      /* the centre rod is 3 ft long */
@@ -215,11 +222,9 @@ const models = [];
 
   for (const s of [-1, 1]) {
     const u = s * halfSpan;
-    parts.push({ atM: [u, 0], w: 9.5, d: 13, minHeight: 0, height: deck,
+    parts.push({ atM: [u, 0], w: 9.5, d: 13, minHeight: 0, height: towerTop - 3,
       roof: 'flat', material: 'stone', colour: C.cliftonS,
-      note: s < 0 ? 'the tower below deck level, and the pier under it' : undefined });
-    parts.push({ atM: [u, 0], w: 9.5, d: 13, minHeight: deck, height: towerTop - 3,
-      roof: 'flat', material: 'stone', colour: C.cliftonS });
+      note: s < 0 ? 'the tower, standing on the clifftop' : undefined });
     /* the tapered head the chains pass over */
     parts.push({ atM: [u, 0], w: 8.6, d: 12, minHeight: towerTop - 3, height: towerTop,
       roof: 'flat', material: 'stone', colour: C.cliftonS,
@@ -249,6 +254,7 @@ const models = [];
     maxArea: 20000,
     minArea: 500,
     datum: 'anchor',
+    datumAtM: [115, 0],
     replaceOutline: true,
     uBearing: 103,
     confidence: 'medium-high on the form — span, sag, deck height and tower height '
@@ -256,11 +262,17 @@ const models = [];
       + 'is what a loaded suspension chain actually is',
     nearSource: 'Mid-span. It falls inside the man_made=bridge outline OpenStreetMap '
       + 'holds for the bridge.',
-    note: 'Heights here are metres above high water, not above the ground under each '
-      + 'part, because datum:"anchor" pads the whole model from mid-span. That is the '
-      + 'entire reason this bridge needed a framework change: the deck is 75 m over '
-      + 'the Avon and the towers stand on two clifftops, so parts padded individually '
-      + 'would have had the chains dipping into the gorge and climbing out again.',
+    note: 'Heights here are metres above the ground at the Clifton tower, not above '
+      + 'the water 75 m below and not above the ground under each part. Two things '
+      + 'forced that. Parts padded individually would have had the chains dipping '
+      + 'into the gorge and climbing out again, following the terrain instead of '
+      + 'crossing it. And padding from mid-span, the obvious fix, anchors the model '
+      + 'to the least trustworthy height anywhere near the bridge: the terrain is a '
+      + 'DEM at roughly 22 m a sample and a gorge 250 m wide comes back part-filled, '
+      + 'so the whole model would have floated above the deck by whatever the DEM '
+      + 'had filled in. An abutment is flat, well sampled, and is what the '
+      + 'procedural deck takes its own height from — so anchoring there puts the '
+      + 'chains on the deck the traffic actually drives on.',
     sources: [
       'Wikipedia, Clifton Suspension Bridge: 1,352 ft (412 m) total; main span '
         + '702 ft 3 in (214.05 m); towers 86 ft (26 m) above the deck; deck 245 ft '

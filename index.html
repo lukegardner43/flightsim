@@ -1156,8 +1156,22 @@ function modelParts(e, m){
          datum:"anchor" pads every part of the model from one point, the
          anchor, and the heights below are then metres above THAT. */
       if(m.datum === "anchor"){
-        tg["tf:padx"] = String(box.cx.toFixed(2));
-        tg["tf:padz"] = String(box.cz.toFixed(2));
+        /* Which point to pad from. The middle of the span is the obvious
+           choice and it is the wrong one over a gorge: the terrain comes from
+           a DEM at about 22 m a sample, which part-fills a narrow valley, so
+           the floor under mid-span is the least trustworthy height anywhere
+           near the bridge. An abutment is flat, well sampled, and — the part
+           that matters — it is what the procedural deck takes ITS height
+           from, so anchoring there puts the model's chains on the same deck
+           the traffic drives on instead of near it. datumAtM is metres from
+           the middle, in the model's own frame. */
+        var dux = box.cx, duz = box.cz;
+        if(m.datumAtM){
+          dux += m.datumAtM[0]*box.ux - m.datumAtM[1]*box.uz;
+          duz += m.datumAtM[0]*box.uz + m.datumAtM[1]*box.ux;
+        }
+        tg["tf:padx"] = String(dux.toFixed(2));
+        tg["tf:padz"] = String(duz.toFixed(2));
       }
       if(p.type) tg.building = p.type;           /* drives material and roof defaults */
       if(p.height != null)     tg.height = String(Math.max(0.6, p.height - drop));

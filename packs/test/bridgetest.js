@@ -120,6 +120,8 @@ for (const m of doc.models) byId[m.id] = m;
 console.log('bridge models');
 
 /* ---------------------------------------------------------------- shared */
+ok(byId.clifton.datumAtM && Math.abs(byId.clifton.datumAtM[0]) > 100,
+  'Clifton pads from an abutment, not from mid-span over the gorge');
 for (const m of doc.models) {
   ok(m.datum === 'anchor', m.id + ' pads from its anchor');
   ok(m.replaceOutline === true, m.id + ' replaces its outline');
@@ -157,7 +159,9 @@ for (const [len, label] of [[290, 'a 290 m outline'], [520, 'a 520 m outline']])
 /* ------------------------------------------------------------ the chains */
 {
   const got = run(byId.clifton, 51.4549, -2.6278, 260, 12, 103);
-  const deck = 75.0, halfSpan = 107.02, yMid = 75.91, yEnd = yMid + 21.34;
+  /* the clifftop datum: the deck is 3 m over the ground at the tower, not
+     75 m over the water — see the note in build-bridges.js */
+  const deck = 3.0, halfSpan = 107.02, yMid = 3.91, yEnd = yMid + 21.34;
 
   /* one side's chain, in order along the span */
   const chain = got.filter(p => p.v > 2 && p.tags['building:material'] === 'metal'
@@ -205,6 +209,23 @@ for (const [len, label] of [[290, 'a 290 m outline'], [520, 'a 520 m outline']])
                             && p.len < 1.5 && p.min === deck);
   ok(rods.length > 8, 'the suspension rods are drawn (' + rods.length + ')');
   ok(rods.every(r => r.top <= yEnd + 0.5), 'no rod rises above the chain');
+}
+
+/* ------------------------------------------------- the pad lands where asked
+   datumAtM is metres along the span from the middle. If index.html ignored it
+   the model would silently go back to padding from mid-span, which over the
+   Avon Gorge is the one height near this bridge that cannot be trusted. */
+{
+  const len = 260, lat = 51.4549, lon = -2.6278, br = 103;
+  const S = Object.assign({}, sandbox, { ringsOf: () => [{ role: 'outer', pts: outline(lat, lon, len, 12, br) }] });
+  const parts = make(S)({ type: 'way', id: 1, geometry: [] }, byId.clifton);
+  const cx = lon * M_LON, cz = -lat * M_LAT;
+  const b = br * Math.PI / 180, ux = Math.sin(b), uz = -Math.cos(b);
+  const px = parseFloat(parts[0].tags['tf:padx']) - cx;
+  const pz = parseFloat(parts[0].tags['tf:padz']) - cz;
+  near(px * ux + pz * uz, 115, 1.5, 'Clifton pads 115 m along the span from the middle');
+  const same = parts.every(p => p.tags['tf:padx'] === parts[0].tags['tf:padx']);
+  ok(same, 'every Clifton part pads from the same point');
 }
 
 /* --------------------------------------------- big enough to be drawn
