@@ -146,7 +146,16 @@ function describe(c, h, us, vs, uLen, vLen) {
      and the samples along it are half garden. */
   let eaves = pct(sorted, 0.08);
   /* Not the top: a chimney is two or three samples and read as the ridge it
-     made an eight metre house eleven metres tall. */
+     made an eight metre house eleven metres tall.
+
+     The cost of that, and it is a real one: anything tall standing on a small
+     part of a large footprint is below this percentile and is lost. A
+     synthetic 372 x 310 m block at 20 m with a perfect 310 m tower in one
+     corner — the London Bridge station site, as the lidar actually has it —
+     fits to 20.0 m, flat. The tower is half a per cent of the cells. That is
+     why the Shard is a model rather than a measurement, and no amount of
+     better lidar would have changed it. Splitting a footprint on a tall
+     outlier is the fix, and it is not written. */
   const ridge = pct(sorted, 0.94);
   const med = pct(sorted, 0.5);
   if (!(ridge > 1.2)) return { n: h.length, ok: false };      /* not a building */

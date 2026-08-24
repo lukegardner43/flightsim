@@ -90,6 +90,34 @@ Copy `kt23-3hp.json`. A model is:
 - `roof`: `flat`, `gabled`, `hipped`, `pyramidal`, `cone`, `dome`, `onion`,
   `skillion`. `material` / `roofMaterial` take OSM values (`stone`, `brick`,
   `plaster`, `slate`, `tile`, `lead`, `wood`).
+- `taper` shrinks the plan as the part rises: `0.6` means the top is six
+  tenths the size of the bottom, about its own middle. A tapered part gets no
+  roof and no parapet — both are built from the base ring, and on a spire that
+  is a ground-floor-sized lid hanging in the air.
+- `plan` scales an `on: "footprint"` part before it is built, so a tower can
+  be a stack of pieces that all keep the shape of the polygon somebody
+  surveyed instead of becoming rectangles guessed in metres. Give each piece
+  the `plan` its neighbour below tapered down to and the joins do not show:
+  `taper: 0.6` then `plan: 0.6`.
+- `maxArea` / `minArea`, in square metres, say how big the building is. Only
+  the anchor uses them, and only when a building is unnamed — but that is the
+  case that matters, because standing inside a ring stops being evidence when
+  the ring is a hectare. Without one, London Bridge station is a candidate for
+  the Shard.
+
+## The lidar cannot see a tower inside a big block
+
+Worth knowing before writing a model to fix something the pipeline "got
+wrong". The height fitter takes the 94th percentile of the samples inside a
+footprint as its ridge, which is what stops a chimney making a house three
+metres taller. On a large footprint with something tall standing on a small
+part of it, that percentile is in the low roof and the tall thing is gone.
+
+Measured, not argued: a synthetic 372 x 310 m block at 20 m with a perfect
+310 m tower in one corner — the London Bridge site as the lidar has it —
+fits to **20.0 m, shape flat**. The tower is half a per cent of the cells.
+No improvement in lidar changes that answer, which is why the Shard is a
+model and not a measurement.
 
 Then run `node models/embed.js`, which writes `models/<id>.js` and registers it
 in `index.html`. `node models/embed.js --check` fails if they are out of sync.
