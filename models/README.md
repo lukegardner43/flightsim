@@ -99,6 +99,18 @@ Copy `kt23-3hp.json`. A model is:
   surveyed instead of becoming rectangles guessed in metres. Give each piece
   the `plan` its neighbour below tapered down to and the joins do not show:
   `taper: 0.6` then `plan: 0.6`.
+- `uBearing` is a compass bearing saying where the model's own `+u` points.
+  Without it the frame comes from the footprint's longest edge, with a swap so
+  `u` is the longer half — decisive on a long building, and a coin-toss on a
+  square one. Polesden Lacey is 58.9 m east to west by 59.5 m north to south,
+  so that swap turned on 1.3 m: the orientation of every part of the house was
+  being chosen by rounding, and a re-survey moving one corner would have
+  turned it ninety degrees with nothing to say so. The building's own axes are
+  kept — Polesden's ranges run at 13 and 103 degrees, and squaring them to the
+  compass would be its own error — so the bearing only picks which of the four
+  is `u`. `packs/test/orienttest.js` rasterises a model's ground plan against
+  the surveyed outline and fails if any of the eight placements (four
+  rotations, each mirrored) fits better than the pinned one.
 - `maxArea` / `minArea`, in square metres, say how big the building is. Only
   the anchor uses them, and only when a building is unnamed — but that is the
   case that matters, because standing inside a ring stops being evidence when
