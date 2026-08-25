@@ -46,6 +46,10 @@ on:
         description: 'How many squares at once.'
         required: false
         default: '6'
+      commit_unmeasured:
+        description: 'Also commit tiles that have footprints but no lidar heights yet. Costs about 700 MB.'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -213,22 +217,12 @@ jobs:
           merge-multiple: false
 
       - name: Put them together and rebuild the list
+        env:
+          KEEP_UNMEASURED: ${{ inputs.commit_unmeasured }}
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          NEW=0
-          for d in incoming/packs-*; do
-            for f in "$d"/*.js; do
-              b=$(basename "$f")
-              # a pack starts with TF_PACK( — everything else in there is a
-              # tool that came along with the upload
-              head -c 8 "$f" | grep -q 'TF_PACK(' || continue
-              if [ ! -f "packs/$b" ] || ! cmp -s "$f" "packs/$b"; then
-                cp "$f" "packs/$b"; NEW=$((NEW+1))
-              fi
-            done
-          done
-          echo "::notice::$NEW pack file(s) new or changed"
+          read -r NEW HELD HELDKB KEPT < <(packs/collect-packs.sh incoming packs)
+          echo "::notice::$NEW pack file(s) new or changed; $HELD held back as footprints with no heights yet ($((HELDKB/1024)) MB); $KEPT refused as a downgrade of a measured tile"
           node packs/list-packs.js
 
       - name: Commit
