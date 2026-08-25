@@ -1,0 +1,1 @@
+TF_PACK({"id":"sw65","tile":"SW65","name":"SW65","bbox":[50.30100245323815,-5.377883566253272,50.39477677671087,-5.23133247814667],"q":1000000,"source":"OS OpenMap Local. Contains OS data (c) Crown copyright and database right 2026. Open Government Licence v3.","updated":"2026-08-25","buildings":[[50317499,-5232377,34,-49,27,46,-35,49]]});
